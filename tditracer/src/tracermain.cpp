@@ -114,15 +114,11 @@ static void dump(void)
         framecapture_writepngframes();
     }
 
-    printf("tditrace:#traces = %d\n", trace_counter);
+    printf("tditracer:#traces = %d\n", trace_counter);
 }
 
 static void init(void)
 {
-
-    printf("%s\n", __func__);
-
-
     static bool inited = false;
     if (!inited) {
 
@@ -145,7 +141,7 @@ static void init(void)
             dumpafter = atoi(getenv("DA"));
         }
 
-        printf("tditrace:init, pthread:%s, shaders:%s, textures:%s, frames:%d, dumpafter:%d\n",
+        printf("tditracer:init, pthread:%s, shaders:%s, textures:%s, frames:%d, dumpafter:%d\n",
             pthread? "yes":"no",
             shaderrecording? "yes":"no",
             texturerecording? "yes":"no",
@@ -159,7 +155,7 @@ static void init(void)
 
 static void sighandler(int signum)
 {
-    printf("tracer received SIGNAL : %d\n\n\n", signum);
+    printf("tditracer: received SIGNAL : %d\n\n\n", signum);
 
     /*
      * do not dump again if another ctrl-c is received, instead
@@ -180,7 +176,8 @@ static void sighandler(int signum)
         dump();
     }
 
-    abort();
+    //abort();
+	exit(0);
 }
 
 
@@ -297,7 +294,7 @@ static inline void print_stacktrace(int max_frames = MAXFRAMES)
 }
 
 
-#if 1
+#if 0 // globally disable pthread
 
 extern "C" int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start)(void *), void* arg) throw()
 {
@@ -469,7 +466,7 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
 #endif
 
 
-#if 0
+#if 0  //globally disable sem
 
 #include <semaphore.h>
 
@@ -522,7 +519,7 @@ extern "C" int sem_post(sem_t* sem)
 
 #include <mqueue.h>
 
-#if 0
+#if 0 // globally disable mq
 extern "C" mqd_t mq_open(const char *name, int oflag, ...)
 {
     static int (*__mq_open)(const char *, int, ...) = NULL;
@@ -632,6 +629,7 @@ extern "C" void syslog (int f, const char *format, ...)
 }
 
 
+#if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
  * LD_PRELOAD does not intercept symbols obtained via dlopen/dlsym, therefore
@@ -664,7 +662,8 @@ extern "C" void* dlopen(const char* filename, int flag)
     /*
      * dlopen will always trigger (first)
      */
-    init();
+
+    //init();
 
     // TDITRACE("dlopen() %s", filename);
 
@@ -706,7 +705,7 @@ extern "C" void* dlopen(const char* filename, int flag)
 
     return handle;
 }
-
+#endif
 
 #if 0
 extern "C" void* _dl_sym(void*, const char*, void*);
@@ -1279,7 +1278,8 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
 
 
 
-#if 0
+#if 0  // globally disable connect,read,write
+
 extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen)
 {
     static int (*__connect)(int, const struct sockaddr*, socklen_t)=NULL;
@@ -1583,7 +1583,7 @@ extern "C" void QPainter__fillrect2(float w, float h, float x, float y, char* te
     TDITRACE("@T+QPainter::fillRect() %gx%g+%g+%g,%s", w, h, x, y, text);
 }
 
-extern "C" void QPainter__fillrect__return2(void)
+extern "C" void QPainter__fillrect2__return(void)
 {
     TDITRACE("@T-QPainter::fillRect()");
 }
@@ -1618,4 +1618,22 @@ extern "C" void PNGImageDecoder__frameBufferAtIndex_enter(void)
 extern "C" void PNGImageDecoder__frameBufferAtIndex_exit(void)
 {
     TDITRACE("@T-PNGImageDecoder::frameBufferAtIndex()");
+}
+
+static void __attribute__ ((constructor)) tditracer_constructor();
+static void __attribute__ ((destructor)) tditracer_destructor();
+
+static void tditracer_constructor()
+{
+    printf("tditracer:init\n");
+	init();
+}
+ 
+static void tditracer_destructor()
+{
+    printf("tditracer:exit\n");
+
+    if (!diddump) {
+    	dump();
+	}
 }
