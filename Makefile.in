@@ -80,7 +80,7 @@ host_triplet = @host@
 subdir = .
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
-	$(srcdir)/config.h.in compile config.guess config.sub \
+	$(srcdir)/config.h.in compile config.guess config.sub depcomp \
 	install-sh missing ltmain.sh
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -287,13 +287,7 @@ datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
-egl_CFLAGS = @egl_CFLAGS@
-egl_LIBS = @egl_LIBS@
 exec_prefix = @exec_prefix@
-freetype2_CFLAGS = @freetype2_CFLAGS@
-freetype2_LIBS = @freetype2_LIBS@
-glesv2_CFLAGS = @glesv2_CFLAGS@
-glesv2_LIBS = @glesv2_LIBS@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@

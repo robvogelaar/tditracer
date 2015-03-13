@@ -25,9 +25,6 @@ AC_CHECK_LIB([m], [log10])
 
 # Checks for pkg-config
 PKG_PROG_PKG_CONFIG
-PKG_CHECK_MODULES([egl], [egl], [], [AC_MSG_ERROR([Unable to find libEGL])])
-PKG_CHECK_MODULES([glesv2], [glesv2], [], [AC_MSG_ERROR([Unable to find libGLESv2])])
-PKG_CHECK_MODULES([freetype2], [freetype2], [], [AC_MSG_ERROR([Unable to find libfreetype])])
 PKG_CHECK_MODULES([libpng], [libpng >= 1.2.0], [], [AC_MSG_ERROR([Unable to find libpng])])
 
 # Checks for header files.

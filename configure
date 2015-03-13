@@ -638,12 +638,6 @@ LTLIBOBJS
 LIBOBJS
 libpng_LIBS
 libpng_CFLAGS
-freetype2_LIBS
-freetype2_CFLAGS
-glesv2_LIBS
-glesv2_CFLAGS
-egl_LIBS
-egl_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
@@ -795,12 +789,6 @@ CXXCPP
 PKG_CONFIG
 PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
-egl_CFLAGS
-egl_LIBS
-glesv2_CFLAGS
-glesv2_LIBS
-freetype2_CFLAGS
-freetype2_LIBS
 libpng_CFLAGS
 libpng_LIBS'
 
@@ -1459,15 +1447,6 @@ Some influential environment variables:
               directories to add to pkg-config's search path
   PKG_CONFIG_LIBDIR
               path overriding pkg-config's built-in search path
-  egl_CFLAGS  C compiler flags for egl, overriding pkg-config
-  egl_LIBS    linker flags for egl, overriding pkg-config
-  glesv2_CFLAGS
-              C compiler flags for glesv2, overriding pkg-config
-  glesv2_LIBS linker flags for glesv2, overriding pkg-config
-  freetype2_CFLAGS
-              C compiler flags for freetype2, overriding pkg-config
-  freetype2_LIBS
-              linker flags for freetype2, overriding pkg-config
   libpng_CFLAGS
               C compiler flags for libpng, overriding pkg-config
   libpng_LIBS linker flags for libpng, overriding pkg-config
@@ -16527,219 +16506,6 @@ $as_echo "yes" >&6; }
 $as_echo "no" >&6; }
 		PKG_CONFIG=""
 	fi
-fi
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for egl" >&5
-$as_echo_n "checking for egl... " >&6; }
-
-if test -n "$egl_CFLAGS"; then
-    pkg_cv_egl_CFLAGS="$egl_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_egl_CFLAGS=`$PKG_CONFIG --cflags "egl" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$egl_LIBS"; then
-    pkg_cv_egl_LIBS="$egl_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"egl\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "egl") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_egl_LIBS=`$PKG_CONFIG --libs "egl" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        egl_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "egl" 2>&1`
-        else
-	        egl_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "egl" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$egl_PKG_ERRORS" >&5
-
-	as_fn_error $? "Unable to find libEGL" "$LINENO" 5
-elif test $pkg_failed = untried; then
-     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	as_fn_error $? "Unable to find libEGL" "$LINENO" 5
-else
-	egl_CFLAGS=$pkg_cv_egl_CFLAGS
-	egl_LIBS=$pkg_cv_egl_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-fi
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for glesv2" >&5
-$as_echo_n "checking for glesv2... " >&6; }
-
-if test -n "$glesv2_CFLAGS"; then
-    pkg_cv_glesv2_CFLAGS="$glesv2_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_glesv2_CFLAGS=`$PKG_CONFIG --cflags "glesv2" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$glesv2_LIBS"; then
-    pkg_cv_glesv2_LIBS="$glesv2_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"glesv2\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "glesv2") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_glesv2_LIBS=`$PKG_CONFIG --libs "glesv2" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        glesv2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "glesv2" 2>&1`
-        else
-	        glesv2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "glesv2" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$glesv2_PKG_ERRORS" >&5
-
-	as_fn_error $? "Unable to find libGLESv2" "$LINENO" 5
-elif test $pkg_failed = untried; then
-     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	as_fn_error $? "Unable to find libGLESv2" "$LINENO" 5
-else
-	glesv2_CFLAGS=$pkg_cv_glesv2_CFLAGS
-	glesv2_LIBS=$pkg_cv_glesv2_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-fi
-
-pkg_failed=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for freetype2" >&5
-$as_echo_n "checking for freetype2... " >&6; }
-
-if test -n "$freetype2_CFLAGS"; then
-    pkg_cv_freetype2_CFLAGS="$freetype2_CFLAGS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"freetype2\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "freetype2") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_freetype2_CFLAGS=`$PKG_CONFIG --cflags "freetype2" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-if test -n "$freetype2_LIBS"; then
-    pkg_cv_freetype2_LIBS="$freetype2_LIBS"
- elif test -n "$PKG_CONFIG"; then
-    if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"freetype2\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "freetype2") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; then
-  pkg_cv_freetype2_LIBS=`$PKG_CONFIG --libs "freetype2" 2>/dev/null`
-		      test "x$?" != "x0" && pkg_failed=yes
-else
-  pkg_failed=yes
-fi
- else
-    pkg_failed=untried
-fi
-
-
-
-if test $pkg_failed = yes; then
-   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
-        _pkg_short_errors_supported=yes
-else
-        _pkg_short_errors_supported=no
-fi
-        if test $_pkg_short_errors_supported = yes; then
-	        freetype2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "freetype2" 2>&1`
-        else
-	        freetype2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "freetype2" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$freetype2_PKG_ERRORS" >&5
-
-	as_fn_error $? "Unable to find libfreetype" "$LINENO" 5
-elif test $pkg_failed = untried; then
-     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	as_fn_error $? "Unable to find libfreetype" "$LINENO" 5
-else
-	freetype2_CFLAGS=$pkg_cv_freetype2_CFLAGS
-	freetype2_LIBS=$pkg_cv_freetype2_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
 fi
 
 pkg_failed=no
