@@ -196,6 +196,7 @@ const char* demangle(const char* s)
     return s;
 }
 
+
 char* addrinfo(void* addr)
 {
     static char text[256];
@@ -628,7 +629,6 @@ extern "C" void syslog (int f, const char *format, ...)
     }
 }
 
-
 #if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
@@ -655,7 +655,6 @@ static inline void *_dlopen(const char* filename, int flag)
 
     return dlopen_ptr(filename, flag);
 }
-
 
 extern "C" void* dlopen(const char* filename, int flag)
 {
@@ -737,8 +736,6 @@ int glShaderSource_counter = 0;
 bool disableblend = false;
 
 
-int RenderBlock__paint_counter = 0;
-
 
 // extern "C"  void *malloc(size_t size)
 // {
@@ -754,6 +751,7 @@ int RenderBlock__paint_counter = 0;
 //     p = real_malloc(size);
 //     return p;
 // }
+
 
 
 extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
@@ -816,7 +814,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
     glTexImage2D_counter = 0;
     glTexSubImage2D_counter = 0;
     glBindTexture_counter = 0;
-    RenderBlock__paint_counter = 0;
 
     draw_counter = 0;
     texturebind_counter = 0;
@@ -831,8 +828,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 
     return ret;
 }
-
-
 
 extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurface read, EGLContext context)
 {
@@ -853,8 +848,7 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurf
 }
 
 
-extern "C" GLvoid glDisable(GLenum cap);
-
+#ifndef __mips__
 
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
@@ -870,17 +864,10 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
     draw_counter++;
     glDrawArrays_counter++;
 
-    // if (((glDrawArrays_counter == 1) || (glDrawArrays_counter == 4)) && (current_frame >= 9)) {
-    // }
-    // else {
-
     TDITRACE("#gldraws~%d", draw_counter);
     TDITRACE("@T+glDrawArrays() #%d,%s,#indices=%d,tex=%u,prog=%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
     __glDrawArrays(mode, first, count);
     TDITRACE("@T-glDrawArrays()");
-
-    // }
-
 }
 
 
@@ -1276,6 +1263,8 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
     __glBindRenderbuffer(target, renderbuffer);
 }
 
+#endif //GLOBAL
+
 
 
 #if 0  // globally disable connect,read,write
@@ -1368,257 +1357,6 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count)
 #endif
 
 
-extern "C" void ChromeClientQt__addMessageToConsole(const char* message)
-{
-    //printf("[%3d]%s\n", strlen(message), message);
-
-    if (strlen(message) < 256) {
-
-        TDITRACE("CONSOLE %s", message);
-    }
-}
-
-
-extern "C" void RenderLayer__paintLayer(char* text, int w, int h, int x, int y)
-{
-    TDITRACE("RenderLayer::paintLayer() %s %dx%d+%d+%d", text, w, h, x, y);
-
-    TDITRACE("@T+RenderLayer::paintLayer()");
-}
-
-extern "C" void RenderLayer__paintLayer_return(void)
-{
-    TDITRACE("@T-RenderLayer::paintLayer()");
-}
-
-extern "C" void RenderBlock__paint(const char* text, int w, int h, int x, int y, int xoffset, int yoffset)
-{
-    TDITRACE("RenderBlock::+paint() #%d,%s,%dx%d+%d+%d,+%d+%d", ++RenderBlock__paint_counter, text, w, h, x, y, xoffset, yoffset);
-    TDITRACE("@T+RenderBlock::paint()");
-}
-
-extern "C" void RenderBlock__paint__return(void)
-{
-    TDITRACE("@T-RenderBlock::paint() #%d", RenderBlock__paint_counter);
-}
-
-extern "C" void RenderBox__paint(void)
-{
-    TDITRACE("RenderBox::paint()");
-}
-
-extern "C" void RenderInline__paint(void)
-{
-    TDITRACE("RenderInline::paint()");
-}
-
-extern "C" void RenderImage__paint(int w, int h, int x, int y, int xoffset, int yoffset)
-{
-    TDITRACE("RenderImage::paint() %dx%d+%d+%d,+%d+%d", w, h, x, y, xoffset, yoffset);
-}
-
-extern "C" void RenderVideo__paintReplaced(int w, int h, int x, int y, int xoffset, int yoffset)
-{
-    TDITRACE("RenderVideo::paintReplaced() %dx%d+%d+%d,+%d+%d", w, h, x, y, xoffset, yoffset);
-}
-
-
-extern "C" void GraphicsContext__drawText(const char* text)
-{
-    TDITRACE("@T+GraphicsContext::drawText() \"%s\"", text);
-}
-
-extern "C" void GraphicsContext__drawText_return(void)
-{
-    TDITRACE("@T-GraphicsContext::drawText()");
-}
-
-
-
-extern "C" void GraphicsContext__drawImage_enter(float w, float h, float x, float y)
-{
-    TDITRACE("@T+GraphicsContext::drawImage()  %gx%g+%g+%g", w, h, x, y);
-}
-
-extern "C" void GraphicsContext__drawImage_exit(void)
-{
-    TDITRACE("@T-GraphicsContext::drawImage()");
-}
-
-
-
-extern "C" void GraphicsContext__fillRect(float w, float h, float x, float y, int r, int g, int b, int a)
-{
-    TDITRACE("GraphicsContext::fillRect() %gx%g+%g+%g,%02X%02X%02X%02X", w, h, x, y, r, g, b, a);
-}
-
-extern "C" void GraphicsContext__fillRoundedRect(int w, int h, int x, int y, int r, int g, int b, int a)
-{
-    TDITRACE("GraphicsContext::fillRoundedRect() %dx%d+%d+%d,%02X%02X%02X%02X", w, h, x, y, r, g, b, a);
-}
-
-extern "C" void GraphicsContext__fillRectWithRoundedHole(int w, int h, int x, int y, int r, int g, int b, int a)
-{
-    TDITRACE("GraphicsContext::fillRectWithRoundedHole() %dx%d+%d+%d,%02X%02X%02X%02X", w, h, x, y, r, g, b, a);
-}
-
-extern "C" void GraphicsContext__clearRect(float w, float h, float x, float y)
-{
-    TDITRACE("GraphicsContext::clearRect() %gx%g+%g+%g", w, h, x, y);
-}
-
-
-extern "C" void DOMTimer__install(int timeout, int timeoutId)
-{
-    TDITRACE("DOMTimer install(),%dms,%d", timeout, timeoutId);
-}
-
-extern "C" void DOMTimer__removeById(int timeoutId)
-{
-    TDITRACE("DOMTimer removeById(),%d", timeoutId);
-}
-
-extern "C" void DOMTimer__fired(int timeoutId)
-{
-    TDITRACE("DOMTimer fired(),%d", timeoutId);
-}
-
-
-extern "C" void FrameView__willpaintContents(void)
-{
-    TDITRACE("@T+FrameView::paintContents()");
-}
-
-extern "C" void FrameView__didpaintContents(void)
-{
-    TDITRACE("@T-FrameView::paintContents()");
-}
-
-
-extern "C" void RenderLayerBacking__willpaintContents(void)
-{
-    TDITRACE("@T+RenderLayerBacking::paintContents()");
-}
-
-extern "C" void RenderLayerBacking__didpaintContents(void)
-{
-    TDITRACE("@T-RenderLayerBacking::paintContents()");
-}
-
-extern "C" void RenderLayerBacking__startTransition(double timeOffset, int property)
-{
-    TDITRACE("RenderLayerBacking::startTransition() timeOffset=%f,property=%d");
-}
-
-extern "C" void RenderLayerBacking__transitionPaused(void)
-{
-    TDITRACE("RenderLayerBacking::transitionPaused()");
-}
-
-extern "C" void RenderLayerBacking__transitionFinished(void)
-{
-    TDITRACE("RenderLayerBacking::transitionFinished()");
-}
-
-
-extern "C" void MediaPlayerPrivateGStreamer__paint(int w, int h, int x, int y)
-{
-    TDITRACE("MediaPlayerPrivateGStreamer::paint() %dx%d+%d+%d", w, h, x, y);
-}
-
-extern "C" void Document__willrecalcStyle(void)
-{
-    TDITRACE("@T+Document::recalcStyle()");
-}
-
-extern "C" void Document__didrecalcStyle(void)
-{
-    TDITRACE("@T-Document::recalcStyle()");
-}
-
-
-extern "C" void RenderBox__paintBoxDecorations()
-{
-    TDITRACE("@T+RenderBox::paintBoxDecorations()");
-}
-
-extern "C" void RenderBox__paintBoxDecorations__return(void)
-{
-    TDITRACE("@T-RenderBox::paintBoxDecorations()");
-}
-
-
-extern "C" void RenderBox__paintBackground()
-{
-    TDITRACE("@T+RenderBox::paintBackground()");
-}
-
-extern "C" void RenderBox__paintBackground__return(void)
-{
-    TDITRACE("@T-RenderBox::paintBackground()");
-}
-
-extern "C" void Image__drawPattern(void)
-{
-    TDITRACE("@T+Image::drawPattern()");
-}
-
-extern "C" void Image__drawPattern__return(void)
-{
-    TDITRACE("@T-Image::drawPattern()");
-}
-
-extern "C" void QPainter__fillrect(float w, float h, float x, float y, char* text)
-{
-    TDITRACE("@T+QPainter::fillRect() %gx%g+%g+%g,%s", w, h, x, y, text);
-}
-
-extern "C" void QPainter__fillrect__return(void)
-{
-    TDITRACE("@T-QPainter::fillRect()");
-}
-
-extern "C" void QPainter__fillrect2(float w, float h, float x, float y, char* text)
-{
-    TDITRACE("@T+QPainter::fillRect() %gx%g+%g+%g,%s", w, h, x, y, text);
-}
-
-extern "C" void QPainter__fillrect2__return(void)
-{
-    TDITRACE("@T-QPainter::fillRect()");
-}
-
-
-
-extern "C" void BitmapTextureGL__updateContents_enter(void)
-{
-    TDITRACE("@T+BitmapTextureGL::updateContents()");
-}
-
-extern "C" void BitmapTextureGL__updateContents_exit(void)
-{
-    TDITRACE("@T-BitmapTextureGL::updateContents()");
-}
-
-extern "C" void JPEGImageDecoder__frameBufferAtIndex_enter(void)
-{
-    TDITRACE("@T+JPEGImageDecoder::frameBufferAtIndex()");
-}
-
-extern "C" void JPEGImageDecoder__frameBufferAtIndex_exit(void)
-{
-    TDITRACE("@T-JPEGImageDecoder::frameBufferAtIndex()");
-}
-
-extern "C" void PNGImageDecoder__frameBufferAtIndex_enter(void)
-{
-    TDITRACE("@T+PNGImageDecoder::frameBufferAtIndex()");
-}
-
-extern "C" void PNGImageDecoder__frameBufferAtIndex_exit(void)
-{
-    TDITRACE("@T-PNGImageDecoder::frameBufferAtIndex()");
-}
 
 static void __attribute__ ((constructor)) tditracer_constructor();
 static void __attribute__ ((destructor)) tditracer_destructor();
