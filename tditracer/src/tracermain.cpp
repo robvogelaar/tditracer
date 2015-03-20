@@ -848,8 +848,6 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurf
 }
 
 
-#ifndef __mips__
-
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
     static void (*__glDrawArrays)(GLenum  mode,  GLint  first,  GLsizei  count)=NULL;
@@ -1178,8 +1176,6 @@ extern "C" GLvoid glClear(GLbitfield mask)
 }
 
 
-
-
 extern "C" GLvoid glGenFramebuffers(GLsizei n,  GLuint * framebuffers)
 {
     static void (*__glGenFramebuffers)(GLsizei, GLuint*)=NULL;
@@ -1262,8 +1258,6 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
 
     __glBindRenderbuffer(target, renderbuffer);
 }
-
-#endif //GLOBAL
 
 
 
