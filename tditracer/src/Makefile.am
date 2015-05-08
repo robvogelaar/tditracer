@@ -8,8 +8,6 @@ libtditracer_la_LIBADD = \
     ../../tdi/src/libtdi.la
 
 libtditracer_la_SOURCES = \
-   bmp.c \
-   png.c \
    framecapture.c \
    framelinkedlist.c \
    framelinkedlist.h \

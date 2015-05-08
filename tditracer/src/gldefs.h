@@ -40,7 +40,6 @@ typedef float        GLclampf;
 #define GL_LUMINANCE_ALPHA        0x190A
 #define GL_BGRA_EXT               0x80E1
 
-
 #define GL_TEXTURE_MAG_FILTER     0x2800
 #define GL_TEXTURE_MIN_FILTER     0x2801
 #define GL_TEXTURE_WRAP_S         0x2802
@@ -89,13 +88,9 @@ typedef float        GLclampf;
 #define GL_SAMPLE_ALPHA_TO_COVERAGE       0x809E
 #define GL_SAMPLE_COVERAGE                0x80A0
 
-
-
 #define GL_DEPTH_BUFFER_BIT               0x00000100
 #define GL_STENCIL_BUFFER_BIT             0x00000400
 #define GL_COLOR_BUFFER_BIT               0x00004000
-
-
 
 
 #define CLEARSTRING(mask)       (mask==GL_DEPTH_BUFFER_BIT        ? "GL_DEPTH_BUFFER_BIT":        \
@@ -113,7 +108,6 @@ typedef float        GLclampf;
                                  cap==GL_SAMPLE_ALPHA_TO_COVERAGE ? "GL_SAMPLE_ALPHA_TO_COVERAGE": \
                                  cap==GL_SAMPLE_COVERAGE          ? "GL_SAMPLE_COVERAGE":"???")
 
-
 #define BLENDSTRING(factor)     (factor==GL_ZERO                ? "GL_ZERO":                    \
                                  factor==GL_ONE                 ? "GL_ONE":                     \
                                  factor==GL_SRC_COLOR           ? "GL_SRC_COLOR":               \
@@ -125,7 +119,6 @@ typedef float        GLclampf;
                                  factor==GL_DST_COLOR           ? "GL_DST_COLOR":               \
                                  factor==GL_ONE_MINUS_DST_COLOR ? "GL_ONE_MINUS_DST_COLOR":     \
                                  factor==GL_SRC_ALPHA_SATURATE  ? "GL_SRC_ALPHA_SATURATE":"???")
-
 
 #define MODESTRING(mode)        (mode==GL_POINTS?"GL_POINTS":                                      \
                                  mode==GL_LINES?"GL_LINES":                                        \
@@ -154,7 +147,3 @@ typedef float        GLclampf;
                                  format==GL_LUMINANCE?"GL_LUMINANCE":                              \
                                  format==GL_LUMINANCE_ALPHA?"GL_LUMINANCE_ALPHA":                  \
                                  format==GL_BGRA_EXT?"GL_BGRA_EXT":"???")
-
-
-
-

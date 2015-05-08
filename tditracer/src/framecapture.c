@@ -17,8 +17,10 @@
 #include "framelinkedlist.h"
 
 extern int WriteBitmap(char* filename, unsigned char* bitmap, int width, int height, int colordepth);
-extern void write_png_file(char* file_name, int width, int height, png_bytep *row_pointers);
 
+#if 0
+extern void write_png_file(char* file_name, int width, int height, png_bytep *row_pointers);
+#endif
 
 char*       map_base;
 uint8_t*    framesbuffer;
@@ -173,7 +175,9 @@ void framecapture_writepngframes(void)
                 }
             }
 
+            #if 0
             write_png_file(fname, 1280, 720, row_pointers);
+            #endif
             /*
              * write_png_file frees row_pointers
              */

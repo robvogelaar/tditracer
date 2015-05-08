@@ -11,12 +11,14 @@
 
 #include <errno.h>
 
-#include <limits.h>
-
 #include "gldefs.h"
+
 #include <dlfcn.h>
+
+#if 0
 #include <execinfo.h>
 #include <cxxabi.h>
+#endif
 
 /*
  * TDITRACE
@@ -55,6 +57,21 @@ void tdiprintf( const char *format, ...)
             tdiprintf(__VA_ARGS__); \
         }                           \
     } while (0)                     \
+
+
+static void init(void);
+
+static void __attribute__ ((constructor)) tditracer_constructor();
+static void __attribute__ ((destructor)) tditracer_destructor();
+
+static void tditracer_constructor()
+{
+    init();
+}
+
+static void tditracer_destructor()
+{
+}
 
 
 /*
@@ -96,6 +113,7 @@ static void sighandler(int signum);
 
 static int shaders_captured = 0;
 static int textures_captured = 0;
+static int texturebytes_captured = 0;
 static int frames_captured = 0;
 
 
@@ -106,19 +124,29 @@ static void dump(void)
     if (texturerecording || (framestorecord > 0) || shaderrecording) {
         printf("dumping, #shaders captured = %d, #textures captured = %d, #frames captured = %d\n", shaders_captured, textures_captured, frames_captured);
 
-        shadercapture_writeshaders();
+        if (shaderrecording) {
+            shadercapture_writeshaders();
+        }
 
-        texturecapture_writepngtextures();
-        texturecapture_deletetextures();
+        if (texturerecording) {
+            texturecapture_writepngtextures();
+            texturecapture_deletetextures();
+        }
 
-        framecapture_writepngframes();
+        if (framestorecord > 0) {
+            framecapture_writepngframes();
+        }
     }
 
-    printf("tditracer:#traces = %d\n", trace_counter);
+    printf("tditrace:#traces = %d\n", trace_counter);
 }
 
 static void init(void)
 {
+
+    printf("%s\n", __func__);
+
+
     static bool inited = false;
     if (!inited) {
 
@@ -141,7 +169,7 @@ static void init(void)
             dumpafter = atoi(getenv("DA"));
         }
 
-        printf("tditracer:init, pthread:%s, shaders:%s, textures:%s, frames:%d, dumpafter:%d\n",
+        printf("tditrace:init, pthread:%s, shaders:%s, textures:%s, frames:%d, dumpafter:%d\n",
             pthread? "yes":"no",
             shaderrecording? "yes":"no",
             texturerecording? "yes":"no",
@@ -155,7 +183,7 @@ static void init(void)
 
 static void sighandler(int signum)
 {
-    printf("tditracer: received SIGNAL : %d\n\n\n", signum);
+    printf("tracer received SIGNAL : %d\n\n\n", signum);
 
     /*
      * do not dump again if another ctrl-c is received, instead
@@ -176,11 +204,11 @@ static void sighandler(int signum)
         dump();
     }
 
-    //abort();
-	exit(0);
+    abort();
 }
 
 
+#if 0
 const char* demangle(const char* s)
 {
     if (s) {
@@ -195,7 +223,6 @@ const char* demangle(const char* s)
 
     return s;
 }
-
 
 char* addrinfo(void* addr)
 {
@@ -293,9 +320,9 @@ static inline void print_stacktrace(int max_frames = MAXFRAMES)
     free(funcname);
     free(symbollist);
 }
+#endif
 
-
-#if 0 // globally disable pthread
+#if 0
 
 extern "C" int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start)(void *), void* arg) throw()
 {
@@ -467,7 +494,7 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
 #endif
 
 
-#if 0  //globally disable sem
+#if 0
 
 #include <semaphore.h>
 
@@ -520,7 +547,7 @@ extern "C" int sem_post(sem_t* sem)
 
 #include <mqueue.h>
 
-#if 0 // globally disable mq
+#if 0
 extern "C" mqd_t mq_open(const char *name, int oflag, ...)
 {
     static int (*__mq_open)(const char *, int, ...) = NULL;
@@ -624,10 +651,13 @@ extern "C" void syslog (int f, const char *format, ...)
 
     TDITRACE("%s", buf);
 
+    #if 0
     if (f) {
         print_stacktrace();
     }
+    #endif
 }
+
 
 #if 0
 /*
@@ -656,13 +686,13 @@ static inline void *_dlopen(const char* filename, int flag)
     return dlopen_ptr(filename, flag);
 }
 
+
 extern "C" void* dlopen(const char* filename, int flag)
 {
     /*
      * dlopen will always trigger (first)
      */
-
-    //init();
+    init();
 
     // TDITRACE("dlopen() %s", filename);
 
@@ -736,6 +766,8 @@ int glShaderSource_counter = 0;
 bool disableblend = false;
 
 
+int RenderBlock__paint_counter = 0;
+
 
 // extern "C"  void *malloc(size_t size)
 // {
@@ -751,7 +783,6 @@ bool disableblend = false;
 //     p = real_malloc(size);
 //     return p;
 // }
-
 
 
 extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
@@ -814,6 +845,7 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
     glTexImage2D_counter = 0;
     glTexSubImage2D_counter = 0;
     glBindTexture_counter = 0;
+    RenderBlock__paint_counter = 0;
 
     draw_counter = 0;
     texturebind_counter = 0;
@@ -828,6 +860,8 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 
     return ret;
 }
+
+
 
 extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurface read, EGLContext context)
 {
@@ -848,6 +882,9 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurf
 }
 
 
+extern "C" GLvoid glDisable(GLenum cap);
+
+
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
     static void (*__glDrawArrays)(GLenum  mode,  GLint  first,  GLsizei  count)=NULL;
@@ -862,10 +899,17 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
     draw_counter++;
     glDrawArrays_counter++;
 
+    // if (((glDrawArrays_counter == 1) || (glDrawArrays_counter == 4)) && (current_frame >= 9)) {
+    // }
+    // else {
+
     TDITRACE("#gldraws~%d", draw_counter);
     TDITRACE("@T+glDrawArrays() #%d,%s,#indices=%d,tex=%u,prog=%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
     __glDrawArrays(mode, first, count);
     TDITRACE("@T-glDrawArrays()");
+
+    // }
+
 }
 
 
@@ -925,9 +969,24 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
 
     TDITRACE("@T+glTexImage2D() #%d,%dx%d,%s,%s,%u,%p", ++glTexImage2D_counter, width, height, TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
 
+
+
     if (texturerecording) {
         texturecapture_captexture(boundtexture, false, current_frame, 0, 0, width, height, (int)format, (int)type, pixels);
         textures_captured++;
+
+        #if 0
+        texturebytes_captured+= (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4;
+
+        if (texturebytes_captured > (25 * 1024 * 1024)) {
+
+            texturecapture_writepngtextures();
+            texturecapture_deletetextures();
+            texturebytes_captured = 0;
+
+        }
+        #endif
+
     }
 
     __glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
@@ -951,6 +1010,19 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLi
     if (texturerecording) {
         texturecapture_captexture(boundtexture, true, current_frame, xoffset, yoffset, width, height, (int)format, (int)type, pixels);
         textures_captured++;
+
+        #if 0
+        texturebytes_captured+= (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4;
+
+        if (texturebytes_captured > (25 * 1024 * 1024)) {
+
+            texturecapture_writepngtextures();
+            texturecapture_deletetextures();
+            texturebytes_captured = 0;
+
+        }
+        #endif
+
     }
 
     __glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
@@ -1176,6 +1248,8 @@ extern "C" GLvoid glClear(GLbitfield mask)
 }
 
 
+
+
 extern "C" GLvoid glGenFramebuffers(GLsizei n,  GLuint * framebuffers)
 {
     static void (*__glGenFramebuffers)(GLsizei, GLuint*)=NULL;
@@ -1261,8 +1335,7 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
 
 
 
-#if 0  // globally disable connect,read,write
-
+#if 0
 extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen)
 {
     static int (*__connect)(int, const struct sockaddr*, socklen_t)=NULL;
@@ -1349,23 +1422,3 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count)
     return s;
 }
 #endif
-
-
-
-static void __attribute__ ((constructor)) tditracer_constructor();
-static void __attribute__ ((destructor)) tditracer_destructor();
-
-static void tditracer_constructor()
-{
-    printf("tditracer:init\n");
-	init();
-}
- 
-static void tditracer_destructor()
-{
-    printf("tditracer:exit\n");
-
-    if (!diddump) {
-    	dump();
-	}
-}

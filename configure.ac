@@ -7,25 +7,15 @@ AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_ENABLE_SHARED
 LT_INIT
 AC_CONFIG_SRCDIR([tdidump/src/tdidump.c])
-AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_MACRO_DIR([m4])
+# AC_CONFIG_MACRO_DIR([m4])
 
 # Checks for programs.
 AC_PROG_CXX
-AC_PROG_AWK
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
-AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
-
-# Checks for libraries.
-AC_CHECK_LIB([m], [log10])
-
-# Checks for pkg-config
-PKG_PROG_PKG_CONFIG
-PKG_CHECK_MODULES([libpng], [libpng >= 1.2.0], [], [AC_MSG_ERROR([Unable to find libpng])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/time.h unistd.h])
@@ -40,7 +30,7 @@ AC_TYPE_UINT32_T
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([gettimeofday memset pow sqrt strcspn strdup strerror strstr strtol strtoul])
+AC_CHECK_FUNCS([gettimeofday memset strcspn strdup strerror strstr strtol strtoul])
 
 AC_CONFIG_FILES([
     Makefile
@@ -51,4 +41,3 @@ AC_CONFIG_FILES([
 ])
 
 AC_OUTPUT
-
