@@ -43,12 +43,6 @@ void texturecapture_captexture(unsigned int name, bool subtexture, int frame, in
         texturecapture_inited = 1;
     }
 
-
-    printf("+%s\n", __func__);
-
-    int texturesize = (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4;
-
-
     void *pPNG_data;
 
     size_t png_data_size = 0;
@@ -65,12 +59,14 @@ void texturecapture_captexture(unsigned int name, bool subtexture, int frame, in
             fprintf(stderr, "tdefl_write_image_to_png_file_in_memory_ex() failed!\n");
         }
 
-        printf("datasize=[%dx%d][%s]=%d(%d)\n", width, height, (format == GL_ALPHA) ? "ALPHA" : "ARGB",
+        #if 0
+        printf("datasize=[%dx%d][%s]=%d(%d)\n", width, height, (format == GL_ALPHA) ? "alpha" : "argb",
                   (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4, png_data_size);
+        #endif
 
     } else {
     
-        printf("pixels=NULL\n");
+        //printf("pixels=NULL\n");
 
     }
 
@@ -212,13 +208,16 @@ void texturecapture_writepngtextures(void)
             //if (!texture_ptr->subtexture) {
 
                 char fname[64];
-                sprintf(fname, "t%05d-f%03d-%s-%s-%dx%d-%d.png", texture_ptr->id, texture_ptr->frame, texture_ptr->subtexture?"sub":"par", 
-                    FORMATSTRING(texture_ptr->format), texture_ptr->width, texture_ptr->height, texture_ptr->name);
+                sprintf(fname, "t%05d-f%03d-%s-%d-%dx%d+%d+%d-%d.png", texture_ptr->id, texture_ptr->frame, texture_ptr->subtexture?"s":"p", 
+                    FORMATSIZE(texture_ptr->format), texture_ptr->width, texture_ptr->height,
+                    texture_ptr->xoffset, texture_ptr->yoffset,
+                    texture_ptr->name);
 
                 printf("writing texture: %s\n", fname);
 
                 FILE *pFile = fopen(fname, "wb");
                 fwrite(texture_ptr->png_data, 1, texture_ptr->png_data_size, pFile);
+                chmod(fname, 0666);
                 fclose(pFile);
 
             // }

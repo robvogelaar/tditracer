@@ -187,7 +187,7 @@ void shadercapture_writeshaders(void)
 
                     string++;
                 }
-
+                chmod(fname, 0666);
                 fclose(pFile);
             }
 

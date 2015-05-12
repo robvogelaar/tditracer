@@ -5,7 +5,7 @@ lib_LTLIBRARIES = libtditracer.la
 libtditracer_la_CPPFLAGS = -fpermissive
 
 libtditracer_la_LIBADD = \
-    ../../tdi/src/libtdi.la
+    ../../tdi/src/libtdi.la -ldl
 
 libtditracer_la_SOURCES = \
    framecapture.c \

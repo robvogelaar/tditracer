@@ -147,3 +147,11 @@ typedef float        GLclampf;
                                  format==GL_LUMINANCE?"GL_LUMINANCE":                              \
                                  format==GL_LUMINANCE_ALPHA?"GL_LUMINANCE_ALPHA":                  \
                                  format==GL_BGRA_EXT?"GL_BGRA_EXT":"???")
+
+#define FORMATSIZE(format)      (format==GL_DEPTH_COMPONENT?1: \
+                                 format==GL_ALPHA?1:           \
+                                 format==GL_RGB?3:             \
+                                 format==GL_RGBA?4:            \
+                                 format==GL_LUMINANCE?4:       \
+                                 format==GL_LUMINANCE_ALPHA?4: \
+                                 format==GL_BGRA_EXT?4:1)

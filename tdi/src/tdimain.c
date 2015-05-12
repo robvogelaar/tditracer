@@ -447,17 +447,17 @@ void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long spe
         }
         else {
             token = strtok(NULL, search);
-            if (!token)    {}
+            if (!token) break;
             // token is functionname with optional parameters
             text = token;
 
             token = strtok(NULL, search);
-            if (!token)    {}
+            if (!token) break;
             // token is timestamp
             timestamp = (_u64)atoll(token);
 
             token = strtok(NULL, search);
-            if (!token)    {}
+            if (!token) break;
             // token is tid
             tid = atoi(token);
 
@@ -550,6 +550,9 @@ void tditrace_exit(char* filename, char* trace_buffer)
     fwrite(text, strlen(text), 1, tdifile);
 
     fclose(tdifile);
+
+    chmod(filename, 0666);
+
     printf("Done\n");
 }
 

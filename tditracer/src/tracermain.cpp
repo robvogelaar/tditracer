@@ -192,14 +192,17 @@ static void sighandler(int signum)
     if (!diddump) {
         diddump = true;
 
-        framecapture_capframe();
-        frames_captured++;
+        if (framestorecord > 0) {
 
-        framecapture_capframe();
-        frames_captured++;
+            framecapture_capframe();
+            frames_captured++;
 
-        framecapture_capframe();
-        frames_captured++;
+            framecapture_capframe();
+            frames_captured++;
+
+            framecapture_capframe();
+            frames_captured++;
+        }
 
         dump();
     }
@@ -822,14 +825,17 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 
                 usleep(500 * 1000);
 
-                framecapture_capframe();
-                frames_captured++;
+                if (framestorecord > 0) {
 
-                framecapture_capframe();
-                frames_captured++;
+                    framecapture_capframe();
+                    frames_captured++;
 
-                framecapture_capframe();
-                frames_captured++;
+                    framecapture_capframe();
+                    frames_captured++;
+
+                    framecapture_capframe();
+                    frames_captured++;
+                }
 
                 dump();
 
