@@ -799,17 +799,11 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
         }
     }
 
-    TDITRACE("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d", draw_counter, texturebind_counter);
-
-    TDITRACE("#gldraws~%d", 0);
-    TDITRACE("#gltexturebinds~%d", 0);
-
     if (framestorecord > 0) {
 
         framecapture_capframe();
         frames_captured++;
     }
-
 
     if (dumpafter !=0) {
 
@@ -846,6 +840,17 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
         }
     }
 
+    TDITRACE("@T+eglSwapBuffers()");
+
+    EGLBoolean ret = __eglSwapBuffers(display, surface);
+
+    TDITRACE("@T-eglSwapBuffers()");
+
+    TDITRACE("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d", draw_counter, texturebind_counter);
+
+    TDITRACE("#gldraws~%d", 0);
+    TDITRACE("#gltexturebinds~%d", 0);
+
     glDrawElements_counter = 0;
     glDrawArrays_counter = 0;
     glTexImage2D_counter = 0;
@@ -857,12 +862,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
     texturebind_counter = 0;
 
     current_frame++;
-
-    TDITRACE("@T+eglSwapBuffers()");
-
-    EGLBoolean ret = __eglSwapBuffers(display, surface);
-
-    TDITRACE("@T-eglSwapBuffers()");
 
     return ret;
 }
