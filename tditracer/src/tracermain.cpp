@@ -868,7 +868,7 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 
 
 
-extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurface read, EGLContext context)
+extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context)
 {
     static EGLBoolean (*__eglMakeCurrent)(EGLDisplay, EGLSurface, EGLSurface, EGLContext)=NULL;
 
@@ -879,7 +879,7 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display,EGLSurface draw, EGLSurf
         }
     }
 
-    TDITRACE("@T+eglMakeCurrent()");
+    TDITRACE("@T+eglMakeCurrent() %d,%d,%d,%d", display, draw, read, context);
     EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
     TDITRACE("@T-eglMakeCurrent()");
 
@@ -938,6 +938,22 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const 
     TDITRACE("@T-glDrawElements()");
 }
 
+
+extern "C" void glGenTextures(GLsizei n, GLuint * textures)
+{
+    static void (*__glGenTextures)(GLsizei n, GLuint *)=NULL;
+
+    if (__glGenTextures==NULL) {
+        __glGenTextures = (void (*)(GLsizei n, GLuint *))dlsym(RTLD_NEXT, "glGenTextures");
+        if (NULL == __glGenTextures) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    TDITRACE("glGenTextures() %d", n);
+
+    __glGenTextures(n, textures);
+}
 
 extern "C" GLvoid glBindTexture(GLenum target, GLuint texture)
 {
@@ -1254,7 +1270,6 @@ extern "C" GLvoid glClear(GLbitfield mask)
 
 
 
-
 extern "C" GLvoid glGenFramebuffers(GLsizei n,  GLuint * framebuffers)
 {
     static void (*__glGenFramebuffers)(GLsizei, GLuint*)=NULL;
@@ -1266,7 +1281,7 @@ extern "C" GLvoid glGenFramebuffers(GLsizei n,  GLuint * framebuffers)
         }
     }
 
-    TDITRACE("glGenFramebuffers()");
+    TDITRACE("glGenFramebuffers() %d", n);
 
     __glGenFramebuffers(n, framebuffers);
 }
@@ -1305,6 +1320,39 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment, GLenu
     __glFramebufferTexture2D(target, attachment, textarget, texture, level);
 }
 
+
+extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height)
+{
+    static void (*__glRenderbufferStorage)(GLenum, GLenum, GLsizei, GLsizei)=NULL;
+
+    if (__glRenderbufferStorage==NULL) {
+        __glRenderbufferStorage = (void (*)(GLenum, GLenum, GLsizei, GLsizei))dlsym(RTLD_NEXT, "glRenderbufferStorage");
+        if (NULL == __glRenderbufferStorage) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    TDITRACE("glRenderbufferStorage() 0x%08x,%dx%d", internalformat, width, height);
+
+    __glRenderbufferStorage(target, internalformat, width, height);
+}
+
+
+extern GLvoid glGenRenderbuffers(GLsizei n,  GLuint *renderbuffers)
+{
+    static void (*__glgenRenderbuffers)(GLsizei, GLuint*)=NULL;
+
+    if (__glgenRenderbuffers==NULL) {
+        __glgenRenderbuffers = (void (*)(GLsizei, GLuint*))dlsym(RTLD_NEXT, "glgenRenderbuffers");
+        if (NULL == __glgenRenderbuffers) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    TDITRACE("glgenRenderbuffers() %d", n);
+
+    __glgenRenderbuffers(n, renderbuffers);
+}
 
 extern "C" GLvoid glFramebufferRenderbuffer(GLenum target,  GLenum attachment,  GLenum renderbuffertarget,  GLuint renderbuffer)
 {

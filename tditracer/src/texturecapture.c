@@ -208,10 +208,9 @@ void texturecapture_writepngtextures(void)
             //if (!texture_ptr->subtexture) {
 
                 char fname[64];
-                sprintf(fname, "t%05d-f%03d-%s-%d-%dx%d+%d+%d-%d.png", texture_ptr->id, texture_ptr->frame, texture_ptr->subtexture?"s":"p", 
+                sprintf(fname, "t%u-%05d-f%03d-%s-%d-%dx%d+%d+%d.png", texture_ptr->name, texture_ptr->id, texture_ptr->frame, texture_ptr->subtexture?"s":"p", 
                     FORMATSIZE(texture_ptr->format), texture_ptr->width, texture_ptr->height,
-                    texture_ptr->xoffset, texture_ptr->yoffset,
-                    texture_ptr->name);
+                    texture_ptr->xoffset, texture_ptr->yoffset);
 
                 printf("writing texture: %s\n", fname);
 
