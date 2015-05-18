@@ -93,6 +93,24 @@ typedef float        GLclampf;
 #define GL_COLOR_BUFFER_BIT               0x00004000
 
 
+/* Framebuffer Object. */
+#define GL_RGBA4                          0x8056
+#define GL_RGB5_A1                        0x8057
+#define GL_RGB565                         0x8D62
+#define GL_DEPTH_COMPONENT16              0x81A5
+#define GL_STENCIL_INDEX                  0x1901
+#define GL_STENCIL_INDEX8                 0x8D48
+
+#define GL_DEPTH_STENCIL_OES              0x84F9
+#define GL_UNSIGNED_INT_24_8_OES          0x84FA
+#define GL_DEPTH24_STENCIL8_OES           0x88F0
+
+#define GL_COLOR_ATTACHMENT0              0x8CE0
+#define GL_DEPTH_ATTACHMENT               0x8D00
+#define GL_STENCIL_ATTACHMENT             0x8D20
+
+
+
 #define CLEARSTRING(mask)       (mask==GL_DEPTH_BUFFER_BIT        ? "GL_DEPTH_BUFFER_BIT":        \
                                  mask==GL_STENCIL_BUFFER_BIT      ? "GL_STENCIL_BUFFER_BIT":      \
                                  mask==GL_COLOR_BUFFER_BIT        ? "GL_COLOR_BUFFER_BIT": "???")
@@ -155,3 +173,17 @@ typedef float        GLclampf;
                                  format==GL_LUMINANCE?4:       \
                                  format==GL_LUMINANCE_ALPHA?4: \
                                  format==GL_BGRA_EXT?4:1)
+
+#define IFORMATSTRING(format)   (format==GL_RGBA4?"GL_RGBA4":                          \
+                                 format==GL_RGB5_A1?"GL_RGB5_A1":                      \
+                                 format==GL_RGB565?"GL_RGB565":                        \
+                                 format==GL_DEPTH_COMPONENT16?"GL_DEPTH_COMPONENT16":  \
+                                 format==GL_DEPTH_STENCIL_OES?"GL_DEPTH_STENCIL_OES":  \
+                                 format==GL_STENCIL_INDEX?"GL_STENCIL_INDEX":  \
+                                 format==GL_STENCIL_INDEX8?"GL_STENCIL_INDEX8":  \
+                                 format==GL_UNSIGNED_INT_24_8_OES?"GL_UNSIGNED_INT_24_8_OES":\
+                                 format==GL_DEPTH24_STENCIL8_OES?"GL_DEPTH24_STENCIL8_OES":"???")
+
+#define ATTACHMENTSTRING(attachment) (attachment==GL_COLOR_ATTACHMENT0?"GL_COLOR_ATTACHMENT0":  \
+		                                attachment==GL_DEPTH_ATTACHMENT?"GL_DEPTH_ATTACHMENT":    \
+		                                attachment==GL_STENCIL_ATTACHMENT?"GL_STENCIL_ATTACHMENT":"???")

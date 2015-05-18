@@ -50,9 +50,9 @@ void texturecapture_captexture(unsigned int name, bool subtexture, int frame, in
     if (pixels) {
 
         if (format == GL_ALPHA) {
-            pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(pixels, ((width + 3) & ~3), height, 1, &png_data_size, 6, MZ_FALSE);
+            pPNG_data = tdefl_write_image_to_png_file_in_memory(pixels, ((width + 3) & ~3), height, 1, &png_data_size);
         } else {
-            pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(pixels, width, height, 4, &png_data_size, 6, MZ_FALSE);
+            pPNG_data = tdefl_write_image_to_png_file_in_memory(pixels, width, height, 4, &png_data_size);
         }
 
         if (!pPNG_data) {

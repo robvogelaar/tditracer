@@ -8,6 +8,7 @@
 #include <syscall.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #include <errno.h>
 
@@ -89,6 +90,7 @@ extern "C" void texturecapture_captexture(unsigned int name, bool subtexture, in
 extern "C" void texturecapture_writepngtextures(void);
 extern "C" void texturecapture_deletetextures(void);
 bool texturerecording = false;
+bool renderbufferrecording = false;
 
 /*
  * SHADERCAPTURE
@@ -107,6 +109,13 @@ bool diddump = false;
 
 static GLuint boundtexture;
 static GLuint currentprogram;
+static GLuint boundframebuffer = 0;
+static GLuint boundrenderbuffer = 0;
+static GLuint framebuffertexture[1024] = {};
+static GLuint framebufferrenderbuffer[1024] = {};
+static GLuint renderbufferwidth[1024] = {};
+static GLuint renderbufferheight[1024] = {};
+
 
 static void sighandler(int signum);
 
@@ -138,14 +147,13 @@ static void dump(void)
         }
     }
 
-    printf("tditrace:#traces = %d\n", trace_counter);
+    printf("tditracer:#traces = %d\n", trace_counter);
 }
+
 
 static void init(void)
 {
-
     printf("%s\n", __func__);
-
 
     static bool inited = false;
     if (!inited) {
@@ -159,6 +167,9 @@ static void init(void)
         if (getenv("TR")) {
             texturerecording = (atoi(getenv("TR")) >= 1);
         }
+        if (getenv("RR")) {
+            renderbufferrecording = (atoi(getenv("RR")) >= 1);
+        }
         if (getenv("FR")) {
             framestorecord = atoi(getenv("FR"));
         }
@@ -169,10 +180,15 @@ static void init(void)
             dumpafter = atoi(getenv("DA"));
         }
 
-        printf("tditrace:init, pthread:%s, shaders:%s, textures:%s, frames:%d, dumpafter:%d\n",
+        if (renderbufferrecording) {
+            texturerecording = true;
+        }
+
+        printf("tditrace:init, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d, dumpafter:%d\n",
             pthread? "yes":"no",
             shaderrecording? "yes":"no",
             texturerecording? "yes":"no",
+            renderbufferrecording? "yes":"no",
             framestorecord,
             dumpafter);
 
@@ -181,9 +197,18 @@ static void init(void)
 }
 
 
+typedef unsigned int mz_uint;
+typedef int mz_bool;
+
+
+extern "C" void *tdefl_write_image_to_png_file_in_memory(const void *pImage, int w, int h, int num_chans, size_t *pLen_out);
+extern "C" void *tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h, int num_chans, size_t *pLen_out, mz_uint level, mz_bool flip);
+
+extern "C" void glReadPixels(GLint x,  GLint y,  GLsizei width,  GLsizei height,  GLenum format,  GLenum type,  GLvoid * data);
+
 static void sighandler(int signum)
 {
-    printf("tracer received SIGNAL : %d\n\n\n", signum);
+    printf("tditracer received SIGNAL : %d\n\n\n", signum);
 
     /*
      * do not dump again if another ctrl-c is received, instead
@@ -205,6 +230,20 @@ static void sighandler(int signum)
         }
 
         dump();
+    }
+
+
+    if (texturerecording) {
+
+        unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
+        glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, p);
+        void *pPNG_data;
+        size_t png_data_size = 0;
+        pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, 1280, 720, 4, &png_data_size, 6, 1);
+        FILE *pFile = fopen("frame.png", "wb");
+        fwrite(pPNG_data, 1, png_data_size, pFile);
+        chmod("frame.png", 0666);
+        fclose(pFile);
     }
 
     abort();
@@ -258,8 +297,8 @@ static inline void print_stacktrace(int max_frames = MAXFRAMES)
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
 
     if (addrlen == 0) {
-	    printf("    <empty, possibly corrupt>\n");
-	    return;
+        printf("    <empty, possibly corrupt>\n");
+        return;
     }
 
     // resolve addresses into strings containing "filename(function+address)",
@@ -278,46 +317,46 @@ static inline void print_stacktrace(int max_frames = MAXFRAMES)
     {
         char *begin_name = 0, *begin_offset = 0, *end_offset = 0;
 
-	    // find parentheses and +address offset surrounding the mangled name:
-	    // ./module(function+0x15c) [0x8048a6d]
-	    for (char *p = symbollist[i]; *p; ++p)
-	    {
-	        if (*p == '(')
-		        begin_name = p;
-	        else if (*p == '+')
-		        begin_offset = p;
-	        else if (*p == ')' && begin_offset) {
-		        end_offset = p;
-		        break;
-	        }
-	    }
+        // find parentheses and +address offset surrounding the mangled name:
+        // ./module(function+0x15c) [0x8048a6d]
+        for (char *p = symbollist[i]; *p; ++p)
+        {
+            if (*p == '(')
+                begin_name = p;
+            else if (*p == '+')
+                begin_offset = p;
+            else if (*p == ')' && begin_offset) {
+                end_offset = p;
+                break;
+            }
+        }
 
-	    if (begin_name && begin_offset && end_offset && begin_name < begin_offset)
-	    {
-	        *begin_name++ = '\0';
-	        *begin_offset++ = '\0';
-	        *end_offset = '\0';
+        if (begin_name && begin_offset && end_offset && begin_name < begin_offset)
+        {
+            *begin_name++ = '\0';
+            *begin_offset++ = '\0';
+            *end_offset = '\0';
 
-	        // mangled name is now in [begin_name, begin_offset) and caller
-	        // offset in [begin_offset, end_offset). now apply
-	        // __cxa_demangle():
+            // mangled name is now in [begin_name, begin_offset) and caller
+            // offset in [begin_offset, end_offset). now apply
+            // __cxa_demangle():
 
-	        int status;
-	        char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
-	        if (status == 0) {
-		        funcname = ret; // use possibly realloc()-ed string
-		        printf("    [%ld][%2d][0x%08x]%s : %s+%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i], funcname, begin_offset);
-	        }
-	        else {
-		        // demangling failed. Output function name as a C function with no arguments.
-		        printf("    [%ld][%2d][0x%08x]%s : %s()+%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i], begin_name, begin_offset);
-	        }
-	    }
-	    else
-	    {
-	        // couldn't parse the line? print the whole line.
-	        printf("    [%ld][%2d][0x%08x],%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i]);
-	    }
+            int status;
+            char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
+            if (status == 0) {
+                funcname = ret; // use possibly realloc()-ed string
+                printf("    [%ld][%2d][0x%08x]%s : %s+%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i], funcname, begin_offset);
+            }
+            else {
+                // demangling failed. Output function name as a C function with no arguments.
+                printf("    [%ld][%2d][0x%08x]%s : %s()+%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i], begin_name, begin_offset);
+            }
+        }
+        else
+        {
+            // couldn't parse the line? print the whole line.
+            printf("    [%ld][%2d][0x%08x],%s\n", syscall(SYS_gettid), i, (int)addrlist[i], symbollist[i]);
+        }
     }
 
     free(funcname);
@@ -886,13 +925,9 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSur
     return b;
 }
 
-
-extern "C" GLvoid glDisable(GLenum cap);
-
-
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
-    static void (*__glDrawArrays)(GLenum  mode,  GLint  first,  GLsizei  count)=NULL;
+    static void (*__glDrawArrays)(GLenum, GLint, GLsizei)=NULL;
 
     if (__glDrawArrays==NULL) {
         __glDrawArrays = (void(*)(GLenum, GLint, GLsizei))dlsym(RTLD_NEXT, "glDrawArrays");
@@ -904,34 +939,79 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
     draw_counter++;
     glDrawArrays_counter++;
 
-    // if (((glDrawArrays_counter == 1) || (glDrawArrays_counter == 4)) && (current_frame >= 9)) {
-    // }
-    // else {
-
     TDITRACE("#gldraws~%d", draw_counter);
-    TDITRACE("@T+glDrawArrays() #%d,%s,#indices=%d,tex=%u,prog=%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+    if (boundframebuffer) {
+        TDITRACE("@T+glDrawArrays() #%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram,
+             boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
+             renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+             renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
+
+        if (renderbufferrecording) {
+
+            if (framebufferrenderbuffer[boundframebuffer]) {
+                unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
+                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                               renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
+                            GL_RGBA, GL_UNSIGNED_BYTE, p);
+                void *pPNG_data;
+                size_t png_data_size = 0;
+                pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                                                                       renderbufferheight[framebufferrenderbuffer[boundframebuffer]], 4, &png_data_size, 6, 1);
+                texturecapture_captexture(framebuffertexture[boundframebuffer], true, current_frame, 0, 0,
+                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                         renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
+                free(p);
+                textures_captured++;
+            }
+        }
+    } else {
+        TDITRACE("@T+glDrawArrays() #%d,%s,#i=%d,t=%u,p=%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+    }
     __glDrawArrays(mode, first, count);
     TDITRACE("@T-glDrawArrays()");
-
-    // }
-
 }
 
 
 extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid * indices)
 {
-    static void (*__glDrawElements)(GLenum mode,  GLsizei count,  GLenum type,  const GLvoid * indices)=NULL;
+    static void (*__glDrawElements)(GLenum, GLsizei, GLenum, const GLvoid *)=NULL;
 
     if (__glDrawElements==NULL) {
-        __glDrawElements = (void (*)(GLenum, GLsizei, GLenum, const GLvoid * ))dlsym(RTLD_NEXT, "glDrawElements");
+        __glDrawElements = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *))dlsym(RTLD_NEXT, "glDrawElements");
         if (NULL == __glDrawElements) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
 
     TDITRACE("#gldraws~%d", ++draw_counter);
+    if (boundframebuffer) {
+        TDITRACE("@T+glDrawElements() #%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", ++glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram,
+             boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
+             renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+             renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
+    
+        if (renderbufferrecording) {
 
-    TDITRACE("@T+glDrawElements() #%d,%s,#indices=%d,tex=%d,prog=%d", ++glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+            if (framebufferrenderbuffer[boundframebuffer]) {
+                unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
+                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                               renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
+                            GL_RGBA, GL_UNSIGNED_BYTE, p);
+                void *pPNG_data;
+                size_t png_data_size = 0;
+                pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                                                                       renderbufferheight[framebufferrenderbuffer[boundframebuffer]], 4, &png_data_size, 6, 1);
+                texturecapture_captexture(framebuffertexture[boundframebuffer], true, current_frame, 0, 0,
+                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
+                         renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
+                free(p);
+                textures_captured++;
+            }
+        }
+    
+    } else {
+        TDITRACE("@T+glDrawElements() #%d,%s,#i=%d,t=%u,p=%u", ++glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+    }
 
     __glDrawElements(mode, count, type, indices);
 
@@ -941,10 +1021,10 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const 
 
 extern "C" void glGenTextures(GLsizei n, GLuint * textures)
 {
-    static void (*__glGenTextures)(GLsizei n, GLuint *)=NULL;
+    static void (*__glGenTextures)(GLsizei, GLuint *)=NULL;
 
     if (__glGenTextures==NULL) {
-        __glGenTextures = (void (*)(GLsizei n, GLuint *))dlsym(RTLD_NEXT, "glGenTextures");
+        __glGenTextures = (void (*)(GLsizei, GLuint *))dlsym(RTLD_NEXT, "glGenTextures");
         if (NULL == __glGenTextures) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -957,10 +1037,10 @@ extern "C" void glGenTextures(GLsizei n, GLuint * textures)
 
 extern "C" GLvoid glBindTexture(GLenum target, GLuint texture)
 {
-    static void (*__glBindTexture)(GLenum target, GLuint texture)=NULL;
+    static void (*__glBindTexture)(GLenum, GLuint)=NULL;
 
     if (__glBindTexture==NULL) {
-        __glBindTexture = (void (*)(GLenum target, GLuint texture))dlsym(RTLD_NEXT, "glBindTexture");
+        __glBindTexture = (void (*)(GLenum, GLuint))dlsym(RTLD_NEXT, "glBindTexture");
         if (NULL == __glBindTexture) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -978,7 +1058,7 @@ extern "C" GLvoid glBindTexture(GLenum target, GLuint texture)
 
 extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid* pixels)
 {
-    static void (*__glTexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const GLvoid* pixels)=NULL;
+    static void (*__glTexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const GLvoid*)=NULL;
 
     if (__glTexImage2D==NULL) {
         __glTexImage2D = (void (*)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const GLvoid*))dlsym(RTLD_NEXT, "glTexImage2D");
@@ -987,27 +1067,11 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
         }
     }
 
-
     TDITRACE("@T+glTexImage2D() #%d,%dx%d,%s,%s,%u,%p", ++glTexImage2D_counter, width, height, TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
-
-
 
     if (texturerecording) {
         texturecapture_captexture(boundtexture, false, current_frame, 0, 0, width, height, (int)format, (int)type, pixels);
         textures_captured++;
-
-        #if 0
-        texturebytes_captured+= (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4;
-
-        if (texturebytes_captured > (25 * 1024 * 1024)) {
-
-            texturecapture_writepngtextures();
-            texturecapture_deletetextures();
-            texturebytes_captured = 0;
-
-        }
-        #endif
-
     }
 
     __glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
@@ -1031,19 +1095,6 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLi
     if (texturerecording) {
         texturecapture_captexture(boundtexture, true, current_frame, xoffset, yoffset, width, height, (int)format, (int)type, pixels);
         textures_captured++;
-
-        #if 0
-        texturebytes_captured+= (format == GL_ALPHA) ? ((width + 3) & ~3) * height : width * height * 4;
-
-        if (texturebytes_captured > (25 * 1024 * 1024)) {
-
-            texturecapture_writepngtextures();
-            texturecapture_deletetextures();
-            texturebytes_captured = 0;
-
-        }
-        #endif
-
     }
 
     __glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
@@ -1088,7 +1139,7 @@ extern "C" GLvoid glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
 
 extern "C" GLvoid glTexParameteri(GLenum target, GLenum pname, GLint param)
 {
-    static void (*__glTexParameteri)(GLenum target, GLenum pname, GLint param)=NULL;
+    static void (*__glTexParameteri)(GLenum, GLenum, GLint)=NULL;
 
     if (__glTexParameteri==NULL) {
         __glTexParameteri = (void (*)(GLenum, GLenum, GLint))dlsym(RTLD_NEXT, "glTexParameteri");
@@ -1103,7 +1154,7 @@ extern "C" GLvoid glTexParameteri(GLenum target, GLenum pname, GLint param)
 
 extern "C" GLvoid glUseProgram(GLuint program)
 {
-    static void (*__glUseProgram)(GLuint program)=NULL;
+    static void (*__glUseProgram)(GLuint)=NULL;
 
     if (__glUseProgram==NULL) {
         __glUseProgram = (void (*)(GLuint program))dlsym(RTLD_NEXT, "glUseProgram");
@@ -1140,12 +1191,12 @@ extern "C" GLvoid glShaderSource(GLuint shader, GLsizei count, const GLchar** st
 }
 
 
-extern "C" GLvoid glAttachShader(GLuint program,  GLuint shader)
+extern "C" GLvoid glAttachShader(GLuint program, GLuint shader)
 {
     static void (*__glAttachShader)(GLuint, GLuint)=NULL;
 
     if (__glAttachShader==NULL) {
-        __glAttachShader = (void (*)(GLuint,  GLuint))dlsym(RTLD_NEXT, "glAttachShader");
+        __glAttachShader = (void (*)(GLuint, GLuint))dlsym(RTLD_NEXT, "glAttachShader");
         if (NULL == __glAttachShader) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -1270,7 +1321,7 @@ extern "C" GLvoid glClear(GLbitfield mask)
 
 
 
-extern "C" GLvoid glGenFramebuffers(GLsizei n,  GLuint * framebuffers)
+extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint * framebuffers)
 {
     static void (*__glGenFramebuffers)(GLsizei, GLuint*)=NULL;
 
@@ -1301,6 +1352,8 @@ extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer)
     TDITRACE("glBindFramebuffer() %u", framebuffer);
 
     __glBindFramebuffer(target, framebuffer);
+
+    boundframebuffer = framebuffer;
 }
 
 
@@ -1315,9 +1368,11 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment, GLenu
         }
     }
 
-    TDITRACE("glFramebufferTexture2D() %u", texture);
+    TDITRACE("glFramebufferTexture2D() %s,%u", ATTACHMENTSTRING(attachment), texture);
 
     __glFramebufferTexture2D(target, attachment, textarget, texture, level);
+
+    framebuffertexture[boundframebuffer] = texture;
 }
 
 
@@ -1332,13 +1387,16 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat, GL
         }
     }
 
-    TDITRACE("glRenderbufferStorage() 0x%08x,%dx%d", internalformat, width, height);
+    TDITRACE("glRenderbufferStorage() %s0x%08x,%dx%d", IFORMATSTRING(internalformat), internalformat, width, height);
 
     __glRenderbufferStorage(target, internalformat, width, height);
+
+    renderbufferwidth[boundrenderbuffer] = width;
+    renderbufferheight[boundrenderbuffer] = height;
 }
 
 
-extern GLvoid glGenRenderbuffers(GLsizei n,  GLuint *renderbuffers)
+extern GLvoid glGenRenderbuffers(GLsizei n, GLuint *renderbuffers)
 {
     static void (*__glgenRenderbuffers)(GLsizei, GLuint*)=NULL;
 
@@ -1354,23 +1412,25 @@ extern GLvoid glGenRenderbuffers(GLsizei n,  GLuint *renderbuffers)
     __glgenRenderbuffers(n, renderbuffers);
 }
 
-extern "C" GLvoid glFramebufferRenderbuffer(GLenum target,  GLenum attachment,  GLenum renderbuffertarget,  GLuint renderbuffer)
+extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer)
 {
     static void (*__glFramebufferRenderbuffer)(GLenum, GLenum, GLenum, GLuint)=NULL;
 
     if (__glFramebufferRenderbuffer==NULL) {
-        __glFramebufferRenderbuffer = (void (*)(GLenum,  GLenum, GLenum, GLuint))dlsym(RTLD_NEXT, "glFramebufferRenderbuffer");
+        __glFramebufferRenderbuffer = (void (*)(GLenum, GLenum, GLenum, GLuint))dlsym(RTLD_NEXT, "glFramebufferRenderbuffer");
         if (NULL == __glFramebufferRenderbuffer) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
 
-    TDITRACE("glFramebufferRenderbuffer() %u", renderbuffer);
+    TDITRACE("glFramebufferRenderbuffer() %s,%u", ATTACHMENTSTRING(attachment), renderbuffer);
 
     __glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);
+
+    framebufferrenderbuffer[boundframebuffer] = renderbuffer;
 }
 
-extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
+extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer)
 {
     static void (*__glBindRenderbuffer)(GLenum, GLuint)=NULL;
 
@@ -1384,6 +1444,9 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target,  GLuint renderbuffer)
     TDITRACE("glBindRenderbuffer() %u", renderbuffer);
 
     __glBindRenderbuffer(target, renderbuffer);
+
+    boundrenderbuffer = renderbuffer;
+    framebufferrenderbuffer[boundframebuffer] = renderbuffer;
 }
 
 
@@ -1435,7 +1498,7 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
 
 extern "C" ssize_t read(int fd, void *buf, size_t count)
 {
-    static ssize_t (*__read)(int fd, void *buf, size_t count)=NULL;
+    static ssize_t (*__read)(int, void *, size_t)=NULL;
 
     if (__read==NULL) {
         __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT,"read");
@@ -1456,7 +1519,7 @@ extern "C" ssize_t read(int fd, void *buf, size_t count)
 
 extern "C" ssize_t write(int fd, const void *buf, size_t count)
 {
-    static ssize_t (*__write)(int fd, const void *buf, size_t count)=NULL;
+    static ssize_t (*__write)(int, const void *, size_t)=NULL;
 
     if (__write==NULL) {
         __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT,"write");
