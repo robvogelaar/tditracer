@@ -16,6 +16,10 @@
 
 #include <dlfcn.h>
 
+extern "C" {
+#include "texturecapture.h"
+}
+
 #if 0
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -86,9 +90,6 @@ int framestorecord = 0;
 /*
  * TEXTURECAPTURE
  */
-extern "C" void texturecapture_captexture(unsigned int name, bool subtexture, int frame, int xoffset, int yoffset, int width, int height, int format, int type, const void* pixels);
-extern "C" void texturecapture_writepngtextures(void);
-extern "C" void texturecapture_deletetextures(void);
 bool texturerecording = false;
 bool renderbufferrecording = false;
 
@@ -922,6 +923,8 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSur
     EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
     TDITRACE("@T-eglMakeCurrent()");
 
+    boundframebuffer = 0;
+
     return b;
 }
 
@@ -940,34 +943,38 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
     glDrawArrays_counter++;
 
     TDITRACE("#gldraws~%d", draw_counter);
-    if (boundframebuffer) {
-        TDITRACE("@T+glDrawArrays() #%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram,
+    if (boundframebuffer != 0) {
+        TDITRACE("@T+glDrawArrays() #%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", current_frame, glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram,
              boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
              renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
              renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
 
-        if (renderbufferrecording) {
+    } else {
+        TDITRACE("@T+glDrawArrays() #%d,%d,%s,#i=%d,t=%u,p=%u", current_frame, glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+    }
+    __glDrawArrays(mode, first, count);
 
-            if (framebufferrenderbuffer[boundframebuffer]) {
+    if ((boundframebuffer != 0) && renderbufferrecording) {
+
+        if (framebufferrenderbuffer[boundframebuffer]) {
+
+            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer]] &&
+                renderbufferheight[framebufferrenderbuffer[boundframebuffer]]) {
+
                 unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
                 glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
                                renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
                             GL_RGBA, GL_UNSIGNED_BYTE, p);
-                void *pPNG_data;
-                size_t png_data_size = 0;
-                pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                                                                       renderbufferheight[framebufferrenderbuffer[boundframebuffer]], 4, &png_data_size, 6, 1);
-                texturecapture_captexture(framebuffertexture[boundframebuffer], true, current_frame, 0, 0,
+                texturecapture_captexture(framebuffertexture[boundframebuffer], RENDER, current_frame, 0, 0,
                          renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
                          renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
                 free(p);
                 textures_captured++;
             }
         }
-    } else {
-        TDITRACE("@T+glDrawArrays() #%d,%s,#i=%d,t=%u,p=%u", glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
     }
-    __glDrawArrays(mode, first, count);
+
+
     TDITRACE("@T-glDrawArrays()");
 }
 
@@ -983,37 +990,41 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const 
         }
     }
 
-    TDITRACE("#gldraws~%d", ++draw_counter);
+    draw_counter++;
+    glDrawElements_counter++;
+
+    TDITRACE("#gldraws~%d", draw_counter);
     if (boundframebuffer) {
-        TDITRACE("@T+glDrawElements() #%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", ++glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram,
+        TDITRACE("@T+glDrawElements() #%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", current_frame, glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram,
              boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
              renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
              renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
     
-        if (renderbufferrecording) {
+    } else {
+        TDITRACE("@T+glDrawElements() #%d,%d,%s,#i=%d,t=%u,p=%u", current_frame, glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram);
+    }
 
-            if (framebufferrenderbuffer[boundframebuffer]) {
+    __glDrawElements(mode, count, type, indices);
+
+    if ((boundframebuffer != 0) && renderbufferrecording) {
+
+        if (framebufferrenderbuffer[boundframebuffer]) {
+
+            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer]] &&
+                renderbufferheight[framebufferrenderbuffer[boundframebuffer]]) {
+
                 unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
                 glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
                                renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
                             GL_RGBA, GL_UNSIGNED_BYTE, p);
-                void *pPNG_data;
-                size_t png_data_size = 0;
-                pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                                                                       renderbufferheight[framebufferrenderbuffer[boundframebuffer]], 4, &png_data_size, 6, 1);
-                texturecapture_captexture(framebuffertexture[boundframebuffer], true, current_frame, 0, 0,
+                texturecapture_captexture(framebuffertexture[boundframebuffer], RENDER, current_frame, 0, 0,
                          renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
                          renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
                 free(p);
                 textures_captured++;
             }
         }
-    
-    } else {
-        TDITRACE("@T+glDrawElements() #%d,%s,#i=%d,t=%u,p=%u", ++glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram);
     }
-
-    __glDrawElements(mode, count, type, indices);
 
     TDITRACE("@T-glDrawElements()");
 }
@@ -1070,7 +1081,7 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
     TDITRACE("@T+glTexImage2D() #%d,%dx%d,%s,%s,%u,%p", ++glTexImage2D_counter, width, height, TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
 
     if (texturerecording) {
-        texturecapture_captexture(boundtexture, false, current_frame, 0, 0, width, height, (int)format, (int)type, pixels);
+        texturecapture_captexture(boundtexture, PARENT, current_frame, 0, 0, width, height, (int)format, (int)type, pixels);
         textures_captured++;
     }
 
@@ -1093,7 +1104,7 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLi
     TDITRACE("@T+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,%p", ++glTexSubImage2D_counter, width, height, xoffset, yoffset, TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
 
     if (texturerecording) {
-        texturecapture_captexture(boundtexture, true, current_frame, xoffset, yoffset, width, height, (int)format, (int)type, pixels);
+        texturecapture_captexture(boundtexture, SUB, current_frame, xoffset, yoffset, width, height, (int)format, (int)type, pixels);
         textures_captured++;
     }
 

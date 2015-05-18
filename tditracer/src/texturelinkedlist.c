@@ -10,7 +10,7 @@
 texture_struct_t *texturelinkedlist_head = NULL;
 texture_struct_t *texturelinkedlist_curr = NULL;
 
-texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, bool subtexture, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size)
+texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, int ttype, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size)
 {
     verboseprintf("\n creating list with headnode as [%d]\n",id);
     texture_struct_t *ptr = (texture_struct_t*)malloc(sizeof(texture_struct_t));
@@ -21,7 +21,7 @@ texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, bool 
     }
     ptr->id = id;
     ptr->name = name;
-    ptr->subtexture = subtexture;
+    ptr->ttype = ttype;
     ptr->frame = frame;
     ptr->xoffset = xoffset;
     ptr->yoffset = yoffset;
@@ -37,11 +37,11 @@ texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, bool 
     return ptr;
 }
 
-texture_struct_t* texturelinkedlist_add_to_list(int id, unsigned int name, bool subtexture, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size, bool add_to_end)
+texture_struct_t* texturelinkedlist_add_to_list(int id, unsigned int name, int ttype, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size, bool add_to_end)
 {
     if(NULL == texturelinkedlist_head)
     {
-        return (texturelinkedlist_create_list(id, name, subtexture, frame, xoffset, yoffset, width, height, format, png_data, png_data_size));
+        return (texturelinkedlist_create_list(id, name, ttype, frame, xoffset, yoffset, width, height, format, png_data, png_data_size));
     }
 
     if(add_to_end)
@@ -57,7 +57,7 @@ texture_struct_t* texturelinkedlist_add_to_list(int id, unsigned int name, bool 
     }
     ptr->id = id;
     ptr->name = name;
-    ptr->subtexture = subtexture;
+    ptr->ttype = ttype;
     ptr->frame = frame;
     ptr->xoffset = xoffset;
     ptr->yoffset = yoffset;

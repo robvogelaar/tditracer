@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <fcntl.h>
 
+#include "texturecapture.h"
 
 #define MINIZ_NO_STDIO
 #define MINIZ_NO_ARCHIVE_APIS
@@ -18,31 +19,13 @@
 #include "gldefs.h"
 #include "texturelinkedlist.h"
 
-void* memcpy_arm(void*, const void*, size_t);
-void* memcpy_neon(void*, const void*, size_t);
-
-int  texturecapture_inited = 0;
-
-int  texturecapture_init(void);
-void texturecapture_captexture(unsigned int name, bool subtexture, int frame, int xoffset, int yoffset, int width, int height, int format, int type, void* pixels);
-void texturecapture_writepngframes(int textures);
 
 static int nr_textures = 0;
 
-int texturecapture_init(void)
-{
-    return 0;
-}
-
 typedef unsigned char uint8;
 
-void texturecapture_captexture(unsigned int name, bool subtexture, int frame, int xoffset, int yoffset, int width, int height, int format, int type, void* pixels)
+void texturecapture_captexture(unsigned int name, int ttype, int frame, int xoffset, int yoffset, int width, int height, int format, int type, const void* pixels)
 {
-    if (!texturecapture_inited) {
-        texturecapture_init();
-        texturecapture_inited = 1;
-    }
-
     void *pPNG_data;
 
     size_t png_data_size = 0;
@@ -50,9 +33,9 @@ void texturecapture_captexture(unsigned int name, bool subtexture, int frame, in
     if (pixels) {
 
         if (format == GL_ALPHA) {
-            pPNG_data = tdefl_write_image_to_png_file_in_memory(pixels, ((width + 3) & ~3), height, 1, &png_data_size);
+            pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(pixels, ((width + 3) & ~3), height, 1, &png_data_size, 6, ttype == RENDER);
         } else {
-            pPNG_data = tdefl_write_image_to_png_file_in_memory(pixels, width, height, 4, &png_data_size);
+            pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(pixels, width, height, 4, &png_data_size, 6, ttype == RENDER);
         }
 
         if (!pPNG_data) {
@@ -70,7 +53,7 @@ void texturecapture_captexture(unsigned int name, bool subtexture, int frame, in
 
     }
 
-    texturelinkedlist_add_to_list(nr_textures, name, subtexture, frame, xoffset, yoffset, width, height, format, pPNG_data, png_data_size, true);
+    texturelinkedlist_add_to_list(nr_textures, name, ttype, frame, xoffset, yoffset, width, height, format, pPNG_data, png_data_size, true);
 
     nr_textures++;
 }
@@ -98,7 +81,7 @@ void texturecapture_writepngtextures(void)
             texture_ptr = texturelinkedlist_search_in_list(texture, NULL);
             if (texture_ptr) {
 
-                if ((texture_ptr->frame == frame) && (texture_ptr->subtexture)) {
+                if ((texture_ptr->frame == frame) && (texture_ptr->ttype == SUB)) {
 
                     texture_struct_t *sub_ptr = NULL;
                     texture_struct_t *parent_ptr = NULL;
@@ -112,7 +95,7 @@ void texturecapture_writepngtextures(void)
                     int t;
                     for (t = 0 ; t < nr_textures ; t++) {
                         parent_ptr = texturelinkedlist_search_in_list(t, NULL);
-                        if ((!parent_ptr->subtexture) && (parent_ptr->name == sub_ptr->name))
+                        if ((parent_ptr->ttype == PARENT) && (parent_ptr->name == sub_ptr->name))
                             break;
                     }
 
@@ -208,7 +191,8 @@ void texturecapture_writepngtextures(void)
             //if (!texture_ptr->subtexture) {
 
                 char fname[64];
-                sprintf(fname, "t%u-%05d-f%03d-%s-%d-%dx%d+%d+%d.png", texture_ptr->name, texture_ptr->id, texture_ptr->frame, texture_ptr->subtexture?"s":"p", 
+                sprintf(fname, "t%u-%05d-f%03d-%s-%d-%dx%d+%d+%d.png", texture_ptr->name, texture_ptr->id, texture_ptr->frame,
+                    texture_ptr->ttype==PARENT?"p":texture_ptr->ttype==SUB?"s":"r",
                     FORMATSIZE(texture_ptr->format), texture_ptr->width, texture_ptr->height,
                     texture_ptr->xoffset, texture_ptr->yoffset);
 
