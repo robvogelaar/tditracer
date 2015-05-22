@@ -43,9 +43,11 @@ int tditrace_inited = 0;
     } while (0)                     \
 
 
+
+
 #include <stdarg.h>
 
-void tdiprintf( const char *format, ...)
+void tdiprintf(const char *format, ...)
 {
     va_list args;
     fprintf(stdout, "TDI:");
@@ -702,7 +704,6 @@ extern "C" void syslog (int f, const char *format, ...)
     #endif
 }
 
-
 #if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
@@ -908,7 +909,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 }
 
 
-
 extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context)
 {
     static EGLBoolean (*__eglMakeCurrent)(EGLDisplay, EGLSurface, EGLSurface, EGLContext)=NULL;
@@ -946,9 +946,9 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
     TDITRACE("#gldraws~%d", draw_counter);
     if (boundframebuffer != 0) {
         TDITRACE("@T+glDrawArrays() #%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", current_frame, glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram,
-             boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
-             renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-             renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
+             boundframebuffer, framebuffertexture[boundframebuffer & 0x3ff], framebufferrenderbuffer[boundframebuffer & 0x3ff],
+             renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+             renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff]);
 
     } else {
         TDITRACE("@T+glDrawArrays() #%d,%d,%s,#i=%d,t=%u,p=%u", current_frame, glDrawArrays_counter, MODESTRING(mode), count, boundtexture, currentprogram);
@@ -957,24 +957,23 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 
     if ((boundframebuffer != 0) && renderbufferrecording) {
 
-        if (framebufferrenderbuffer[boundframebuffer]) {
+        if (framebufferrenderbuffer[boundframebuffer & 0x3ff]) {
 
-            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer]] &&
-                renderbufferheight[framebufferrenderbuffer[boundframebuffer]]) {
+            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff] &&
+                renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff]) {
 
                 unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
-                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                               renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
+                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+                               renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
                             GL_RGBA, GL_UNSIGNED_BYTE, p);
-                texturecapture_captexture(framebuffertexture[boundframebuffer], RENDER, current_frame, 0, 0,
-                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                         renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
+                texturecapture_captexture(framebuffertexture[boundframebuffer & 0x3ff], RENDER, current_frame, 0, 0,
+                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+                         renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
                 free(p);
                 textures_captured++;
             }
         }
     }
-
 
     TDITRACE("@T-glDrawArrays()");
 }
@@ -997,9 +996,9 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const 
     TDITRACE("#gldraws~%d", draw_counter);
     if (boundframebuffer) {
         TDITRACE("@T+glDrawElements() #%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u", current_frame, glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram,
-             boundframebuffer, framebuffertexture[boundframebuffer], framebufferrenderbuffer[boundframebuffer],
-             renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-             renderbufferheight[framebufferrenderbuffer[boundframebuffer]]);
+             boundframebuffer, framebuffertexture[boundframebuffer & 0x3ff], framebufferrenderbuffer[boundframebuffer & 0x3ff],
+             renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+             renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff]);
     
     } else {
         TDITRACE("@T+glDrawElements() #%d,%d,%s,#i=%d,t=%u,p=%u", current_frame, glDrawElements_counter, MODESTRING(mode), count, boundtexture, currentprogram);
@@ -1009,18 +1008,18 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type, const 
 
     if ((boundframebuffer != 0) && renderbufferrecording) {
 
-        if (framebufferrenderbuffer[boundframebuffer]) {
+        if (framebufferrenderbuffer[boundframebuffer & 0x3ff]) {
 
-            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer]] &&
-                renderbufferheight[framebufferrenderbuffer[boundframebuffer]]) {
+            if (renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff] &&
+                renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff]) {
 
                 unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
-                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                               renderbufferheight[framebufferrenderbuffer[boundframebuffer]],
+                glReadPixels(0, 0, renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+                               renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
                             GL_RGBA, GL_UNSIGNED_BYTE, p);
-                texturecapture_captexture(framebuffertexture[boundframebuffer], RENDER, current_frame, 0, 0,
-                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer]],
-                         renderbufferheight[framebufferrenderbuffer[boundframebuffer]], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
+                texturecapture_captexture(framebuffertexture[boundframebuffer & 0x3ff], RENDER, current_frame, 0, 0,
+                         renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
+                         renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff], (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
                 free(p);
                 textures_captured++;
             }
@@ -1384,7 +1383,7 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment, GLenu
 
     __glFramebufferTexture2D(target, attachment, textarget, texture, level);
 
-    framebuffertexture[boundframebuffer] = texture;
+    framebuffertexture[boundframebuffer & 0x3ff] = texture;
 }
 
 
@@ -1403,10 +1402,9 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat, GL
 
     __glRenderbufferStorage(target, internalformat, width, height);
 
-    renderbufferwidth[boundrenderbuffer] = width;
-    renderbufferheight[boundrenderbuffer] = height;
+    renderbufferwidth[boundrenderbuffer & 0x3ff] = width;
+    renderbufferheight[boundrenderbuffer & 0x3ff] = height;
 }
-
 
 extern GLvoid glGenRenderbuffers(GLsizei n, GLuint *renderbuffers)
 {
@@ -1439,7 +1437,7 @@ extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment, GL
 
     __glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);
 
-    framebufferrenderbuffer[boundframebuffer] = renderbuffer;
+    framebufferrenderbuffer[boundframebuffer & 0x3ff] = renderbuffer;
 }
 
 extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer)
@@ -1458,7 +1456,7 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer)
     __glBindRenderbuffer(target, renderbuffer);
 
     boundrenderbuffer = renderbuffer;
-    framebufferrenderbuffer[boundframebuffer] = renderbuffer;
+    framebufferrenderbuffer[boundframebuffer & 0x3ff] = renderbuffer;
 }
 
 
