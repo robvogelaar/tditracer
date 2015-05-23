@@ -30,6 +30,7 @@ extern "C" {
  * TDITRACE
  */
 extern "C" int  tditrace_init(void);
+extern "C" void tditrace_rewind(void);
 extern "C" void tditrace(const char* format, ...);
 int tditrace_inited = 0;
 #define TDITRACE(...)               \
@@ -41,7 +42,6 @@ int tditrace_inited = 0;
         }                           \
         tditrace(__VA_ARGS__);      \
     } while (0)                     \
-
 
 
 
@@ -121,7 +121,9 @@ static GLuint renderbufferwidth[1024] = {};
 static GLuint renderbufferheight[1024] = {};
 
 
-static void sighandler(int signum);
+
+static void signalhandler(int sig, siginfo_t *si, void *context);
+
 
 
 static int shaders_captured = 0;
@@ -157,12 +159,18 @@ static void dump(void)
 
 static void init(void)
 {
-    printf("%s\n", __func__);
-
     static bool inited = false;
     if (!inited) {
 
-        signal(SIGINT, sighandler);
+        static struct sigaction sVal;
+
+        sVal.sa_flags = SA_SIGINFO;
+        sVal.sa_sigaction = signalhandler;
+        // Register for SIGINT
+        sigaction(SIGINT, &sVal, NULL);
+        // Register for SIGQUIT
+        sigaction(SIGQUIT, &sVal, NULL);
+
 
         if (getenv("PT")) {
             pthread = (atoi(getenv("PT")) >= 1);
@@ -188,7 +196,7 @@ static void init(void)
             texturerecording = true;
         }
 
-        printf("tditrace:init, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d, dumpafter:%d\n",
+        printf("tditracer: init, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d, dumpafter:%d\n",
             pthread? "yes":"no",
             shaderrecording? "yes":"no",
             texturerecording? "yes":"no",
@@ -210,47 +218,62 @@ extern "C" void *tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, 
 
 extern "C" void glReadPixels(GLint x,  GLint y,  GLsizei width,  GLsizei height,  GLenum format,  GLenum type,  GLvoid * data);
 
-static void sighandler(int signum)
+static void signalhandler(int sig, siginfo_t *si, void *context)
 {
-    printf("tditracer received SIGNAL : %d\n\n\n", signum);
+    switch(sig)
+    {
+        case SIGINT:
 
-    /*
-     * do not dump again if another ctrl-c is received, instead
-     * go direct to abort, allowing a current dumping to be aborted
-     */
-    if (!diddump) {
-        diddump = true;
+            printf("tditracer: received SIGINT\n");
 
-        if (framestorecord > 0) {
+            /*
+             * do not dump again if another ctrl-c is received, instead
+             * go direct to abort, allowing a current dumping to be aborted
+             */
+            if (!diddump) {
+                diddump = true;
 
-            framecapture_capframe();
-            frames_captured++;
+                if (framestorecord > 0) {
 
-            framecapture_capframe();
-            frames_captured++;
+                    framecapture_capframe();
+                    frames_captured++;
 
-            framecapture_capframe();
-            frames_captured++;
-        }
+                    framecapture_capframe();
+                    frames_captured++;
 
-        dump();
-    }
+                    framecapture_capframe();
+                    frames_captured++;
+                }
+
+                dump();
+            }
 
 
-    if (texturerecording) {
+            if (texturerecording) {
 
-        unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
-        glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, p);
-        void *pPNG_data;
-        size_t png_data_size = 0;
-        pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, 1280, 720, 4, &png_data_size, 6, 1);
-        FILE *pFile = fopen("frame.png", "wb");
-        fwrite(pPNG_data, 1, png_data_size, pFile);
-        chmod("frame.png", 0666);
-        fclose(pFile);
-    }
+                unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
+                glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, p);
+                void *pPNG_data;
+                size_t png_data_size = 0;
+                pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(p, 1280, 720, 4, &png_data_size, 6, 1);
+                FILE *pFile = fopen("frame.png", "wb");
+                fwrite(pPNG_data, 1, png_data_size, pFile);
+                chmod("frame.png", 0666);
+                fclose(pFile);
+            }
 
-    abort();
+            abort();
+
+        break;
+
+        case SIGQUIT:
+
+            printf("tditracer: received SIGQUIT, rewinding tracebuffer\n");
+
+            tditrace_rewind();
+
+        break;
+   }
 }
 
 
@@ -928,6 +951,24 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSur
 
     return b;
 }
+
+
+extern "C" void glFinish(void)
+{
+    static void (*__glFinish)(void)=NULL;
+
+    if (__glFinish==NULL) {
+        __glFinish = (void(*)(void))dlsym(RTLD_NEXT, "glFinish");
+        if (NULL == __glFinish) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    TDITRACE("@T+glFinish()");
+    __glFinish();
+    TDITRACE("@T-glFinish()");
+}
+
 
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {

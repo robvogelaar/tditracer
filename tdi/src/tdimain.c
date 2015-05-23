@@ -59,7 +59,7 @@ void simplefu_down(simplefu who)
     int val;
     do {
     val = who->avail;
-    if( val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1) )
+    if (val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1))
         return;
     __sync_fetch_and_add(&who->waiters, 1);
     syscall(__NR_futex, &who->avail, FUTEX_WAIT, val, NULL, 0, 0);
@@ -89,10 +89,12 @@ static  char    *gtrace_buffer;
 static  char    *trace_buffer_ptr;
         int     trace_counter;
 
+static  int     reported_full;
+
+
 typedef unsigned long long  _u64;
 
-//static pthread_mutex_t myMutex;
-struct simplefu_mutex myMutex1;
+struct simplefu_mutex myMutex;
 
 
 // 100 queues of 1000 chars each
@@ -465,7 +467,7 @@ void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long spe
         }
     }
 
-    printf("Adding the final entry (%d Bytes %d%% used)\n", (int)(text-ptr1), (int)((text-ptr1) * 100.0) / TRACEBUFFERSIZE );
+    printf("Adding the final entry (%d%% used)\n", (int)((((text-ptr1) * 100.0) / TRACEBUFFERSIZE) + 1));
 
     // Add one more entry 0.1 sec behind all the previous ones
     addentry(tdifile, "TDITRACE_EXIT\0", timestamp - timestamp_offset + 100 * 1000, tid);
@@ -497,13 +499,13 @@ int tditrace_init(void)
 
     memset(gtrace_buffer, 0, TRACEBUFFERSIZE);
 
-    printf("Tracer: tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
+    printf("tdi: tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
 
     trace_buffer_ptr = gtrace_buffer;
     trace_counter = 0;
 
     // write one time start text
-    i = sprintf(trace_buffer_ptr,(char*)"TRACEBUFFER\t");
+    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\t");
     trace_buffer_ptr+= i;
 
     // obtain absolute timestamp and write to buffer
@@ -512,13 +514,44 @@ int tditrace_init(void)
     _u64 timestamp_offset;
     timestamp_offset = (_u64)((_u64)mytime.tv_usec + (_u64)mytime.tv_sec * (_u64)1000000);
 
-    i = sprintf(trace_buffer_ptr,(char*)"%lld\t", timestamp_offset);
+    i = sprintf(trace_buffer_ptr, (char*)"%lld\t", timestamp_offset);
     trace_buffer_ptr+= i;
 
-    //pthread_mutex_init(&myMutex, NULL);
-    simplefu_mutex_init(&myMutex1);
+    reported_full = 0;
+
+    simplefu_mutex_init(&myMutex);
 
     return 0;
+}
+
+void tditrace_rewind()
+{
+    struct timeval mytime;
+    int i;
+
+    simplefu_mutex_lock(&myMutex);
+
+    memset(gtrace_buffer, 0, TRACEBUFFERSIZE);
+
+    trace_buffer_ptr = gtrace_buffer;
+    trace_counter = 0;
+
+    // write one time start text
+    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\t");
+    trace_buffer_ptr+= i;
+
+    // obtain absolute timestamp and write to buffer
+    gettimeofday(&mytime, 0);
+
+    _u64 timestamp_offset;
+    timestamp_offset = (_u64)((_u64)mytime.tv_usec + (_u64)mytime.tv_sec * (_u64)1000000);
+
+    i = sprintf(trace_buffer_ptr, (char*)"%lld\t", timestamp_offset);
+    trace_buffer_ptr+= i;
+
+    reported_full = 0;
+
+    simplefu_mutex_unlock(&myMutex);
 }
 
 
@@ -570,11 +603,9 @@ void tditrace(const char* format, ...)
     // get a timestamp
     timestamp = timestamp_usec();
 
-    //sem_wait(&mutex);     /* down semaphore */
-    //pthread_mutex_lock(&myMutex);
-    simplefu_mutex_lock(&myMutex1);
+    simplefu_mutex_lock(&myMutex);
 
-    if ((trace_buffer_ptr-gtrace_buffer) <= (TRACEBUFFERSIZE-500)) {
+    if ((trace_buffer_ptr - gtrace_buffer) <= (TRACEBUFFERSIZE - 500)) {
         // obtain the trace string
         va_start(args, format);
         vsprintf(buffer, format, args);
@@ -585,20 +616,30 @@ void tditrace(const char* format, ...)
 
         trace_counter++;
 
-        #if 0
-        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, 0);
+        #if 1
+        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t0\t", trace_counter, buffer, timestamp);
         #endif
-
-        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, (int)syscall(SYS_gettid));
 
         #if 0
         trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, this_pid);
         #endif
-    }
 
-    //sem_post(&mutex);
-    //pthread_mutex_unlock(&myMutex);
-    simplefu_mutex_unlock(&myMutex1);
+        #if 0
+        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, (int)syscall(SYS_gettid));
+        #endif
+
+        simplefu_mutex_unlock(&myMutex);
+
+    } else {
+
+        if (reported_full) {
+            simplefu_mutex_unlock(&myMutex);
+        } else {
+            reported_full = 1;
+            simplefu_mutex_unlock(&myMutex);
+            printf("tdi: full\n");
+        }
+    }
 }
 
 #if 0
