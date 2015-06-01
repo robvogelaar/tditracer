@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <linux/futex.h>
 
+
 struct simplefu_semaphore
 {
     int avail;
@@ -58,12 +59,12 @@ void simplefu_down(simplefu who)
 {
     int val;
     do {
-    val = who->avail;
-    if (val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1))
-        return;
-    __sync_fetch_and_add(&who->waiters, 1);
-    syscall(__NR_futex, &who->avail, FUTEX_WAIT, val, NULL, 0, 0);
-    __sync_fetch_and_sub(&who->waiters, 1);
+        val = who->avail;
+        if (val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1))
+            return;
+        __sync_fetch_and_add(&who->waiters, 1);
+        syscall(__NR_futex, &who->avail, FUTEX_WAIT, val, NULL, 0, 0);
+        __sync_fetch_and_sub(&who->waiters, 1);
     } while(1);
 }
 
@@ -83,14 +84,12 @@ void simplefu_up(simplefu who)
 
 #define TRACEBUFFERSIZE  (16*1024*1024)
 
-static  int     this_pid;
-
 static  char    *gtrace_buffer;
 static  char    *trace_buffer_ptr;
         int     trace_counter;
-
+static  int     tditrace_inited;
 static  int     reported_full;
-
+static  int     report_tid;
 
 typedef unsigned long long  _u64;
 
@@ -141,7 +140,6 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
     } else {
         sprintf(text_in1, "[%d]%s", tid, text_in);
     }
-
 
     // get rid of any '\n', replace with '_'
     for (i = 0 ; i < (int)strlen(text) ; i++) {
@@ -403,10 +401,10 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
 }
 
 
-void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long specific_timestamp_offset)
+static void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long specific_timestamp_offset)
 {
     char        *token;
-    const char  *search = "\t";
+    const char  *search = "\f";
     char        *ptr;
     char        *ptr1;
 
@@ -438,33 +436,36 @@ void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long spe
 
     int     tid = 0;
     char    *text;
+    int     timestamp_sec;
+    int     timestamp_usec;
 
     while (1) {
 
+        // layout is "\ftimestamp_sec\ftimestamp_usec\ftid\ftracestring"
+
         token = strtok(NULL, search);
-        // token should be  #counter, if not then end of buffer.
+        if (!token) break;
+        // token is timestamp_sec
+        timestamp_sec = atoi(token);
+        
+        token = strtok(NULL, search);
+        if (!token) break;
+        // token is timestamp_usec
+        timestamp_usec = atoi(token);
 
-        if (!token) {
-            break;
-        }
-        else {
-            token = strtok(NULL, search);
-            if (!token) break;
-            // token is functionname with optional parameters
-            text = token;
+        timestamp = (_u64)timestamp_usec + (_u64)timestamp_sec * (_u64)1000000;
 
-            token = strtok(NULL, search);
-            if (!token) break;
-            // token is timestamp
-            timestamp = (_u64)atoll(token);
+        token = strtok(NULL, search);
+        if (!token) break;
+        // token is tid
+        tid = atoi(token);
 
-            token = strtok(NULL, search);
-            if (!token) break;
-            // token is tid
-            tid = atoi(token);
+        token = strtok(NULL, search);
+        if (!token) break;
+        // token is trace text
+        text = token;
 
-            addentry(tdifile, text, timestamp - timestamp_offset, tid);
-        }
+        addentry(tdifile, text, timestamp - timestamp_offset, tid);
     }
 
     printf("Adding the final entry (%d%% used)\n", (int)((((text-ptr1) * 100.0) / TRACEBUFFERSIZE) + 1));
@@ -481,7 +482,13 @@ int tditrace_init(void)
     struct timeval mytime;
     int i;
 
-    this_pid = getpid();
+    if (tditrace_inited) {
+        return 0;
+    }
+
+    simplefu_mutex_init(&myMutex);
+
+    simplefu_mutex_lock(&myMutex);
 
     // TDI_LOG("(*TDI*) TDITRACE_INIT buffer size is %d\n", TRACEBUFFERSIZE);
 
@@ -490,6 +497,8 @@ int tditrace_init(void)
     FILE    *file;
     if ((file = fopen("/tmp/.tditracebuffer", "w+")) == 0) {
         printf("Error opening file /tmp/.tditracebuffer");
+
+        simplefu_mutex_unlock(&myMutex);
         return -1;
     }
 
@@ -497,7 +506,9 @@ int tditrace_init(void)
 
     gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fileno(file), 0);
 
-    memset(gtrace_buffer, 0, TRACEBUFFERSIZE);
+    for (i = 0; i < TRACEBUFFERSIZE ; i++) {
+        gtrace_buffer[i] = 0;
+    }
 
     printf("tdi: tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
 
@@ -505,7 +516,7 @@ int tditrace_init(void)
     trace_counter = 0;
 
     // write one time start text
-    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\t");
+    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\f");
     trace_buffer_ptr+= i;
 
     // obtain absolute timestamp and write to buffer
@@ -514,15 +525,20 @@ int tditrace_init(void)
     _u64 timestamp_offset;
     timestamp_offset = (_u64)((_u64)mytime.tv_usec + (_u64)mytime.tv_sec * (_u64)1000000);
 
-    i = sprintf(trace_buffer_ptr, (char*)"%lld\t", timestamp_offset);
+    i = sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_offset);
     trace_buffer_ptr+= i;
 
     reported_full = 0;
 
-    simplefu_mutex_init(&myMutex);
+    report_tid = (getenv("TID") != NULL);
+
+    tditrace_inited = 1;
+
+    simplefu_mutex_unlock(&myMutex);
 
     return 0;
 }
+
 
 void tditrace_rewind()
 {
@@ -531,13 +547,15 @@ void tditrace_rewind()
 
     simplefu_mutex_lock(&myMutex);
 
-    memset(gtrace_buffer, 0, TRACEBUFFERSIZE);
+    for (i = 0; i < TRACEBUFFERSIZE ; i++) {
+        gtrace_buffer[i] = 0;
+    }
 
     trace_buffer_ptr = gtrace_buffer;
     trace_counter = 0;
 
     // write one time start text
-    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\t");
+    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\f");
     trace_buffer_ptr+= i;
 
     // obtain absolute timestamp and write to buffer
@@ -546,7 +564,7 @@ void tditrace_rewind()
     _u64 timestamp_offset;
     timestamp_offset = (_u64)((_u64)mytime.tv_usec + (_u64)mytime.tv_sec * (_u64)1000000);
 
-    i = sprintf(trace_buffer_ptr, (char*)"%lld\t", timestamp_offset);
+    i = sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_offset);
     trace_buffer_ptr+= i;
 
     reported_full = 0;
@@ -592,77 +610,388 @@ void tditrace_exit(char* filename, char* trace_buffer)
 
 void tditrace(const char* format, ...)
 {
-    char    buffer[256];
     va_list args;
-    _u64    timestamp;
 
-    if (!gtrace_buffer) {
+    if (!tditrace_inited) {
         return;
     }
 
-    // get a timestamp
-    timestamp = timestamp_usec();
+    struct timeval  mytime;
+    gettimeofday(&mytime, 0);
 
     simplefu_mutex_lock(&myMutex);
 
-    if ((trace_buffer_ptr - gtrace_buffer) <= (TRACEBUFFERSIZE - 500)) {
-        // obtain the trace string
-        va_start(args, format);
-        vsprintf(buffer, format, args);
-        va_end(args);
-
-        // Add the string to the tracebuffer, and add timestamp
-        // layout is "#counter\ttracestring\ttimestamp\ttid\t"
-
-        trace_counter++;
-
-        #if 1
-        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t0\t", trace_counter, buffer, timestamp);
-        #endif
-
-        #if 0
-        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, this_pid);
-        #endif
-
-        #if 0
-        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"#%d\t%s\t%lld\t%d\t", trace_counter, buffer, timestamp, (int)syscall(SYS_gettid));
-        #endif
-
-        simplefu_mutex_unlock(&myMutex);
-
-    } else {
-
-        if (reported_full) {
-            simplefu_mutex_unlock(&myMutex);
-        } else {
-            reported_full = 1;
-            simplefu_mutex_unlock(&myMutex);
+    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 500)) {
+        if (!reported_full) {
             printf("tdi: full\n");
+            reported_full = 1;
+        }
+        simplefu_mutex_unlock(&myMutex);
+        return;
+    }
+
+
+    // Add the string to the tracebuffer, and add timestamp
+    // layout is "\ftimestamp_sec\ftimestamp_usec\ftid\ftracestring"
+
+    trace_counter++;
+
+    *trace_buffer_ptr++ = 0x0c;
+
+    #if 0
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)mytime.tv_sec);
+    #else
+    int n1 = 0;
+    unsigned int d1 = 1;
+    unsigned int num1 = (int)mytime.tv_sec;
+
+    while (num1 / d1 >= 10)
+        d1 *= 10;
+
+    while (d1 != 0) {
+        int digit1 = num1 / d1;
+        num1 %= d1;
+        d1 /= 10;
+        if (n1 || digit1 > 0 || d1 == 0) {
+            *trace_buffer_ptr++ = digit1 + '0';
+            n1++;
         }
     }
+    #endif
+    *trace_buffer_ptr++ = 0x0c;
+
+    #if 0
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)mytime.tv_usec);
+    #else
+    int n2 = 0;
+    unsigned int d2 = 1;
+    unsigned int num2 = (int)mytime.tv_usec;
+
+    while (num2 / d2 >= 10)
+        d2 *= 10;
+
+    while (d2 != 0) {
+        int digit2 = num2 / d2;
+        num2 %= d2;
+        d2 /= 10;
+        if (n2 || digit2 > 0 || d2 == 0) {
+            *trace_buffer_ptr++ = digit2 + '0';
+            n2++;
+        }
+    }
+    #endif
+    *trace_buffer_ptr++ = 0x0c;
+
+
+    if (!report_tid) {
+        *trace_buffer_ptr++ = 0x30;
+    } else {
+
+        #if 0
+        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)syscall(SYS_gettid));
+        #else
+        int n = 0;
+        unsigned int d = 1;
+        unsigned int num = (int)syscall(SYS_gettid);
+
+        while (num / d >= 10)
+            d *= 10;
+
+        while (d != 0) {
+            int digit = num / d;
+            num %= d;
+            d /= 10;
+            if (n || digit > 0 || d == 0) {
+                *trace_buffer_ptr++ = digit + '0';
+                n++;
+            }
+        }
+        #endif
+
+    }
+    
+    *trace_buffer_ptr++ = 0x0c;
+
+    // obtain the trace string
+    va_start(args, format);
+
+    #if 0
+    trace_buffer_ptr+= vsprintf(trace_buffer_ptr, format, args);
+    #else
+    char ch;
+
+    va_start(args, format);
+
+    while (ch = *(format++)) {
+
+        if (ch == '%') {
+
+            switch (ch = (*format++)) {
+
+                case 's': {
+                    char *s;
+                    s = va_arg(args, char *);
+                    while (*s) *trace_buffer_ptr++ = *s++;
+                    break;
+                }
+                case 'd':
+                case 'u': {
+                    int n = 0;
+                    unsigned int d = 1;
+                    unsigned int num = va_arg(args, int);
+
+                    while (num / d >= 10)
+                        d *= 10;
+
+                    while (d != 0) {
+                        int digit = num / d;
+                        num %= d;
+                        d /= 10;
+                        if (n || digit > 0 || d == 0) {
+                            *trace_buffer_ptr++ = digit + '0';
+                            n++;
+                        }
+                    }
+                    break;  
+                }
+                
+                case 'x':
+                case 'p': {
+                    int n = 0;
+                    unsigned int d = 1;
+                    unsigned int num = va_arg(args, int);
+
+                    while (num / d >= 16)
+                        d *= 16;
+
+                    while (d != 0) {
+                        int dgt = num / d;
+                        num %= d;
+                        d /= 16;
+                        if (n || dgt > 0 || d == 0) {
+                            *trace_buffer_ptr++ = dgt + (dgt < 10 ? '0' : 'a' - 10);
+                            ++n;
+                        }
+                    }
+                    break;  
+                }    
+
+                default :
+                    break;
+            }
+            
+        } else {
+            *trace_buffer_ptr++ = ch;
+        }
+    }
+    #endif
+
+    va_end(args);
+
+    simplefu_mutex_unlock(&myMutex);
 }
 
-#if 0
-// returns the amount of memFree
-static int meminfo(void)
+
+void tditrace_ex(const char* format, ...)
 {
-    char    dummy[16];
-    FILE    *stat;
-    int     found = 0;
-    int     MemFree;
+    va_list args;
 
-    stat = fopen ("/proc/meminfo", "r");
-    if (!stat)
-        return -1;
-
-    while (!found) {
-        if (fscanf (stat, "%s", dummy) != 1) return -1;
-        found = (strcmp(dummy, "MemFree:") == 0);
+    if (!tditrace_inited) {
+        return;        
     }
 
-    if (fscanf (stat, "%d", &MemFree) != 1) return -1;
-    fclose (stat);
 
-    return free;
-}
+    struct timeval  mytime;
+    gettimeofday(&mytime, 0);
+
+    simplefu_mutex_lock(&myMutex);
+
+    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 500)) {
+        if (!reported_full) {
+            printf("tdi: full\n");
+            reported_full = 1;
+        }
+        simplefu_mutex_unlock(&myMutex);
+        return;
+    }
+
+
+#if 0
+
+    // Add the string to the tracebuffer, and add timestamp
+    // layout is "\ftimestamp_sec\ftimestamp_usec\ftid\ftracestring"
+
+    trace_counter++;
+
+    *trace_buffer_ptr++ = 0x0c;
+
+    #if 0
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)mytime.tv_sec);
+    #else
+    int n1 = 0;
+    unsigned int d1 = 1;
+    unsigned int num1 = (int)mytime.tv_sec;
+
+    while (num1 / d1 >= 10)
+        d1 *= 10;
+
+    while (d1 != 0) {
+        int digit1 = num1 / d1;
+        num1 %= d1;
+        d1 /= 10;
+        if (n1 || digit1 > 0 || d1 == 0) {
+            *trace_buffer_ptr++ = digit1 + '0';
+            n1++;
+        }
+    }
+    #endif
+    *trace_buffer_ptr++ = 0x0c;
+
+    #if 0
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)mytime.tv_usec);
+    #else
+    int n2 = 0;
+    unsigned int d2 = 1;
+    unsigned int num2 = (int)mytime.tv_usec;
+
+    while (num2 / d2 >= 10)
+        d2 *= 10;
+
+    while (d2 != 0) {
+        int digit2 = num2 / d2;
+        num2 %= d2;
+        d2 /= 10;
+        if (n2 || digit2 > 0 || d2 == 0) {
+            *trace_buffer_ptr++ = digit2 + '0';
+            n2++;
+        }
+    }
+    #endif
+    *trace_buffer_ptr++ = 0x0c;
+
+
+    if (!report_tid) {
+        *trace_buffer_ptr++ = 0x30;
+    } else {
+
+        #if 0
+        trace_buffer_ptr+= sprintf(trace_buffer_ptr,"%d", (int)syscall(SYS_gettid));
+        #else
+        int n = 0;
+        unsigned int d = 1;
+        unsigned int num = (int)syscall(SYS_gettid);
+
+        while (num / d >= 10)
+            d *= 10;
+
+        while (d != 0) {
+            int digit = num / d;
+            num %= d;
+            d /= 10;
+            if (n || digit > 0 || d == 0) {
+                *trace_buffer_ptr++ = digit + '0';
+                n++;
+            }
+        }
+        #endif
+
+    }
+    
+    *trace_buffer_ptr++ = 0x0c;
+
+    // obtain the trace string
+    va_start(args, format);
+
+    #if 0
+    trace_buffer_ptr+= vsprintf(trace_buffer_ptr, format, args);
+    #else
+    char ch;
+
+    va_start(args, format);
+
+    while (ch = *(format++)) {
+
+        if (ch == '%') {
+
+            switch (ch = (*format++)) {
+
+                case 's': {
+                    char *s;
+                    s = va_arg(args, char *);
+                    while (*s) *trace_buffer_ptr++ = *s++;
+                    break;
+                }
+                case 'd':
+                case 'u': {
+                    int n = 0;
+                    unsigned int d = 1;
+                    unsigned int num = va_arg(args, int);
+
+                    while (num / d >= 10)
+                        d *= 10;
+
+                    while (d != 0) {
+                        int digit = num / d;
+                        num %= d;
+                        d /= 10;
+                        if (n || digit > 0 || d == 0) {
+                            *trace_buffer_ptr++ = digit + '0';
+                            n++;
+                        }
+                    }
+                    break;  
+                }
+                
+                case 'x':
+                case 'p': {
+                    int n = 0;
+                    unsigned int d = 1;
+                    unsigned int num = va_arg(args, int);
+
+                    while (num / d >= 16)
+                        d *= 16;
+
+                    while (d != 0) {
+                        int dgt = num / d;
+                        num %= d;
+                        d /= 16;
+                        if (n || dgt > 0 || d == 0) {
+                            *trace_buffer_ptr++ = dgt + (dgt < 10 ? '0' : 'a' - 10);
+                            ++n;
+                        }
+                    }
+                    break;  
+                }    
+
+                default :
+                    break;
+            }
+            
+        } else {
+            *trace_buffer_ptr++ = ch;
+        }
+    }
+    #endif
+
+    va_end(args);
+
+    simplefu_mutex_unlock(&myMutex);
 #endif
+}
+
+
+static void __attribute__ ((constructor)) tdi_constructor();
+static void __attribute__ ((destructor)) tdi_destructor();
+
+extern char *__progname;
+
+static void tdi_constructor()
+{
+    if (strcmp(__progname, "tdidump") != 0) {
+        tditrace_init();
+    }
+}
+
+static void tdi_destructor()
+{
+}
