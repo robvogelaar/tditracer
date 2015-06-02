@@ -510,7 +510,7 @@ int tditrace_init(void)
         gtrace_buffer[i] = 0;
     }
 
-    printf("tdi: tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
+    printf("tdi: init, tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
 
     trace_buffer_ptr = gtrace_buffer;
     trace_counter = 0;
@@ -977,21 +977,4 @@ void tditrace_ex(const char* format, ...)
 
     simplefu_mutex_unlock(&myMutex);
 #endif
-}
-
-
-static void __attribute__ ((constructor)) tdi_constructor();
-static void __attribute__ ((destructor)) tdi_destructor();
-
-extern char *__progname;
-
-static void tdi_constructor()
-{
-    if (strcmp(__progname, "tdidump") != 0) {
-        tditrace_init();
-    }
-}
-
-static void tdi_destructor()
-{
 }

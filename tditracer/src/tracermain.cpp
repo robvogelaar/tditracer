@@ -10,6 +10,8 @@
 
 #include "tdi.h"
 
+#include "tracerutils.h"
+
 extern int trace_counter;
 
 extern "C" {
@@ -30,6 +32,8 @@ extern char *__progname;
 
 static void tditracer_constructor()
 {
+    tditrace_init();
+
     init();
 }
 
@@ -213,6 +217,8 @@ extern "C" void syslog(int f, const char *format, ...)
     va_start(args, format);
     vsnprintf(buf, 256, format, args);
     va_end(args);
+
+    //printf("%s,[%s]\n", buf, addrinfo(__builtin_return_address(0)));
 
     TDITRACE("%s", buf);
 

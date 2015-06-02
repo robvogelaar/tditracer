@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include "tracermain.h"
+#include "tracerutils.h"
 #include "gldefs.h"
 #include "tdi.h"
 

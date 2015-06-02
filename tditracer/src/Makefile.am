@@ -19,6 +19,7 @@ libtditracer_la_SOURCES = \
    texturelinkedlist.h \
    gldefs.h \
    tracermain.cpp \
+   tracerutils.cpp \
    tracergles2.cpp \
    tracerlibc.cpp \
    tracersgx.cpp \

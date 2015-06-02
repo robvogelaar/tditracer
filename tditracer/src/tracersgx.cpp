@@ -9,7 +9,7 @@ extern "C" int SGXQueueTransfer(void* hTransferContext, struct tag *psQueueTrans
     static int (*__SGXQueueTransfer)(void*, struct tag*) = NULL;
 
     if (__SGXQueueTransfer==NULL) {
-        __SGXQueueTransfer = (int (*)(void*, struct tag*))dlsym(RTLD_NEXT,"SGXQueueTransfer");
+        __SGXQueueTransfer = (int (*)(void*, struct tag*))dlsym(RTLD_NEXT, "SGXQueueTransfer");
         if (NULL == __SGXQueueTransfer) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -274,12 +274,14 @@ typedef struct package_tag
     unsigned int    id;
 } package_t;
 
+
+#if 1
 extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex, void *data, unsigned long size)
 {
     static int (*__drmCommandWrite)(int, unsigned long, void *, unsigned long) = NULL;
 
     if (__drmCommandWrite==NULL) {
-        __drmCommandWrite = (int (*)(int, unsigned long, void *, unsigned long))dlsym(RTLD_NEXT,"drmCommandWrite");
+        __drmCommandWrite = (int (*)(int, unsigned long, void *, unsigned long))dlsym(RTLD_NEXT, "drmCommandWrite");
         if (NULL == __drmCommandWrite) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -287,9 +289,12 @@ extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex, void *data
 
     package_t* ppackage = (package_t*)data;
 
-    TDITRACE("@T+drmCommandWrite() func=0x%x \"%s\"", ppackage->id, strings[ppackage->id - 0xc01c6700]);
+    TDITRACE("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
     int ret = __drmCommandWrite(fd, drmCommandIndex, data, size);
-    TDITRACE("@T-drmCommandWrite()");
-
+    /*
+     * cannot trace here...
+     * TDITRACE("drmCommandWrite()");
+     */
     return ret;
 }
+#endif

@@ -1,5 +1,11 @@
-#if 0
-const char* demangle(const char* s)
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+#include <cxxabi.h>
+
+static const char* demangle(const char* s)
 {
     if (s) {
         if (strstr(s, "_ZN")) {
@@ -13,6 +19,7 @@ const char* demangle(const char* s)
 
     return s;
 }
+
 
 char* addrinfo(void* addr)
 {
@@ -33,6 +40,9 @@ int pthreadid(pthread_t ptid)
     memcpy(&threadId, &ptid, 4);
     return threadId;
 }
+
+
+#if 0
 
 #define MAXFRAMES 32
 
