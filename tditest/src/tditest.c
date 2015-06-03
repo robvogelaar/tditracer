@@ -1,5 +1,8 @@
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 /*
  **************************************
@@ -26,11 +29,26 @@ int tditrace_inited = 0;
  **************************************
  */
 
+
 int main(int argc, char **argv)
 {
     int i;
 
+    struct timeval  mytimeval;
+    struct timespec mytimespec;
+
+
     printf("start...\n");
+
+    for (i = 0; i < 150; i++) {
+        gettimeofday(&mytimeval, 0); printf("%d,%d\n", mytimeval.tv_sec, mytimeval.tv_usec);
+        usleep(10000);
+    }
+    
+    for (i = 0; i < 150; i++) {
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec); printf("%d,%d\n", mytimespec.tv_sec, mytimespec.tv_nsec);
+        usleep(10000);
+    }
 
     for (i = 0; i < 10; i++) {
         // will all appear in the same "HELLO" , "NOTES"-timeline
@@ -55,6 +73,48 @@ int main(int argc, char **argv)
         TDITRACE("@T+HELLO");
         usleep(50000);
         TDITRACE("@T-HELLO");
+
+
+        TDITRACE("@T+TEST");
+
+        TDITRACE("@T+T0");
+
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+        gettimeofday(&mytimeval, 0);
+
+        TDITRACE("@T-T0");
+        
+        TDITRACE("@T+T1");
+
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+
+        TDITRACE("@T-T1");
+        
+
+        TDITRACE("T2 01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+
+        TDITRACE("T3 @s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+
+        TDITRACE("T4 %d %d %d %d", 1234567, 1234567, 1234567, 1234567);
+
+        TDITRACE("@T-TEST");
+
 
         usleep(50000);
 

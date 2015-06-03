@@ -92,6 +92,9 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSur
         }
     }
 
+
+    //printf("eglMakeCurrent display=%d draw=0x%x read=0x%x context=0x%x%s,[%s]\n", display, draw, read, context, addrinfo(__builtin_return_address(0)));
+
     TDITRACE("@T+eglMakeCurrent() display=%d draw=0x%x read=0x%x context=0x%x", display, draw, read, context);
     EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
     TDITRACE("@T-eglMakeCurrent()");
@@ -515,6 +518,8 @@ extern "C" GLvoid glClear(GLbitfield mask)
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
+
+    //printf("%s,[%s]\n", CLEARSTRING(mask), addrinfo(__builtin_return_address(0)));
 
     TDITRACE("@T+glClear() %s", CLEARSTRING(mask));
 

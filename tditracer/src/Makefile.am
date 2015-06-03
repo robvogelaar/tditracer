@@ -25,4 +25,5 @@ libtditracer_la_SOURCES = \
    tracersgx.cpp \
    tracerpthread.cpp \
    tracersem.cpp \
-   tracermq.cpp
+   tracermq.cpp \
+   tracerextra.cpp

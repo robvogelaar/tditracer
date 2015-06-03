@@ -44,11 +44,12 @@ static void tditracer_destructor()
 
 
 int  framestorecord;
-bool texturerecording = false;
-bool renderbufferrecording  = false;
-bool shaderrecording = false;
-bool libcrecording = false;
-bool pthreadrecording = false;
+bool texturerecording;
+bool renderbufferrecording;
+bool shaderrecording;
+bool libcrecording;
+bool pthreadrecording;
+bool syslogrecording;
 
 
 int shaders_captured = 0;
@@ -165,13 +166,21 @@ static void init(void)
 
         if (getenv("LIBC")) {
             libcrecording = (atoi(getenv("LIBC")) >= 1);
+        } else {
+            libcrecording = false;
         }
 
         if (getenv("PTHREAD")) {
             pthreadrecording = (atoi(getenv("PTHREAD")) >= 1);
+        } else {
+            pthreadrecording = false;
         }
 
-
+        if (getenv("SYSLOG")) {
+            syslogrecording = (atoi(getenv("SYSLOG")) >= 1);
+        } else {
+            syslogrecording = true;
+        }
 
         if (getenv("TR")) {
             texturerecording = (atoi(getenv("TR")) >= 1);
@@ -190,12 +199,13 @@ static void init(void)
             texturerecording = true;
         }
 
-        printf("tditracer: init, libc:%s, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d\n",
-            libcrecording? "yes":"no",
-            pthreadrecording? "yes":"no",
-            shaderrecording? "yes":"no",
-            texturerecording? "yes":"no",
-            renderbufferrecording? "yes":"no",
+        printf("tditracer: init, libc:%s, pthread:%s, syslog:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d\n",
+            libcrecording ? "yes":"no",
+            pthreadrecording ? "yes":"no",
+            syslogrecording ? "yes":"no",
+            shaderrecording ? "yes":"no",
+            texturerecording ? "yes":"no",
+            renderbufferrecording ? "yes":"no",
             framestorecord);
 
         inited = true;
@@ -213,18 +223,21 @@ extern "C" void syslog(int f, const char *format, ...)
 {
     char buf[256];
 
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buf, 256, format, args);
-    va_end(args);
+    if (syslogrecording) {
 
-    //printf("%s,[%s]\n", buf, addrinfo(__builtin_return_address(0)));
+        va_list args;
+        va_start(args, format);
+        vsnprintf(buf, 256, format, args);
+        va_end(args);
 
-    TDITRACE("%s", buf);
+        //printf("%s,[%s]\n", buf, addrinfo(__builtin_return_address(0)));
 
-    #if 0
-    if (f) {
-        print_stacktrace();
+        TDITRACE("%s", buf);
+
+        #if 0
+        if (f) {
+            print_stacktrace();
+        }
+        #endif
     }
-    #endif
 }

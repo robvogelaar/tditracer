@@ -111,9 +111,10 @@ typedef float        GLclampf;
 
 
 
-#define CLEARSTRING(mask)       (mask==GL_DEPTH_BUFFER_BIT        ? "GL_DEPTH_BUFFER_BIT":        \
-                                 mask==GL_STENCIL_BUFFER_BIT      ? "GL_STENCIL_BUFFER_BIT":      \
-                                 mask==GL_COLOR_BUFFER_BIT        ? "GL_COLOR_BUFFER_BIT": "???")
+#define CLEARSTRING(mask)       (mask==GL_DEPTH_BUFFER_BIT                     ? "GL_DEPTH_BUFFER_BIT":         \
+                                 mask==GL_STENCIL_BUFFER_BIT                   ? "GL_STENCIL_BUFFER_BIT":       \
+                                 mask==GL_COLOR_BUFFER_BIT                     ? "GL_COLOR_BUFFER_BIT":         \
+                                 mask==(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT) ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT": "???")
 
 #define CAPSTRING(factor)       (cap==GL_TEXTURE_2D               ? "GL_TEXTURE_2D":               \
                                  cap==GL_CULL_FACE                ? "GL_CULL_FACE":                \
