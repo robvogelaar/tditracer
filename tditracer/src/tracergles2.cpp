@@ -122,6 +122,23 @@ extern "C" void glFinish(void)
 }
 
 
+extern "C" void glFlush(void)
+{
+    static void (*__glFlush)(void) = NULL;
+
+    if (__glFlush==NULL) {
+        __glFlush = (void(*)(void))dlsym(RTLD_NEXT, "glFlush");
+        if (NULL == __glFlush) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    TDITRACE("@T+glFlush()");
+    __glFlush();
+    TDITRACE("@T-glFlush()");
+}
+
+
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count)
 {
     static void (*__glDrawArrays)(GLenum, GLint, GLsizei) = NULL;

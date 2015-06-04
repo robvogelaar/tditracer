@@ -26,8 +26,12 @@ char* addrinfo(void* addr)
     static char text[256];
     Dl_info dli;
 
-    dladdr(addr, &dli);
-    sprintf(text, "[0x%08x] %s (%s)", (int)addr, demangle(dli.dli_sname), dli.dli_fname);
+    if (addr) {
+        dladdr(addr, &dli);
+        snprintf(text, 256, "0x%08x %s (%s)", (int)addr, demangle(dli.dli_sname), dli.dli_fname);
+    } else {
+        sprintf(text, "0x%08x ? (?)");
+    }
     return text;
 }
 

@@ -219,6 +219,8 @@ static void init(void)
  * syslog(0,"@T-FBIOPAN_DISPLAY");
  */
 
+#include <execinfo.h>
+
 extern "C" void syslog(int f, const char *format, ...)
 {
     char buf[256];
@@ -230,14 +232,14 @@ extern "C" void syslog(int f, const char *format, ...)
         vsnprintf(buf, 256, format, args);
         va_end(args);
 
-        //printf("%s,[%s]\n", buf, addrinfo(__builtin_return_address(0)));
+        // if (0) {
+        //     void* addrlist[10];
+        //     int i = backtrace(addrlist, 10);
+        //     TDITRACE("%s %d [%s]", buf, i, addrinfo(addrlist[1]));
+        // } else {
+        //     TDITRACE("%s", buf);
+        // }
 
         TDITRACE("%s", buf);
-
-        #if 0
-        if (f) {
-            print_stacktrace();
-        }
-        #endif
     }
 }

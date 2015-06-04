@@ -711,7 +711,14 @@ void tditrace(const char* format, ...)
                 case 's': {
                     char *s;
                     s = va_arg(args, char *);
-                    while (*s) *trace_buffer_ptr++ = *s++;
+                    if (s) {
+                        while (*s) *trace_buffer_ptr++ = *s++;
+                    } else {
+                        *trace_buffer_ptr++ = 'n';
+                        *trace_buffer_ptr++ = 'i';
+                        *trace_buffer_ptr++ = 'l';
+                        *trace_buffer_ptr++ = 'l';
+                    }
                     break;
                 }
                 case 'd':
