@@ -495,7 +495,7 @@ static void converttracetotdi(FILE* tdifile)
         
         while (ep = readdir(dp)) {
 
-            if (strncmp(ep->d_name, ".tditracebuffer-", 16) == 0) {
+            if (strncmp(ep->d_name, ".tditracebuffer:", 16) == 0) {
 
                 FILE*   file;
 
@@ -508,7 +508,7 @@ static void converttracetotdi(FILE* tdifile)
                     printf("Found \"%s\"\n", tracebuffers[buffers].filename);
 
                     strncpy(tracebuffers[buffers].procname, (const char*)&tracebuffers[buffers].filename[21],
-                               strchr(&tracebuffers[buffers].filename[21], '-') - &tracebuffers[buffers].filename[21]);
+                               strchr(&tracebuffers[buffers].filename[21], ':') - &tracebuffers[buffers].filename[21]);
 
                     tracebuffers[buffers].pid = atoi(&tracebuffers[buffers].filename[22 + strlen(tracebuffers[buffers].procname)]);
                 
@@ -547,7 +547,7 @@ static void converttracetotdi(FILE* tdifile)
 
     if (buffers == 0) {
 
-        fprintf(stderr, "Not found: \"/tmp/.tditracebuffer-*-*\"\n");
+        fprintf(stderr, "Not found: \"/tmp/.tditracebuffer:*:*\"\n");
         return;
     }
 
@@ -659,15 +659,24 @@ unsigned int find_process_name(char *p_processname)
 
 void get_process_name_by_pid(const int pid, char*name)
 {
+    char fullname[1024];
     if (name){
         sprintf(name, "/proc/%d/cmdline",pid);
+        
         FILE* f = fopen(name,"r");
         if (f){
             size_t size;
-            size = fread(name, sizeof(char), 1024, f);
+            size = fread(fullname, sizeof(char), 1024, f);
+            
             if (size > 0){
-                if ('\n' == name[size - 1])
-                    name[size - 1]='\0';
+                if ('\n' == fullname[size - 1])
+                    fullname[size - 1] ='\0';
+
+                if (strrchr(fullname, '/')) {
+                    strcpy(name, strrchr(fullname, '/') + 1);
+                } else {
+                    strcpy(name, fullname);
+                }
             }
             fclose(f);
         }
@@ -691,7 +700,7 @@ int tditrace_init(void)
 
     char tracebufferfilename[128];
 
-    sprintf(tracebufferfilename, (char*)"/tmp/.tditracebuffer-%s-%d", procname, pid);
+    sprintf(tracebufferfilename, (char*)"/tmp/.tditracebuffer:%s:%d", procname, pid);
 
     /*
      * remove stale tracefiles, i.e. those with this procname, and procname not running
@@ -701,7 +710,7 @@ int tditrace_init(void)
     struct dirent *ep;
 
     char match[128];
-    sprintf(match, (char*)".tditracebuffer-%s-", procname);
+    sprintf(match, (char*)".tditracebuffer:%s:", procname);
 
     dp = opendir ("/tmp/");
     if (dp != NULL) {
