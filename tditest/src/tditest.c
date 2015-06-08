@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <time.h>
 
 /*
  **************************************
@@ -40,17 +40,21 @@ int main(int argc, char **argv)
 
     printf("start...\n");
 
+    #if 0
     for (i = 0; i < 150; i++) {
-        gettimeofday(&mytimeval, 0); printf("%d,%d\n", mytimeval.tv_sec, mytimeval.tv_usec);
+        gettimeofday(&mytimeval, 0); printf("%d,%d\n", (int)mytimeval.tv_sec, (int)mytimeval.tv_usec);
         usleep(10000);
     }
-    
-    for (i = 0; i < 150; i++) {
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec); printf("%d,%d\n", mytimespec.tv_sec, mytimespec.tv_nsec);
-        usleep(10000);
-    }
+    #endif
 
-    for (i = 0; i < 10; i++) {
+    #if 0
+    for (i = 0; i < 150; i++) {
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec); printf("%d,%d\n", (int)mytimespec.tv_sec, (int)mytimespec.tv_nsec);
+        usleep(10000);
+    }
+    #endif
+
+    for (i = 0; i < 50; i++) {
         // will all appear in the same "HELLO" , "NOTES"-timeline
         TDITRACE("HELLO");
         TDITRACE("HELLO %d", i);
@@ -107,14 +111,19 @@ int main(int argc, char **argv)
         TDITRACE("@T-T1");
         
 
-        TDITRACE("T2 01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        TDITRACE("@T+T2 01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        TDITRACE("@T-T2");
 
-        TDITRACE("T3 @s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        TDITRACE("@T+T3 %s", "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        TDITRACE("@T-T3");
 
-        TDITRACE("T4 %d %d %d %d", 1234567, 1234567, 1234567, 1234567);
+        TDITRACE("@T+T5 %d %u %x %p", 0, 0, 0, 0);
+        TDITRACE("@T-T5");
+        
+        TDITRACE("@T+T5 %d %u %x %p", 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff);
+        TDITRACE("@T-T5");
 
         TDITRACE("@T-TEST");
-
 
         usleep(50000);
 

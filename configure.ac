@@ -28,8 +28,6 @@ AC_TYPE_UINT8_T
 AC_TYPE_UINT32_T
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_CHECK_FUNCS([gettimeofday memset strcspn strdup strerror strstr strtol strtoul])
 
 AC_CONFIG_FILES([

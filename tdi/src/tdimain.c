@@ -9,9 +9,11 @@
 #include <syscall.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <sys/mman.h>
 #include <linux/futex.h>
 
+#include <dirent.h>
 
 struct simplefu_semaphore
 {
@@ -111,7 +113,15 @@ static int  nr_events = 0;
 static char notes_array[1000][100];
 static int  nr_notes = 0;
 
-static _u64 timestamp_nsec(void)
+static _u64 timestamp_timeofday_nsec(void)
+{
+    struct timeval mytime;
+
+    gettimeofday(&mytime, 0);
+    return ((_u64)((_u64)mytime.tv_usec * (_u64)1000 + (_u64)mytime.tv_sec * (_u64)1000000000));
+}
+
+static _u64 timestamp_monotonic_nsec(void)
 {
     struct timespec mytime;
 
@@ -119,7 +129,7 @@ static _u64 timestamp_nsec(void)
     return ((_u64)((_u64)mytime.tv_nsec + (_u64)mytime.tv_sec * (_u64)1000000000));
 }
 
-static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
+static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, char* procname, int pid, int tid)
 {
     int     i;
     int     entry;
@@ -131,13 +141,14 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
     char    text_in1[256];
     char    *text = text_in1;
 
-    if ((strncmp(text_in,"@T+",3)==0) || (strncmp(text_in,"@T-",3)==0) || (strncmp(text_in,"@E+",3)==0)) {
+
+    if ((strncmp(text_in, "@T+", 3) == 0) || (strncmp(text_in, "@T-", 3) == 0) || (strncmp(text_in, "@E+", 3) == 0)) {
 
         strncpy(text_in1, text_in, 3);
-        sprintf(&text_in1[3], "[%d]%s", tid, &text_in[3]);
+        sprintf(&text_in1[3], "[%s][%d][%d]%s", procname, pid, tid, &text_in[3]);
 
     } else {
-        sprintf(text_in1, "[%d]%s", tid, text_in);
+        sprintf(text_in1, "[%s][%d][%d]%s", procname, pid, tid, text_in);
     }
 
     // get rid of any '\n', replace with '_'
@@ -152,9 +163,9 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
      * TASKS entry
      *
      */
-    if ((strncmp(text,"@T+",3)==0) || (strncmp(text,"@T-",3)==0)) {
+    if ((strncmp(text, "@T+", 3) == 0) || (strncmp(text, "@T-", 3) == 0)) {
 
-        int enter_not_exit = (strncmp(text+2,"+",1)==0);
+        int enter_not_exit = (strncmp(text + 2, "+", 1) == 0);
 
         text+= 3;
         // if the entry has not been seen before, add a new entry for it and issue a NAM
@@ -222,7 +233,7 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
      * EVENTS entry
      *
      */
-    if (strncmp(text,"@E+",3)==0) {
+    if (strncmp(text, "@E+", 3) == 0) {
 
         text+= 3;
         // if the entry has not been seen before, add a new entry for it and issue a NAM
@@ -399,81 +410,268 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, int tid)
     fwrite(fullentry, strlen(fullentry), 1, tdifile);
 }
 
+typedef struct {
 
-static void converttracetotdi(FILE* tdifile, char* trace_buffer, unsigned long long specific_timestamp_offset)
+    char    filename[128];
+    char    procname[64];
+    int     pid;
+    char*   bufmmapped;
+    char*   buf;
+    int     bufsize;
+    char*   ptr;
+    char*   saveptr;
+    _u64    timeofday_offset;
+    _u64    monotonic_offset;
+    _u64    monotonic_timestamp;
+    char*   text;
+    int     tid;
+    int     valid;
+} tracebuffer_t;
+
+tracebuffer_t tracebuffers[5];
+
+
+static void parse(int bid) 
 {
-    char        *token;
     const char  *search = "\f";
+    char    *token;
+
+    int     timestamp_sec;
+    int     timestamp_nsec;
+    
+
+    // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
+
+    tracebuffers[bid].valid = 0;
+
+    token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
+    if (token) {
+
+        // token is timestamp_sec
+        timestamp_sec = atoi(token);
+
+        token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
+        if (token) {
+            
+            // token is timestamp_nsec
+            timestamp_nsec = atoi(token);
+
+            tracebuffers[bid].monotonic_timestamp = (_u64)timestamp_nsec + (_u64)timestamp_sec * (_u64)1000000000;
+
+            token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
+            if (token) {
+
+                // token is tid
+                tracebuffers[bid].tid = atoi(token);
+
+                token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
+                if (token) {
+
+                    tracebuffers[bid].text = token;
+                    tracebuffers[bid].valid = 1;
+                }
+            }
+        }
+    }
+}
+
+
+static void converttracetotdi(FILE* tdifile)
+{
+    int         i;
+    const char  *search = "\f";
+    
     char        *ptr;
     char        *ptr1;
 
-    if (!trace_buffer) {
-        trace_buffer = gtrace_buffer;
+    int         buffers = 0;
+
+    DIR*        dp;
+    struct dirent *ep;
+
+
+    dp = opendir ("/tmp/");
+    if (dp != NULL) {
+        
+        while (ep = readdir(dp)) {
+
+            if (strncmp(ep->d_name, ".tditracebuffer-", 16) == 0) {
+
+                FILE*   file;
+
+                sprintf(tracebuffers[buffers].filename, "/tmp/%s", ep->d_name);
+
+                if ((file = fopen(tracebuffers[buffers].filename, "r")) != NULL) {
+
+                    /* /tmp/.tditracebuffer-xxx-xxx */
+
+                    printf("Found \"%s\"\n", tracebuffers[buffers].filename);
+
+                    strncpy(tracebuffers[buffers].procname, (const char*)&tracebuffers[buffers].filename[21],
+                               strchr(&tracebuffers[buffers].filename[21], '-') - &tracebuffers[buffers].filename[21]);
+
+                    tracebuffers[buffers].pid = atoi(&tracebuffers[buffers].filename[22 + strlen(tracebuffers[buffers].procname)]);
+                
+                    struct stat st;
+                    stat(tracebuffers[buffers].filename, &st);
+
+                    tracebuffers[buffers].bufmmapped = (char *)mmap(0, st.st_size, PROT_READ, MAP_SHARED, fileno(file), 0);
+                    tracebuffers[buffers].bufsize = st.st_size;
+                    tracebuffers[buffers].buf = malloc(st.st_size);
+                    memcpy(tracebuffers[buffers].buf, tracebuffers[buffers].bufmmapped, st.st_size);
+                    tracebuffers[buffers].ptr = tracebuffers[buffers].buf;
+
+                    // token should hold "TDITRACEBUFFER"
+                    if (strncmp("TDITRACEBUFFER", strtok_r(tracebuffers[buffers].ptr, search, &tracebuffers[buffers].saveptr), 14) != 0) {
+                        printf("Invalid tracebuffer, skipping\n");
+                        break;
+                    }
+
+                    // token should hold "timeofday timestamp offset in nsecs"
+                    tracebuffers[buffers].timeofday_offset = (_u64)atoll(strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+
+                    tracebuffers[buffers].monotonic_offset = (_u64)atoll(strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+
+                    fclose(file);
+                    
+                    buffers++;
+
+                }
+
+            }
+            
+        }
+
+        closedir(dp);
     }
 
-    // strtok modifies the buffer, make a copy and work with the copy
-    // such that we can call tdidump more than once
-    ptr = (char*)malloc(TRACEBUFFERSIZE);
-    memcpy(ptr, trace_buffer, TRACEBUFFERSIZE);
+    if (buffers == 0) {
 
-    ptr1 = ptr;
-
-    token = strtok(ptr, search);
-    // token should hold "TRACEBUFFER"
-
-    token = strtok(NULL, search);
-    // token should hold "timestamp offset in usecs"
-
-    _u64  timestamp = 0;
-    _u64  timestamp_offset;
-
-    if (specific_timestamp_offset == 0) {
-        timestamp_offset = (_u64)atoll(token);
-    }
-    else {
-        timestamp_offset = specific_timestamp_offset;
+        fprintf(stderr, "Not found: \"/tmp/.tditracebuffer-*-*\"\n");
+        return;
     }
 
-    int     tid = 0;
-    char    *text;
-    int     timestamp_sec;
-    int     timestamp_nsec;
+
+    _u64 abs_timeofday = 0;
+    _u64 last_timestamp = 0;
+
+    for (i = 0; i < buffers ; i++) {
+
+        parse(i);
+        
+        if (abs_timeofday == 0) {
+            abs_timeofday = tracebuffers[i].timeofday_offset;
+        } else if (tracebuffers[i].timeofday_offset < abs_timeofday) {
+            abs_timeofday = tracebuffers[i].timeofday_offset;
+        }
+        
+    }
 
     while (1) {
 
-        // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
+        int pctused;
+        int d = -1;
 
-        token = strtok(NULL, search);
-        if (!token) break;
-        // token is timestamp_sec
-        timestamp_sec = atoi(token);
+        for (i = 0; i < buffers ; i++) {
+            if (tracebuffers[i].valid) {
+                d = i;
+            }
+        }
+
+        if (d == -1) {
+            break;
+        }
+
+
+        for (i = 0; i < buffers ; i++) {
+            if (tracebuffers[i].valid) {
+
+                if (
+                    (tracebuffers[i].timeofday_offset - abs_timeofday + tracebuffers[i].monotonic_timestamp - tracebuffers[i].monotonic_offset) <
+                    (tracebuffers[d].timeofday_offset - abs_timeofday + tracebuffers[d].monotonic_timestamp - tracebuffers[d].monotonic_offset)
+                   ) {
+                    d = i;
+                }
+            
+            }
+        }
+
+        addentry(tdifile, tracebuffers[d].text,
+
+                 tracebuffers[d].timeofday_offset - abs_timeofday + tracebuffers[d].monotonic_timestamp - tracebuffers[d].monotonic_offset,
+
+                 tracebuffers[d].procname, tracebuffers[d].pid, tracebuffers[d].tid);
+
+        pctused = (((tracebuffers[d].text - tracebuffers[d].buf) * 100.0) / tracebuffers[d].bufsize) + 1;
+
+        last_timestamp = tracebuffers[d].timeofday_offset - abs_timeofday + tracebuffers[d].monotonic_timestamp - tracebuffers[d].monotonic_offset;
+
+        parse(d);
         
-        token = strtok(NULL, search);
-        if (!token) break;
-        // token is timestamp_usec
-        timestamp_nsec = atoi(token);
 
-        timestamp = (_u64)timestamp_nsec + (_u64)timestamp_sec * (_u64)1000000000;
+        if (!tracebuffers[d].valid) {
+            printf("\"%s\" final entry (%d%% used)\n", tracebuffers[d].filename, pctused);
 
-        token = strtok(NULL, search);
-        if (!token) break;
-        // token is tid
-        tid = atoi(token);
+        }
 
-        token = strtok(NULL, search);
-        if (!token) break;
-        // token is trace text
-        text = token;
-
-        addentry(tdifile, text, timestamp - timestamp_offset, tid);
     }
 
-    printf("Adding the final entry (%d%% used)\n", (int)((((text - ptr1) * 100.0) / TRACEBUFFERSIZE) + 1));
-
     // Add one more entry 0.1 sec behind all the previous ones
-    addentry(tdifile, "TDITRACE_EXIT\0", timestamp - timestamp_offset + 100 * 1000000, tid);
 
-    free(ptr);
+    addentry(tdifile, "TDITRACE_EXIT\0", last_timestamp + 100 * 1000000, "", 0, 0);
+}
+
+
+unsigned int find_process_name(char *p_processname)
+{
+    DIR *dir_p;
+    struct dirent *dir_entry_p;
+    char dir_name[64];
+    char target_name[128];
+    int target_result;
+    char exe_link[128];
+    int result;
+
+    result = 0;
+    dir_p = opendir("/proc/");
+    while(NULL != (dir_entry_p = readdir(dir_p))) {
+        if (strspn(dir_entry_p->d_name, "0123456789") == strlen(dir_entry_p->d_name)) {
+            strcpy(dir_name, "/proc/");
+            strcat(dir_name, dir_entry_p->d_name);
+            strcat(dir_name, "/");
+            exe_link[0] = 0;
+            strcat(exe_link, dir_name);
+            strcat(exe_link, "exe");
+            target_result = readlink(exe_link, target_name, sizeof(target_name)-1);
+            if (target_result > 0) {
+                target_name[target_result] = 0;
+                if (strstr(target_name, p_processname) != NULL) {
+                    result = atoi(dir_entry_p->d_name);
+                    closedir(dir_p);
+                    return result;
+                }
+            }
+        }
+    }
+    closedir(dir_p);
+    return result;
+}
+
+void get_process_name_by_pid(const int pid, char*name)
+{
+    if (name){
+        sprintf(name, "/proc/%d/cmdline",pid);
+        FILE* f = fopen(name,"r");
+        if (f){
+            size_t size;
+            size = fread(name, sizeof(char), 1024, f);
+            if (size > 0){
+                if ('\n' == name[size - 1])
+                    name[size - 1]='\0';
+            }
+            fclose(f);
+        }
+    }
 }
 
 
@@ -486,23 +684,61 @@ int tditrace_init(void)
         return 0;
     }
 
-    simplefu_mutex_init(&myMutex);
+    pid_t pid = getpid();
+    char procname[128];
 
-    simplefu_mutex_lock(&myMutex);
+    get_process_name_by_pid(pid, procname);
 
-    // TDI_LOG("(*TDI*) TDITRACE_INIT buffer size is %d\n", TRACEBUFFERSIZE);
+    char tracebufferfilename[128];
 
-    // Allocate memory to hold the rough traces
+    sprintf(tracebufferfilename, (char*)"/tmp/.tditracebuffer-%s-%d", procname, pid);
+
+    /*
+     * remove stale tracefiles, i.e. those with this procname, and procname not running
+     */
+
+    DIR *dp;
+    struct dirent *ep;
+
+    char match[128];
+    sprintf(match, (char*)".tditracebuffer-%s-", procname);
+
+    dp = opendir ("/tmp/");
+    if (dp != NULL) {
+        while (ep = readdir(dp)) {
+
+            if (strncmp(ep->d_name, match, strlen(match)) == 0) {
+
+                char procpid[128];
+                sprintf(procpid, (char*)"/proc/%d", atoi(&ep->d_name[strlen(match)]));
+
+                char fullname[128];
+                sprintf(fullname, "/tmp/%s", ep->d_name);
+                
+                struct stat sts;
+                if (stat(procpid, &sts) == -1) {
+
+                    printf("tdi: init, removing: \"%s\"\n", fullname);
+                    unlink(fullname);
+                } else {
+
+                    printf("tdi: init, not removing: \"%s\"\n", fullname);
+                }
+            }
+        }
+
+        closedir(dp);
+    }
+
+    // find_process_name("tditest");
 
     FILE    *file;
-    if ((file = fopen("/tmp/.tditracebuffer", "w+")) == 0) {
-        printf("Error opening file /tmp/.tditracebuffer");
-
-        simplefu_mutex_unlock(&myMutex);
+    if ((file = fopen(tracebufferfilename, "w+")) == 0) {
+        fprintf(stderr, "Error creating file \"%s\"", tracebufferfilename);
         return -1;
     }
 
-    ftruncate(fileno(file), TRACEBUFFERSIZE);
+    (void)ftruncate(fileno(file), TRACEBUFFERSIZE);
 
     gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fileno(file), 0);
 
@@ -510,22 +746,27 @@ int tditrace_init(void)
         gtrace_buffer[i] = 0;
     }
 
-    printf("tdi: init, tracebuffer (16MB) (/tmp/.tditracebuffer) allocated\n");
+    printf("tdi: init, allocated: \"%s\" (16MB)\n", tracebufferfilename);
 
     trace_buffer_ptr = gtrace_buffer;
     trace_counter = 0;
 
     // write one time start text
-    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\f");
-    trace_buffer_ptr+= i;
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"TDITRACEBUFFER\f");;
 
-    // obtain absolute timestamp and write to buffer
-    i = sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_nsec());
-    trace_buffer_ptr+= i;
+    // obtain timeofday timestamp and write to buffer
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_timeofday_nsec());
+
+    // obtain monotonic timestamp and write to buffer
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_monotonic_nsec());
 
     reported_full = 0;
 
     report_tid = (getenv("TID") != NULL);
+
+    simplefu_mutex_init(&myMutex);
+
+    simplefu_mutex_lock(&myMutex);
 
     tditrace_inited = 1;
 
@@ -550,17 +791,13 @@ void tditrace_rewind()
     trace_counter = 0;
 
     // write one time start text
-    i = sprintf(trace_buffer_ptr, (char*)"TRACEBUFFER\f");
-    trace_buffer_ptr+= i;
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"TDITRACEBUFFER\f");
 
-    // obtain absolute timestamp and write to buffer
-    gettimeofday(&mytime, 0);
+    // obtain timeofday timestamp and write to buffer
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_timeofday_nsec());
 
-    _u64 timestamp_offset;
-    timestamp_offset = (_u64)((_u64)mytime.tv_usec + (_u64)mytime.tv_sec * (_u64)1000000);
-
-    i = sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_offset);
-    trace_buffer_ptr+= i;
+    // obtain monotonic timestamp and write to buffer
+    trace_buffer_ptr+= sprintf(trace_buffer_ptr, (char*)"%lld\f", timestamp_monotonic_nsec());
 
     reported_full = 0;
 
@@ -568,7 +805,7 @@ void tditrace_rewind()
 }
 
 
-void tditrace_exit(char* filename, char* trace_buffer)
+void tditrace_exit(char* filename)
 {
     // Create the TDI file from the rough traces
     FILE    *tdifile;
@@ -579,7 +816,7 @@ void tditrace_exit(char* filename, char* trace_buffer)
         return;
     }
 
-    printf("Writing trace file \"%s\" .....\n", filename);
+    printf("Writing tdi file \"%s\"...\n", filename);
 
     sprintf(text, "TIME %d\n", 1000000000);
     fwrite(text, strlen(text), 1, tdifile);
@@ -590,7 +827,7 @@ void tditrace_exit(char* filename, char* trace_buffer)
     sprintf(text, "DNM 0 0 >\n");
     fwrite(text, strlen(text), 1, tdifile);
 
-    converttracetotdi(tdifile, trace_buffer, 0);
+    converttracetotdi(tdifile);
 
     sprintf(text, "END\n");
     fwrite(text, strlen(text), 1, tdifile);
