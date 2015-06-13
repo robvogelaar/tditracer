@@ -411,7 +411,6 @@ static void addentry(FILE *tdifile, char *text_in, _u64 timestamp, char* procnam
 }
 
 typedef struct {
-
     char    filename[128];
     char    procname[64];
     int     pid;
@@ -428,8 +427,7 @@ typedef struct {
     int     valid;
 } tracebuffer_t;
 
-tracebuffer_t tracebuffers[5];
-
+tracebuffer_t tracebuffers[10];
 
 static void parse(int bid) 
 {
@@ -537,9 +535,7 @@ static void converttracetotdi(FILE* tdifile)
                     buffers++;
 
                 }
-
             }
-            
         }
 
         closedir(dp);
@@ -567,6 +563,11 @@ static void converttracetotdi(FILE* tdifile)
         
     }
 
+
+    fprintf(tdifile, "TIME %d\n", 1000000000);
+    fprintf(tdifile, "SPEED %d\n", 1000000000);
+    fprintf(tdifile, "DNM 0 0 >\n");
+
     while (1) {
 
         int pctused;
@@ -582,7 +583,6 @@ static void converttracetotdi(FILE* tdifile)
             break;
         }
 
-
         for (i = 0; i < buffers ; i++) {
             if (tracebuffers[i].valid) {
 
@@ -592,7 +592,6 @@ static void converttracetotdi(FILE* tdifile)
                    ) {
                     d = i;
                 }
-            
             }
         }
 
@@ -608,7 +607,6 @@ static void converttracetotdi(FILE* tdifile)
 
         parse(d);
         
-
         if (!tracebuffers[d].valid) {
             printf("\"%s\" final entry (%d%% used)\n", tracebuffers[d].filename, pctused);
 
@@ -617,12 +615,13 @@ static void converttracetotdi(FILE* tdifile)
     }
 
     // Add one more entry 0.1 sec behind all the previous ones
-
     addentry(tdifile, "TDITRACE_EXIT\0", last_timestamp + 100 * 1000000, "", 0, 0);
+
+    fprintf(tdifile, "END %lld\n", abs_timeofday);
 }
 
 
-unsigned int find_process_name(char *p_processname)
+static unsigned int find_process_name(char *p_processname)
 {
     DIR *dir_p;
     struct dirent *dir_entry_p;
@@ -657,7 +656,8 @@ unsigned int find_process_name(char *p_processname)
     return result;
 }
 
-void get_process_name_by_pid(const int pid, char*name)
+
+static void get_process_name_by_pid(const int pid, char*name)
 {
     char fullname[1024];
     if (name){
@@ -703,23 +703,20 @@ int tditrace_init(void)
     sprintf(tracebufferfilename, (char*)"/tmp/.tditracebuffer:%s:%d", procname, pid);
 
     /*
-     * remove stale tracefiles, i.e. those with this procname, and procname not running
+     * remove inactive tracefiles
      */
 
     DIR *dp;
     struct dirent *ep;
 
-    char match[128];
-    sprintf(match, (char*)".tditracebuffer:%s:", procname);
-
     dp = opendir ("/tmp/");
     if (dp != NULL) {
         while (ep = readdir(dp)) {
 
-            if (strncmp(ep->d_name, match, strlen(match)) == 0) {
+            if (strncmp(ep->d_name, ".tditracebuffer:", 16) == 0) {
 
                 char procpid[128];
-                sprintf(procpid, (char*)"/proc/%d", atoi(&ep->d_name[strlen(match)]));
+                sprintf(procpid, (char*)"/proc/%d", atoi(strrchr(ep->d_name, ':') + 1));
 
                 char fullname[128];
                 sprintf(fullname, "/tmp/%s", ep->d_name);
@@ -727,11 +724,11 @@ int tditrace_init(void)
                 struct stat sts;
                 if (stat(procpid, &sts) == -1) {
 
-                    printf("tdi: init, removing: \"%s\"\n", fullname);
+                    printf("tdi: init, removed: \"%s\"\n", fullname);
                     unlink(fullname);
                 } else {
 
-                    printf("tdi: init, not removing: \"%s\"\n", fullname);
+                    printf("tdi: init, not removed: \"%s\"\n", fullname);
                 }
             }
         }
@@ -818,7 +815,6 @@ void tditrace_exit(char* filename)
 {
     // Create the TDI file from the rough traces
     FILE    *tdifile;
-    char    text[100];
 
     if ((tdifile = fopen(filename, "w+")) == NULL) {
         printf("Could not create trace file: [%s]\n", filename);
@@ -827,19 +823,7 @@ void tditrace_exit(char* filename)
 
     printf("Writing tdi file \"%s\"...\n", filename);
 
-    sprintf(text, "TIME %d\n", 1000000000);
-    fwrite(text, strlen(text), 1, tdifile);
-
-    sprintf(text, "SPEED %d\n", 1000000000);
-    fwrite(text, strlen(text), 1, tdifile);
-
-    sprintf(text, "DNM 0 0 >\n");
-    fwrite(text, strlen(text), 1, tdifile);
-
     converttracetotdi(tdifile);
-
-    sprintf(text, "END\n");
-    fwrite(text, strlen(text), 1, tdifile);
 
     fclose(tdifile);
 
