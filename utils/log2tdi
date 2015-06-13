@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+
+import sys
+import re
+from datetime import datetime
+
+names = []
+offset_sec = 0
+offset_nsec = 0
+
+prev_stamp = 0
+
+def addnote (logfilename, logline, matches):
+
+   global prev_stamp
+
+   global names
+   global offset_sec
+   global offset_nsec
+
+
+   for match in matches:
+
+      prog = re.compile('.*' + match + '.*')
+
+      if prog.match(logline):
+         name = match;
+
+   if name:
+
+      if name not in names:
+
+         names.append(name)
+         print('NAM 7 %d %s' %((7 * 1000 + names.index(name)) , '[' + logfilename + ']' + name.replace(' ', '_')))
+
+      #150610-22:42:34.855932
+      tstamp = re.findall("\d{6}-\d{2}:\d{2}:\d{2}\.\d+", logline)
+      if tstamp:
+         if tstamp[0]:
+
+            t = datetime.strptime(tstamp[0], '%y%m%d-%H:%M:%S.%f')
+            sec = int((t - datetime(1970, 1, 1)).total_seconds())
+            nsec = int(t.microsecond * 1000)
+            stamp = long(sec * 1000000000 + nsec);
+
+      #20150610 22:41:36.082
+      tstamp = re.findall("\d{8} \d{2}:\d{2}:\d{2}\.\d+", logline)
+      if tstamp:
+         if tstamp[0]:
+            
+            t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
+            sec = int((t - datetime(1970, 1, 1)).total_seconds())
+            nsec = int(t.microsecond * 1000)
+            stamp = long(sec * 1000000000 + nsec);
+
+      #2015-06-10T20:04:27.941
+      tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
+      if tstamp:
+         if tstamp[0]:
+
+            t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+            sec = int((t - datetime(1970, 1, 1)).total_seconds())
+            nsec = int(t.microsecond * 1000)
+            stamp = long(sec * 1000000000 + nsec);
+
+      if (offset_sec == 0):
+         offset_sec = sec;
+         offset_nsec = nsec;
+
+      if prev_stamp:
+         if stamp < prev_stamp:
+            sys.stderr.write('stamp < prev_stamp\n')
+
+      prev_stamp = stamp
+
+      print('OCC 7 %d %d' %((7 * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
+      print('DSC 0 0 %s' % logline.replace(" ", "_"))
+
+
+def main():
+
+   if len(sys.argv) >= 2:
+
+      textfile = open(sys.argv[1], 'r')
+      filetext = textfile.read()
+      textfile.close()
+
+      matches = []
+      for arg in sys.argv[2:]:
+         matches.append(arg)
+
+      totalmatch = ''
+      for match in matches:
+         totalmatch = totalmatch + '.*' + match + '.*|'
+
+      totalmatch = totalmatch[:-1]
+
+      loglinematches = re.findall(totalmatch, filetext)
+
+      print('TIME 1000000000')
+      print('SPEED 1000000000')
+      print('DNM 0 0 >')
+
+      for logline in loglinematches:
+
+         addnote(sys.argv[1], logline, matches)
+
+      print('END %d' % (offset_sec * 1000000000 + offset_nsec));
+
+   else:
+
+      print("Usage: %s logfile regexp..." % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
