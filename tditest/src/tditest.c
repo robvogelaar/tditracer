@@ -4,30 +4,9 @@
 #include <unistd.h>
 #include <time.h>
 
-/*
- **************************************
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-int  tditrace_init(void);
-void tditrace(const char *format, ...);
-#ifdef __cplusplus
-}
-#endif
-int tditrace_inited = 0;
-#define TDITRACE(...)               \
-    do                              \
-    {                               \
-        if (!tditrace_inited) {     \
-            tditrace_init();        \
-            tditrace_inited = 1;    \
-        }                           \
-        tditrace(__VA_ARGS__);      \
-    } while (0)                     \
-/*
- **************************************
- */
+
+
+extern void tditrace(const char* format, ...);
 
 
 int main(int argc, char **argv)
@@ -56,32 +35,32 @@ int main(int argc, char **argv)
 
     for (i = 0; i < 50; i++) {
         // will all appear in the same "HELLO" , "NOTES"-timeline
-        TDITRACE("HELLO");
-        TDITRACE("HELLO %d", i);
-        TDITRACE("HELLO %d %s %s", i, "yes", "no");
+        if (tditrace) tditrace("HELLO");
+        if (tditrace) tditrace("HELLO %d", i);
+        if (tditrace) tditrace("HELLO %d %s %s", i, "yes", "no");
 
         // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
-        TDITRACE("HELLO%d", i);
+        if (tditrace) tditrace("HELLO%d", i);
 
         // variable~value creates a QUEUES-timeline
-        TDITRACE("i~%d", 12);
+        if (tditrace) tditrace("i~%d", 12);
         usleep(10000);
 
-        TDITRACE("i~%d", 16);
+        if (tditrace) tditrace("i~%d", 16);
         usleep(10000);
 
-        TDITRACE("i~%d", 8);
+        if (tditrace) tditrace("i~%d", 8);
         usleep(100000);
 
         // create "TASKS"-timeline, using the @T+ and #T- identifier
-        TDITRACE("@T+HELLO");
+        if (tditrace) tditrace("@T+HELLO");
         usleep(50000);
-        TDITRACE("@T-HELLO");
+        if (tditrace) tditrace("@T-HELLO");
 
 
-        TDITRACE("@T+TEST");
+        if (tditrace) tditrace("@T+TEST");
 
-        TDITRACE("@T+T0");
+        if (tditrace) tditrace("@T+T0");
 
         gettimeofday(&mytimeval, 0);
         gettimeofday(&mytimeval, 0);
@@ -94,9 +73,9 @@ int main(int argc, char **argv)
         gettimeofday(&mytimeval, 0);
         gettimeofday(&mytimeval, 0);
 
-        TDITRACE("@T-T0");
+        if (tditrace) tditrace("@T-T0");
         
-        TDITRACE("@T+T1");
+        if (tditrace) tditrace("@T+T1");
 
         clock_gettime(CLOCK_MONOTONIC, &mytimespec);
         clock_gettime(CLOCK_MONOTONIC, &mytimespec);
@@ -108,33 +87,33 @@ int main(int argc, char **argv)
         clock_gettime(CLOCK_MONOTONIC, &mytimespec);
         clock_gettime(CLOCK_MONOTONIC, &mytimespec);
 
-        TDITRACE("@T-T1");
+        if (tditrace) tditrace("@T-T1");
         
 
-        TDITRACE("@T+T2 01234567890123456789012345678901234567890123456789012345678901234567890123456789");
-        TDITRACE("@T-T2");
+        if (tditrace) tditrace("@T+T2 01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        if (tditrace) tditrace("@T-T2");
 
-        TDITRACE("@T+T3 %s", "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789");
-        TDITRACE("@T-T3");
+        if (tditrace) tditrace("@T+T3 %s", "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789");
+        if (tditrace) tditrace("@T-T3");
 
-        TDITRACE("@T+T5 %d %u %x %p", 0, 0, 0, 0);
-        TDITRACE("@T-T5");
+        if (tditrace) tditrace("@T+T5 %d %u %x %p", 0, 0, 0, 0);
+        if (tditrace) tditrace("@T-T5");
         
-        TDITRACE("@T+T5 %d %u %x %p", 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff);
-        TDITRACE("@T-T5");
+        if (tditrace) tditrace("@T+T5 %d %u %x %p", 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff);
+        if (tditrace) tditrace("@T-T5");
 
-        TDITRACE("@T-TEST");
+        if (tditrace) tditrace("@T-TEST");
 
         usleep(50000);
 
         // create "EVENTS"-timeline, using the @E+ identifier
-        TDITRACE("@E+HELLO");
+        if (tditrace) tditrace("@E+HELLO");
 
         usleep(50000);
     }
 
     usleep(100000);
-    TDITRACE("END");
+    if (tditrace) tditrace("END");
 
     printf("...end\n");
 

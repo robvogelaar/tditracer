@@ -49,7 +49,6 @@ bool renderbufferrecording;
 bool shaderrecording;
 bool libcrecording;
 bool pthreadrecording;
-bool syslogrecording;
 
 
 int shaders_captured = 0;
@@ -176,12 +175,6 @@ static void init(void)
             pthreadrecording = false;
         }
 
-        if (getenv("SYSLOG")) {
-            syslogrecording = (atoi(getenv("SYSLOG")) >= 1);
-        } else {
-            syslogrecording = true;
-        }
-
         if (getenv("TR")) {
             texturerecording = (atoi(getenv("TR")) >= 1);
         }
@@ -199,47 +192,14 @@ static void init(void)
             texturerecording = true;
         }
 
-        printf("tditracer: init, libc:%s, pthread:%s, syslog:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d\n",
+        printf("tditracer: init, libc:%s, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d\n",
             libcrecording ? "yes":"no",
             pthreadrecording ? "yes":"no",
-            syslogrecording ? "yes":"no",
             shaderrecording ? "yes":"no",
             texturerecording ? "yes":"no",
             renderbufferrecording ? "yes":"no",
             framestorecord);
 
         inited = true;
-    }
-}
-
-
-/*
- * #include <syslog.h>
- * syslog(1,"@T+FBIOPAN_DISPLAY");
- * syslog(0,"@T-FBIOPAN_DISPLAY");
- */
-
-#include <execinfo.h>
-
-extern "C" void syslog(int f, const char *format, ...)
-{
-    char buf[256];
-
-    if (syslogrecording) {
-
-        va_list args;
-        va_start(args, format);
-        vsnprintf(buf, 256, format, args);
-        va_end(args);
-
-        // if (0) {
-        //     void* addrlist[10];
-        //     int i = backtrace(addrlist, 10);
-        //     TDITRACE("%s %d [%s]", buf, i, addrinfo(addrlist[1]));
-        // } else {
-        //     TDITRACE("%s", buf);
-        // }
-
-        TDITRACE("%s", buf);
     }
 }
