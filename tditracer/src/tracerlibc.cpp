@@ -7,7 +7,6 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-
 #if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
@@ -85,7 +84,6 @@ extern "C" void* dlopen(const char* filename, int flag)
 }
 #endif
 
-
 #if 0
 extern "C" void* _dl_sym(void*, const char*, void*);
 extern "C" void* dlsym(void* handle, const char* name)
@@ -98,16 +96,15 @@ extern "C" void* dlsym(void* handle, const char* name)
 }
 #endif
 
-
 #if 0
 extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen)
 {
     static int (*__connect)(int, const struct sockaddr*, socklen_t) = NULL;
 
-    #if 0
+#if 0
     unsigned char *c;
     int port,ok=1;
-    #endif
+#endif
 
     if (__connect==NULL) {
         __connect = (int (*)(int, const struct sockaddr*, socklen_t))dlsym(RTLD_NEXT,"connect");
@@ -116,7 +113,7 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
         }
     }
 
-    #if 0
+#if 0
     if (serv_addr->sa_family==AF_INET6) return EACCES;
     if (serv_addr->sa_family==AF_INET){
         c=serv_addr->sa_data;
@@ -130,29 +127,27 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
     }
     //if (ok) return connect_real(sockfd,serv_addr,addrlen);
     return EACCES;
-    #endif
+#endif
 
     TDITRACE("connect()");
 
     return __connect(sockfd,serv_addr,addrlen);
 
-    #if 0
+#if 0
     if (getenv("WRAP_TCP_DEBUG"))
       fprintf(stderr,"connect() denied to address %d.%d.%d.%d port %d\n",
               (int)(*c),(int)(*(c+1)),(int)(*(c+2)),(int)(*(c+3)),
               port);
-    #endif
+#endif
 }
 #endif
 
-
 #if 1
-extern "C" int open(const char *pathname, int flags, ...)
-{
-    static int (*__open)(const char*, int, ...) = NULL;
+extern "C" int open(const char *pathname, int flags, ...) {
+    static int (*__open)(const char *, int, ...) = NULL;
 
     if (__open == NULL) {
-        __open = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
+        __open = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
         if (NULL == __open) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -177,19 +172,16 @@ extern "C" int open(const char *pathname, int flags, ...)
 }
 #endif
 
-
 #if 1
-extern "C" ssize_t read(int fd, void *buf, size_t count)
-{
+extern "C" ssize_t read(int fd, void *buf, size_t count) {
     static ssize_t (*__read)(int, void *, size_t) = NULL;
 
-    if (__read==NULL) {
-        __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT,"read");
+    if (__read == NULL) {
+        __read = (ssize_t (*)(int, void *, size_t))dlsym(RTLD_NEXT, "read");
         if (NULL == __read) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
-
 
     if (libcrecording) {
         TDITRACE("@T+read() %d %d", fd, count);
@@ -205,19 +197,17 @@ extern "C" ssize_t read(int fd, void *buf, size_t count)
 }
 #endif
 
-
 #if 1
-extern "C" ssize_t write(int fd, const void *buf, size_t count)
-{
+extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     static ssize_t (*__write)(int, const void *, size_t) = NULL;
 
-    if (__write==NULL) {
-        __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT,"write");
+    if (__write == NULL) {
+        __write =
+            (ssize_t (*)(int, const void *, size_t))dlsym(RTLD_NEXT, "write");
         if (NULL == __write) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
-
 
     if (libcrecording) {
         TDITRACE("@T+write() %d %d", fd, count);
@@ -233,10 +223,8 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count)
 }
 #endif
 
-
 #if 1
-extern "C" int ioctl(int d, int request, ...)
-{
+extern "C" int ioctl(int d, int request, ...) {
     static int (*__ioctl)(int d, int request, ...) = NULL;
 
     if (__ioctl == NULL) {
@@ -256,7 +244,7 @@ extern "C" int ioctl(int d, int request, ...)
     }
 
     int ret = __ioctl(d, request, a1);
-    
+
     if (libcrecording) {
         TDITRACE("@T-ioctl()");
     }
@@ -265,14 +253,13 @@ extern "C" int ioctl(int d, int request, ...)
 }
 #endif
 
-
 #if 1
-extern "C" void *memcpy(void *dest, const void *src, size_t n)
-{
-    static void* (*__memcpy)(void *, const void *, size_t) = NULL;
+extern "C" void *memcpy(void *dest, const void *src, size_t n) {
+    static void *(*__memcpy)(void *, const void *, size_t) = NULL;
 
     if (__memcpy == NULL) {
-        __memcpy = (void* (*)(void *, const void *, size_t))dlsym(RTLD_NEXT,"memcpy");
+        __memcpy =
+            (void *(*)(void *, const void *, size_t))dlsym(RTLD_NEXT, "memcpy");
         if (NULL == __memcpy) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -282,8 +269,8 @@ extern "C" void *memcpy(void *dest, const void *src, size_t n)
         TDITRACE("@T+memcpy() 0x%x 0x%x %d", dest, src, n);
     }
 
-    void* ret = __memcpy(dest, src, n);
-    
+    void *ret = __memcpy(dest, src, n);
+
     if (libcrecording) {
         TDITRACE("@T-memcpy()");
     }
@@ -292,14 +279,12 @@ extern "C" void *memcpy(void *dest, const void *src, size_t n)
 }
 #endif
 
-
 #if 1
-extern "C" void *memset(void *dest, int c, size_t n)
-{
-    static void* (*__memset)(void *, int, size_t) = NULL;
+extern "C" void *memset(void *dest, int c, size_t n) {
+    static void *(*__memset)(void *, int, size_t) = NULL;
 
     if (__memset == NULL) {
-        __memset = (void* (*)(void *, int, size_t))dlsym(RTLD_NEXT,"memset");
+        __memset = (void *(*)(void *, int, size_t))dlsym(RTLD_NEXT, "memset");
         if (NULL == __memset) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -309,7 +294,7 @@ extern "C" void *memset(void *dest, int c, size_t n)
         TDITRACE("@T+memset() 0x%x,0x%x,%d", dest, c, n);
     }
 
-    void* ret = __memset(dest, c, n);
+    void *ret = __memset(dest, c, n);
 
     if (libcrecording) {
         TDITRACE("@T-memset()");
@@ -319,14 +304,12 @@ extern "C" void *memset(void *dest, int c, size_t n)
 }
 #endif
 
-
 #if 1
-extern "C" char *strcpy(char *dest, const char *src)
-{
-    static char* (*__strcpy)(char *, const char *) = NULL;
+extern "C" char *strcpy(char *dest, const char *src) {
+    static char *(*__strcpy)(char *, const char *) = NULL;
 
     if (__strcpy == NULL) {
-        __strcpy = (char* (*)(char *, const char *))dlsym(RTLD_NEXT,"strcpy");
+        __strcpy = (char *(*)(char *, const char *))dlsym(RTLD_NEXT, "strcpy");
         if (NULL == __strcpy) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -336,8 +319,8 @@ extern "C" char *strcpy(char *dest, const char *src)
         TDITRACE("@T+strcpy() 0x%x,0x%x", dest, src);
     }
 
-    char* ret = __strcpy(dest, src);
-    
+    char *ret = __strcpy(dest, src);
+
     if (libcrecording) {
         TDITRACE("@T-strcpy()");
     }
@@ -346,14 +329,13 @@ extern "C" char *strcpy(char *dest, const char *src)
 }
 #endif
 
-
 #if 1
-extern "C" char *strncpy(char *dest, const char *src, size_t n)
-{
-    static char* (*__strncpy)(char *, const char *, size_t) = NULL;
+extern "C" char *strncpy(char *dest, const char *src, size_t n) {
+    static char *(*__strncpy)(char *, const char *, size_t) = NULL;
 
     if (__strncpy == NULL) {
-        __strncpy = (char* (*)(char *, const char *, size_t))dlsym(RTLD_NEXT,"strncpy");
+        __strncpy = (char *(*)(char *, const char *, size_t))dlsym(RTLD_NEXT,
+                                                                   "strncpy");
         if (NULL == __strncpy) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -363,7 +345,7 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n)
         TDITRACE("@T+strncpy() 0x%x 0x%x %d", dest, src, n);
     }
 
-    char* ret = __strncpy(dest, src, n);
+    char *ret = __strncpy(dest, src, n);
 
     if (libcrecording) {
         TDITRACE("@T-strncpy()");
@@ -373,14 +355,12 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n)
 }
 #endif
 
-
 #if 1
-extern "C" void *malloc(size_t size)
-{
-    static void* (*__malloc)(size_t) = NULL;
+extern "C" void *malloc(size_t size) {
+    static void *(*__malloc)(size_t) = NULL;
 
     if (__malloc == NULL) {
-        __malloc = (void* (*)(size_t))dlsym(RTLD_NEXT, "malloc");
+        __malloc = (void *(*)(size_t))dlsym(RTLD_NEXT, "malloc");
         if (NULL == __malloc) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -390,7 +370,7 @@ extern "C" void *malloc(size_t size)
         TDITRACE("@T+malloc() %d", size);
     }
 
-    void* ret = __malloc(size);
+    void *ret = __malloc(size);
 
     if (libcrecording) {
         TDITRACE("@T-malloc()");

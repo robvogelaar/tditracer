@@ -3,13 +3,13 @@
 #include <dlfcn.h>
 #include "tdi.h"
 
+extern "C" int SGXQueueTransfer(void *hTransferContext,
+                                struct tag *psQueueTransfer) {
+    static int (*__SGXQueueTransfer)(void *, struct tag *) = NULL;
 
-extern "C" int SGXQueueTransfer(void* hTransferContext, struct tag *psQueueTransfer)
-{
-    static int (*__SGXQueueTransfer)(void*, struct tag*) = NULL;
-
-    if (__SGXQueueTransfer==NULL) {
-        __SGXQueueTransfer = (int (*)(void*, struct tag*))dlsym(RTLD_NEXT, "SGXQueueTransfer");
+    if (__SGXQueueTransfer == NULL) {
+        __SGXQueueTransfer =
+            (int (*)(void *, struct tag *))dlsym(RTLD_NEXT, "SGXQueueTransfer");
         if (NULL == __SGXQueueTransfer) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
@@ -106,7 +106,7 @@ extern "C" int SGXQueueTransfer(void* hTransferContext, struct tag *psQueueTrans
  *  0xc01c6750  SYNC_OPS_FLUSH_TO_DELTA
  *  0xc01c6751  ALLOC_SYNC_INFO
  *  0xc01c6752  FREE_SYNC_INFO
- *  0xc01c6753    
+ *  0xc01c6753
  *  0xc01c6754  SGX_GETCLIENTINFO);
  *  0xc01c6755  SGX_RELEASECLIENTINFO);
  *  0xc01c6756  SGX_GETINTERNALDEVINFO);
@@ -130,9 +130,9 @@ extern "C" int SGXQueueTransfer(void* hTransferContext, struct tag *psQueueTrans
  *  0xc01c6768  SGX_REGISTER_HW_RENDER_CONTEXT
  *  0xc01c6769  SGX_FLUSH_HW_RENDER_TARGET
  *  0xc01c676a  SGX_UNREGISTER_HW_RENDER_CONTEXT
- *  0xc01c676b  
- *  0xc01c676c  
- *  0xc01c676d  
+ *  0xc01c676b
+ *  0xc01c676c
+ *  0xc01c676d
  *  0xc01c676e  SGX_REGISTER_HW_TRANSFER_CONTEXT
  *  0xc01c676f  SGX_UNREGISTER_HW_TRANSFER_CONTEXT
  *  0xc01c6770  SGX_SCHEDULE_PROCESS_QUEUES
@@ -143,151 +143,66 @@ extern "C" int SGXQueueTransfer(void* hTransferContext, struct tag *psQueueTrans
 
 static const char *strings[] = {
 
-    "ENUM_DEVICES",
-    "ACQUIRE_DEVICEINFO",
-    "RELEASE_DEVICEINFO",
-    "CREATE_DEVMEMCONTEXT",
-    "DESTROY_DEVMEMCONTEXT",
-    "GET_DEVMEM_HEAPINFO",
-    "ALLOC_DEVICEMEM",
-    "FREE_DEVICEMEM",
-    "GETFREE_DEVICEMEM",
-    "CREATE_COMMANDQUEUE",
-    "DESTROY_COMMANDQUEUE",
-    "MHANDLE_TO_MMAP_DATA",
-    "CONNECT_SERVICES",
-    "DISCONNECT_SERVICES",
-    "WRAP_DEVICE_MEM",
-    "GET_DEVICEMEMINFO",
-    "RESERVE_DEV_VIRTMEM",
-    "FREE_DEV_VIRTMEM",
-    "MAP_EXT_MEMORY",
-    "UNMAP_EXT_MEMORY",
-    "MAP_DEV_MEMORY",
-    "UNMAP_DEV_MEMORY",
-    "MAP_DEVICECLASS_MEMORY",
-    "UNMAP_DEVICECLASS_MEMORY",
-    "MAP_MEM_INFO_TO_USER",
-    "UNMAP_MEM_INFO_FROM_USER",
-    "EXPORT_DEVICEMEM",
-    "RELEASE_MMAP_DATA",
-    "CHG_DEV_MEM_ATTRIBS",
-    "MAP_DEV_MEMORY_2",
-    "EXPORT_DEVICEMEM_2",
-    "PROCESS_SIMISR_EVENT",
-    "REGISTER_SIM_PROCESS",
-    "UNREGISTER_SIM_PROCESS",
-    "MAPPHYSTOUSERSPACE",
-    "UNMAPPHYSTOUSERSPACE",
-    "GETPHYSTOUSERSPACEMAP",
-    "GET_FB_STATS",
-    "GET_MISC_INFO",
-    "RELEASE_MISC_INFO",
-    "GET_OEMJTABLE",
-    "ENUM_CLASS",
-    "OPEN_DISPCLASS_DEVICE",
-    "CLOSE_DISPCLASS_DEVICE",
-    "ENUM_DISPCLASS_FORMATS",
-    "ENUM_DISPCLASS_DIMS",
-    "GET_DISPCLASS_SYSBUFFER",
-    "GET_DISPCLASS_INFO",
-    "CREATE_DISPCLASS_SWAPCHAIN",
-    "DESTROY_DISPCLASS_SWAPCHAIN",
-    "SET_DISPCLASS_DSTRECT",
-    "SET_DISPCLASS_SRCRECT",
-    "SET_DISPCLASS_DSTCOLOURKEY",
-    "SET_DISPCLASS_SRCCOLOURKEY",
-    "GET_DISPCLASS_BUFFERS",
-    "SWAP_DISPCLASS_TO_BUFFER",
-    "SWAP_DISPCLASS_TO_BUFFER2",
-    "SWAP_DISPCLASS_TO_SYSTEM",
-    "OPEN_BUFFERCLASS_DEVICE",
-    "CLOSE_BUFFERCLASS_DEVICE",
-    "GET_BUFFERCLASS_INFO",
-    "GET_BUFFERCLASS_BUFFER",
-    "WRAP_EXT_MEMORY",
-    "UNWRAP_EXT_MEMORY",
-    "ALLOC_SHARED_SYS_MEM",
-    "FREE_SHARED_SYS_MEM",
-    "MAP_MEMINFO_MEM",
-    "UNMAP_MEMINFO_MEM",
-    "INITSRV_CONNECT",
-    "INITSRV_DISCONNECT",
-    "EVENT_OBJECT_WAIT",
-    "EVENT_OBJECT_OPEN",
-    "EVENT_OBJECT_CLOSE",
-    "CREATE_SYNC_INFO_MOD_OBJ",
-    "DESTROY_SYNC_INFO_MOD_OBJ",
-    "MODIFY_PENDING_SYNC_OPS",
-    "MODIFY_COMPLETE_SYNC_OPS",
-    "SYNC_OPS_TAKE_TOKEN",
-    "SYNC_OPS_FLUSH_TO_TOKEN",
-    "SYNC_OPS_FLUSH_TO_MOD_OBJ",
-    "SYNC_OPS_FLUSH_TO_DELTA",
-    "ALLOC_SYNC_INFO",
-    "FREE_SYNC_INFO",
-    "",
-    "",
-    "",
-    "SGX_GETCLIENTINFO",
-    "SGX_RELEASECLIENTINFO",
-    "SGX_GETINTERNALDEVINFO",
-    "SGX_DOKICK",
-    "SGX_GETPHYSPAGEADDR",
-    "SGX_READREGISTRYDWORD",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "SGX_2DQUERYBLTSCOMPLETE",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "SGX_SUBMITTRANSFER",
-    "SGX_GETMISCINFO",
-    "SGXINFO_FOR_SRVINIT",
-    "SGX_DEVINITPART2",
-    "SGX_FINDSHAREDPBDESC",
-    "SGX_UNREFSHAREDPBDESC",
-    "SGX_ADDSHAREDPBDESC",
-    "SGX_REGISTER_HW_RENDER_CONTEXT",
-    "SGX_FLUSH_HW_RENDER_TARGET",
-    "SGX_UNREGISTER_HW_RENDER_CONTEXT",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "SGX_REGISTER_HW_TRANSFER_CONTEXT",
-    "SGX_UNREGISTER_HW_TRANSFER_CONTEXT",
-    "SGX_SCHEDULE_PROCESS_QUEUES",
-    "SGX_READ_HWPERF_CB",
-    "SGX_SET_RENDER_CONTEXT_PRIORITY",
-    "SGX_SET_TRANSFER_CONTEXT_PRIORITY"
-};
+    "ENUM_DEVICES", "ACQUIRE_DEVICEINFO", "RELEASE_DEVICEINFO",
+    "CREATE_DEVMEMCONTEXT", "DESTROY_DEVMEMCONTEXT", "GET_DEVMEM_HEAPINFO",
+    "ALLOC_DEVICEMEM", "FREE_DEVICEMEM", "GETFREE_DEVICEMEM",
+    "CREATE_COMMANDQUEUE", "DESTROY_COMMANDQUEUE", "MHANDLE_TO_MMAP_DATA",
+    "CONNECT_SERVICES", "DISCONNECT_SERVICES", "WRAP_DEVICE_MEM",
+    "GET_DEVICEMEMINFO", "RESERVE_DEV_VIRTMEM", "FREE_DEV_VIRTMEM",
+    "MAP_EXT_MEMORY", "UNMAP_EXT_MEMORY", "MAP_DEV_MEMORY", "UNMAP_DEV_MEMORY",
+    "MAP_DEVICECLASS_MEMORY", "UNMAP_DEVICECLASS_MEMORY",
+    "MAP_MEM_INFO_TO_USER", "UNMAP_MEM_INFO_FROM_USER", "EXPORT_DEVICEMEM",
+    "RELEASE_MMAP_DATA", "CHG_DEV_MEM_ATTRIBS", "MAP_DEV_MEMORY_2",
+    "EXPORT_DEVICEMEM_2", "PROCESS_SIMISR_EVENT", "REGISTER_SIM_PROCESS",
+    "UNREGISTER_SIM_PROCESS", "MAPPHYSTOUSERSPACE", "UNMAPPHYSTOUSERSPACE",
+    "GETPHYSTOUSERSPACEMAP", "GET_FB_STATS", "GET_MISC_INFO",
+    "RELEASE_MISC_INFO", "GET_OEMJTABLE", "ENUM_CLASS", "OPEN_DISPCLASS_DEVICE",
+    "CLOSE_DISPCLASS_DEVICE", "ENUM_DISPCLASS_FORMATS", "ENUM_DISPCLASS_DIMS",
+    "GET_DISPCLASS_SYSBUFFER", "GET_DISPCLASS_INFO",
+    "CREATE_DISPCLASS_SWAPCHAIN", "DESTROY_DISPCLASS_SWAPCHAIN",
+    "SET_DISPCLASS_DSTRECT", "SET_DISPCLASS_SRCRECT",
+    "SET_DISPCLASS_DSTCOLOURKEY", "SET_DISPCLASS_SRCCOLOURKEY",
+    "GET_DISPCLASS_BUFFERS", "SWAP_DISPCLASS_TO_BUFFER",
+    "SWAP_DISPCLASS_TO_BUFFER2", "SWAP_DISPCLASS_TO_SYSTEM",
+    "OPEN_BUFFERCLASS_DEVICE", "CLOSE_BUFFERCLASS_DEVICE",
+    "GET_BUFFERCLASS_INFO", "GET_BUFFERCLASS_BUFFER", "WRAP_EXT_MEMORY",
+    "UNWRAP_EXT_MEMORY", "ALLOC_SHARED_SYS_MEM", "FREE_SHARED_SYS_MEM",
+    "MAP_MEMINFO_MEM", "UNMAP_MEMINFO_MEM", "INITSRV_CONNECT",
+    "INITSRV_DISCONNECT", "EVENT_OBJECT_WAIT", "EVENT_OBJECT_OPEN",
+    "EVENT_OBJECT_CLOSE", "CREATE_SYNC_INFO_MOD_OBJ",
+    "DESTROY_SYNC_INFO_MOD_OBJ", "MODIFY_PENDING_SYNC_OPS",
+    "MODIFY_COMPLETE_SYNC_OPS", "SYNC_OPS_TAKE_TOKEN",
+    "SYNC_OPS_FLUSH_TO_TOKEN", "SYNC_OPS_FLUSH_TO_MOD_OBJ",
+    "SYNC_OPS_FLUSH_TO_DELTA", "ALLOC_SYNC_INFO", "FREE_SYNC_INFO", "", "", "",
+    "SGX_GETCLIENTINFO", "SGX_RELEASECLIENTINFO", "SGX_GETINTERNALDEVINFO",
+    "SGX_DOKICK", "SGX_GETPHYSPAGEADDR", "SGX_READREGISTRYDWORD", "", "", "",
+    "", "", "SGX_2DQUERYBLTSCOMPLETE", "", "", "", "", "", "SGX_SUBMITTRANSFER",
+    "SGX_GETMISCINFO", "SGXINFO_FOR_SRVINIT", "SGX_DEVINITPART2",
+    "SGX_FINDSHAREDPBDESC", "SGX_UNREFSHAREDPBDESC", "SGX_ADDSHAREDPBDESC",
+    "SGX_REGISTER_HW_RENDER_CONTEXT", "SGX_FLUSH_HW_RENDER_TARGET",
+    "SGX_UNREGISTER_HW_RENDER_CONTEXT", "", "", "", "", "",
+    "SGX_REGISTER_HW_TRANSFER_CONTEXT", "SGX_UNREGISTER_HW_TRANSFER_CONTEXT",
+    "SGX_SCHEDULE_PROCESS_QUEUES", "SGX_READ_HWPERF_CB",
+    "SGX_SET_RENDER_CONTEXT_PRIORITY", "SGX_SET_TRANSFER_CONTEXT_PRIORITY"};
 
-typedef struct package_tag
-{
-    unsigned int    id;
-} package_t;
-
+typedef struct package_tag { unsigned int id; } package_t;
 
 #if 1
-extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex, void *data, unsigned long size)
-{
-    static int (*__drmCommandWrite)(int, unsigned long, void *, unsigned long) = NULL;
+extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex,
+                               void *data, unsigned long size) {
+    static int (*__drmCommandWrite)(int, unsigned long, void *, unsigned long) =
+        NULL;
 
-    if (__drmCommandWrite==NULL) {
-        __drmCommandWrite = (int (*)(int, unsigned long, void *, unsigned long))dlsym(RTLD_NEXT, "drmCommandWrite");
+    if (__drmCommandWrite == NULL) {
+        __drmCommandWrite =
+            (int (*)(int, unsigned long, void *, unsigned long))dlsym(
+                RTLD_NEXT, "drmCommandWrite");
         if (NULL == __drmCommandWrite) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
 
-    package_t* ppackage = (package_t*)data;
+    package_t *ppackage = (package_t *)data;
 
     TDITRACE("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
     int ret = __drmCommandWrite(fd, drmCommandIndex, data, size);

@@ -7,28 +7,32 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-
 #if 1
-extern "C" int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start)(void *), void* arg)
-{
-    static int (*__pthread_create)(pthread_t*, const pthread_attr_t*, void* (*start)(void *), void*) = NULL;
+extern "C" int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                              void *(*start)(void *), void *arg) {
+    static int (*__pthread_create)(pthread_t *, const pthread_attr_t *,
+                                   void *(*start)(void *), void *) = NULL;
 
     if (!__pthread_create)
-        __pthread_create = (int (*)(pthread_t*, const pthread_attr_t*, void* (*start)(void *), void*)) dlsym(RTLD_NEXT, "pthread_create");
+        __pthread_create = (int (*)(pthread_t *, const pthread_attr_t *,
+                                    void *(*start)(void *),
+                                    void *))dlsym(RTLD_NEXT, "pthread_create");
 
     if (pthreadrecording) {
         TDITRACE("pthread_create() 0x%x %p", *thread, start);
     }
-    //TDIPRINTF("[%ld]+pthread_create(), called from: %s, thread: %s\n", syscall(SYS_gettid), addrinfo(__builtin_return_address(0)), addrinfo((void*)start));
+    // TDIPRINTF("[%ld]+pthread_create(), called from: %s, thread: %s\n",
+    // syscall(SYS_gettid), addrinfo(__builtin_return_address(0)),
+    // addrinfo((void*)start));
 
-    int r =  __pthread_create(thread, attr, start, arg);
+    int r = __pthread_create(thread, attr, start, arg);
 
-    //TDIPRINTF("[%ld]-pthread_create():0x%x\n", syscall(SYS_gettid), pthreadid(*thread));
+    // TDIPRINTF("[%ld]-pthread_create():0x%x\n", syscall(SYS_gettid),
+    // pthreadid(*thread));
 
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param *param)
@@ -50,15 +54,13 @@ extern "C" int pthread_setschedparam(pthread_t thread, int policy, const struct 
 }
 #endif
 
-
 #if 1
-extern "C" int pthread_mutex_trylock(pthread_mutex_t* mutex)
-{
-    static int (*__pthread_mutex_trylock)(pthread_mutex_t*) = NULL;
+extern "C" int pthread_mutex_trylock(pthread_mutex_t *mutex) {
+    static int (*__pthread_mutex_trylock)(pthread_mutex_t *) = NULL;
 
     if (!__pthread_mutex_trylock)
-        __pthread_mutex_trylock = (int (*)(pthread_mutex_t*)) dlsym(RTLD_NEXT, "pthread_mutex_trylock");
-
+        __pthread_mutex_trylock = (int (*)(pthread_mutex_t *))dlsym(
+            RTLD_NEXT, "pthread_mutex_trylock");
 
     if (pthreadrecording) {
         TDITRACE("pthread_mutex_trylock() 0x%x", mutex);
@@ -68,25 +70,25 @@ extern "C" int pthread_mutex_trylock(pthread_mutex_t* mutex)
 }
 #endif
 
-
 #if 1
-extern "C" int pthread_mutex_lock(pthread_mutex_t* mutex)
-{
-    static int (*__pthread_mutex_lock)(pthread_mutex_t*) = NULL;
+extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
+    static int (*__pthread_mutex_lock)(pthread_mutex_t *) = NULL;
 
     if (!__pthread_mutex_lock)
-        __pthread_mutex_lock = (int (*)(pthread_mutex_t*)) dlsym(RTLD_NEXT, "pthread_mutex_lock");
+        __pthread_mutex_lock =
+            (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_lock");
 
     if (pthreadrecording) {
         TDITRACE("@T+pthread_mutex_lock() 0x%x", mutex);
     }
 
-    //TDIPRINTF("[%ld]+pthread_mutex_lock(0x%x), %s\n", syscall(SYS_gettid), (int)mutex, addrinfo(__builtin_return_address(0)));
-    //print_stacktrace(MAXFRAMES);
+    // TDIPRINTF("[%ld]+pthread_mutex_lock(0x%x), %s\n", syscall(SYS_gettid),
+    // (int)mutex, addrinfo(__builtin_return_address(0)));
+    // print_stacktrace(MAXFRAMES);
 
     int r = __pthread_mutex_lock(mutex);
 
-    //TDIPRINTF("[%ld]-pthread_mutex_lock()\n", syscall(SYS_gettid));
+    // TDIPRINTF("[%ld]-pthread_mutex_lock()\n", syscall(SYS_gettid));
 
     if (pthreadrecording) {
         TDITRACE("@T-pthread_mutex_lock() 0x%x", mutex);
@@ -96,23 +98,23 @@ extern "C" int pthread_mutex_lock(pthread_mutex_t* mutex)
 }
 #endif
 
-
 #if 1
-extern "C" int pthread_mutex_unlock(pthread_mutex_t* mutex)
-{
-    static int (*__pthread_mutex_unlock)(pthread_mutex_t*) = NULL;
+extern "C" int pthread_mutex_unlock(pthread_mutex_t *mutex) {
+    static int (*__pthread_mutex_unlock)(pthread_mutex_t *) = NULL;
 
     if (!__pthread_mutex_unlock)
-        __pthread_mutex_unlock = (int (*)(pthread_mutex_t*)) dlsym(RTLD_NEXT, "pthread_mutex_unlock");
+        __pthread_mutex_unlock = (int (*)(pthread_mutex_t *))dlsym(
+            RTLD_NEXT, "pthread_mutex_unlock");
 
     if (pthreadrecording) {
         TDITRACE("@T+pthread_mutex_unlock() 0x%x", mutex);
     }
-    //TDIPRINTF("[%ld]+pthread_mutex_unlock(0x%x), %s\n", syscall(SYS_gettid), (int)mutex, addrinfo(__builtin_return_address(0)));
+    // TDIPRINTF("[%ld]+pthread_mutex_unlock(0x%x), %s\n", syscall(SYS_gettid),
+    // (int)mutex, addrinfo(__builtin_return_address(0)));
 
     int r = __pthread_mutex_unlock(mutex);
 
-    //TDIPRINTF("[%ld]-pthread_mutex_unlock()\n", syscall(SYS_gettid));
+    // TDIPRINTF("[%ld]-pthread_mutex_unlock()\n", syscall(SYS_gettid));
 
     if (pthreadrecording) {
         TDITRACE("@T-pthread_mutex_unlock() 0x%x", mutex);
@@ -121,7 +123,6 @@ extern "C" int pthread_mutex_unlock(pthread_mutex_t* mutex)
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex)
@@ -146,7 +147,6 @@ extern "C" int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex)
 }
 #endif
 
-
 #if 0
 extern "C" int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const struct timespec* abstime)
 {
@@ -168,7 +168,6 @@ extern "C" int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mut
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int pthread_cond_signal(pthread_cond_t* cond)

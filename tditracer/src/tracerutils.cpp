@@ -5,8 +5,7 @@
 #include <dlfcn.h>
 #include <cxxabi.h>
 
-static const char* demangle(const char* s)
-{
+static const char *demangle(const char *s) {
     if (s) {
         if (strstr(s, "_ZN")) {
             if (dlsym(RTLD_NEXT, "__cxa_demangle")) {
@@ -20,31 +19,27 @@ static const char* demangle(const char* s)
     return s;
 }
 
-
-char* addrinfo(void* addr)
-{
+char *addrinfo(void *addr) {
     static char text[256];
     Dl_info dli;
 
     if (addr) {
         dladdr(addr, &dli);
-        snprintf(text, 256, "0x%08x %s (%s)", (int)addr, demangle(dli.dli_sname), dli.dli_fname);
+        snprintf(text, 256, "0x%08x %s (%s)", (int)addr,
+                 demangle(dli.dli_sname), dli.dli_fname);
     } else {
         sprintf(text, "0x%08x ? (?)");
     }
     return text;
 }
 
+// extern "C" pthread_t pthread_self(void);
 
-//extern "C" pthread_t pthread_self(void);
-
-int pthreadid(pthread_t ptid)
-{
+int pthreadid(pthread_t ptid) {
     int threadId = 0;
     memcpy(&threadId, &ptid, 4);
     return threadId;
 }
-
 
 #if 0
 

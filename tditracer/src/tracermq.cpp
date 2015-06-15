@@ -1,6 +1,5 @@
 #include <mqueue.h>
 
-
 #if 0
 extern "C" mqd_t mq_open(const char *name, int oflag, ...)
 {
@@ -17,7 +16,6 @@ extern "C" mqd_t mq_open(const char *name, int oflag, ...)
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_prio, const struct timespec *abs_timeout)
@@ -36,7 +34,6 @@ extern "C" int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, un
 }
 #endif
 
-
 #if 0
 extern "C" ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned int* msg_prio, const struct timespec *abs_timeout)
 {
@@ -54,7 +51,6 @@ extern "C" ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len, u
 }
 #endif
 
-
 #if 0
 extern "C" extern "C" int mq_notify(mqd_t mqdes, const struct sigevent* sevp)
 {
@@ -71,7 +67,6 @@ extern "C" extern "C" int mq_notify(mqd_t mqdes, const struct sigevent* sevp)
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)

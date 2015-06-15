@@ -1,6 +1,5 @@
 #include <semaphore.h>
 
-
 #if 0
 extern "C" int sem_init(sem_t* sem, int pshared, unsigned int value)
 {
@@ -18,7 +17,6 @@ extern "C" int sem_init(sem_t* sem, int pshared, unsigned int value)
 }
 #endif
 
-
 #if 0
 extern "C" int sem_wait(sem_t* sem)
 {
@@ -35,7 +33,6 @@ extern "C" int sem_wait(sem_t* sem)
     return r;
 }
 #endif
-
 
 #if 0
 extern "C" int sem_post(sem_t* sem)

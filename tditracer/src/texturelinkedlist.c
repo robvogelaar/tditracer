@@ -10,12 +10,13 @@
 texture_struct_t *texturelinkedlist_head = NULL;
 texture_struct_t *texturelinkedlist_curr = NULL;
 
-texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, int ttype, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size)
-{
-    verboseprintf("\n creating list with headnode as [%d]\n",id);
-    texture_struct_t *ptr = (texture_struct_t*)malloc(sizeof(texture_struct_t));
-    if(NULL == ptr)
-    {
+texture_struct_t *texturelinkedlist_create_list(
+    int id, unsigned int name, int ttype, int frame, int xoffset, int yoffset,
+    int width, int height, int format, void *png_data, size_t png_data_size) {
+    verboseprintf("\n creating list with headnode as [%d]\n", id);
+    texture_struct_t *ptr =
+        (texture_struct_t *)malloc(sizeof(texture_struct_t));
+    if (NULL == ptr) {
         verboseprintf("\n Node creation failed \n");
         return NULL;
     }
@@ -30,28 +31,32 @@ texture_struct_t* texturelinkedlist_create_list(int id, unsigned int name, int t
     ptr->format = format;
     ptr->png_data = png_data;
     ptr->png_data_size = png_data_size;
-    
+
     ptr->next = NULL;
 
     texturelinkedlist_head = texturelinkedlist_curr = ptr;
     return ptr;
 }
 
-texture_struct_t* texturelinkedlist_add_to_list(int id, unsigned int name, int ttype, int frame, int xoffset, int yoffset, int width, int height, int format, void* png_data, size_t png_data_size, bool add_to_end)
-{
-    if(NULL == texturelinkedlist_head)
-    {
-        return (texturelinkedlist_create_list(id, name, ttype, frame, xoffset, yoffset, width, height, format, png_data, png_data_size));
+texture_struct_t *
+texturelinkedlist_add_to_list(int id, unsigned int name, int ttype, int frame,
+                              int xoffset, int yoffset, int width, int height,
+                              int format, void *png_data, size_t png_data_size,
+                              bool add_to_end) {
+    if (NULL == texturelinkedlist_head) {
+        return (texturelinkedlist_create_list(id, name, ttype, frame, xoffset,
+                                              yoffset, width, height, format,
+                                              png_data, png_data_size));
     }
 
-    if(add_to_end)
-        verboseprintf("\n Adding node to end of list with id [%d]\n",id);
+    if (add_to_end)
+        verboseprintf("\n Adding node to end of list with id [%d]\n", id);
     else
-        verboseprintf("\n Adding node to beginning of list with id [%d]\n",id);
+        verboseprintf("\n Adding node to beginning of list with id [%d]\n", id);
 
-    texture_struct_t *ptr = (texture_struct_t*)malloc(sizeof(texture_struct_t));
-    if(NULL == ptr)
-    {
+    texture_struct_t *ptr =
+        (texture_struct_t *)malloc(sizeof(texture_struct_t));
+    if (NULL == ptr) {
         verboseprintf("\n Node creation failed \n");
         return NULL;
     }
@@ -66,88 +71,70 @@ texture_struct_t* texturelinkedlist_add_to_list(int id, unsigned int name, int t
     ptr->format = format;
     ptr->png_data = png_data;
     ptr->png_data_size = png_data_size;
-    
+
     ptr->next = NULL;
 
-    if(add_to_end)
-    {
+    if (add_to_end) {
         texturelinkedlist_curr->next = ptr;
         texturelinkedlist_curr = ptr;
-    }
-    else
-    {
+    } else {
         ptr->next = texturelinkedlist_head;
         texturelinkedlist_head = ptr;
     }
     return ptr;
 }
 
-texture_struct_t* texturelinkedlist_search_in_list(int id, texture_struct_t **prev)
-{
+texture_struct_t *texturelinkedlist_search_in_list(int id,
+                                                   texture_struct_t **prev) {
     texture_struct_t *ptr = texturelinkedlist_head;
     texture_struct_t *tmp = NULL;
     bool found = false;
 
-    verboseprintf("\n Searching the list for id [%d] \n",id);
+    verboseprintf("\n Searching the list for id [%d] \n", id);
 
-    while(ptr != NULL)
-    {
-        if(ptr->id == id)
-        {
+    while (ptr != NULL) {
+        if (ptr->id == id) {
             found = true;
             break;
-        }
-        else
-        {
+        } else {
             tmp = ptr;
             ptr = ptr->next;
         }
     }
 
-    if(true == found)
-    {
-        if(prev)
+    if (true == found) {
+        if (prev)
             *prev = tmp;
         return ptr;
-    }
-    else
-    {
+    } else {
         return NULL;
     }
 }
 
-int texturelinkedlist_delete_from_list(int id)
-{
+int texturelinkedlist_delete_from_list(int id) {
     texture_struct_t *prev = NULL;
     texture_struct_t *del = NULL;
 
-    verboseprintf("\n Deleting id [%d] from list\n",id);
+    verboseprintf("\n Deleting id [%d] from list\n", id);
 
     del = texturelinkedlist_search_in_list(id, &prev);
-    if (del == NULL)
-    {
+    if (del == NULL) {
         return -1;
-    }
-    else
-    {
+    } else {
         free(del->png_data);
 
         if (prev != NULL) {
             prev->next = del->next;
         }
 
-        if(del == texturelinkedlist_curr)
-        {
+        if (del == texturelinkedlist_curr) {
             texturelinkedlist_curr = prev;
-            
-            if(del == texturelinkedlist_head)
-            {
+
+            if (del == texturelinkedlist_head) {
                 texturelinkedlist_head = del->next;
             }
-            
-        }
-        else if(del == texturelinkedlist_head)
-        {
+
+        } else if (del == texturelinkedlist_head) {
             texturelinkedlist_head = del->next;
         }
     }
@@ -157,13 +144,11 @@ int texturelinkedlist_delete_from_list(int id)
     return 0;
 }
 
-void texturelinkedlist_print_list(void)
-{
+void texturelinkedlist_print_list(void) {
     texture_struct_t *ptr = texturelinkedlist_head;
 
     verboseprintf("-------Printing list Start-------\n");
-    while(ptr != NULL)
-    {
+    while (ptr != NULL) {
         printf("[%d]\n", ptr->id);
         ptr = ptr->next;
     }

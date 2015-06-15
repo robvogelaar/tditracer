@@ -1,2 +1,2 @@
 
-extern char* addrinfo(void* addr);
+extern char *addrinfo(void *addr);

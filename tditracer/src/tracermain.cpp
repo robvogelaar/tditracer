@@ -20,84 +20,81 @@ extern "C" {
 #include "framecapture.h"
 }
 
-
 static void init(void);
 static void dump(void);
 
-static void __attribute__ ((constructor)) tditracer_constructor();
-static void __attribute__ ((destructor)) tditracer_destructor();
-
+static void __attribute__((constructor)) tditracer_constructor();
+static void __attribute__((destructor)) tditracer_destructor();
 
 extern char *__progname;
 
-static void tditracer_constructor()
-{
+static void tditracer_constructor() {
     tditrace_init();
 
     init();
 }
 
-static void tditracer_destructor()
-{
+static void tditracer_destructor() {
     printf("tditracer:#traces = %d\n", trace_counter);
 }
 
-
-int  framestorecord;
+int framestorecord;
 bool texturerecording;
 bool renderbufferrecording;
 bool shaderrecording;
 bool libcrecording;
 bool pthreadrecording;
 
-
 int shaders_captured = 0;
 int textures_captured = 0;
 int texturebytes_captured = 0;
 int frames_captured = 0;
 
-
 typedef unsigned int mz_uint;
 typedef int mz_bool;
-extern "C" void *tdefl_write_image_to_png_file_in_memory(const void *pImage, int w, int h, int num_chans, size_t *pLen_out);
-extern "C" void *tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h, int num_chans, size_t *pLen_out, mz_uint level, mz_bool flip);
+extern "C" void *tdefl_write_image_to_png_file_in_memory(const void *pImage,
+                                                         int w, int h,
+                                                         int num_chans,
+                                                         size_t *pLen_out);
+extern "C" void *
+tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h,
+                                           int num_chans, size_t *pLen_out,
+                                           mz_uint level, mz_bool flip);
 
-static void signalhandler(int sig, siginfo_t *si, void *context)
-{
-    switch(sig)
-    {
-        case SIGINT:
+static void signalhandler(int sig, siginfo_t *si, void *context) {
 
-            static bool diddump = false;
+    switch (sig) {
+    case SIGINT:
 
-            printf("tditracer: received SIGINT\n");
+        static bool diddump = false;
 
-            /*
-             * do not dump again if another ctrl-c is received, instead
-             * go direct to abort, allowing a current dumping to be aborted
-             */
-            if (!diddump) {
-                diddump = true;
+        printf("tditracer: received SIGINT\n");
 
-                if (framestorecord > 0) {
+        /*
+         * do not dump again if another ctrl-c is received, instead
+         * go direct to abort, allowing a current dumping to be aborted
+         */
+        if (!diddump) {
+            diddump = true;
 
-                    framecapture_capframe();
-                    frames_captured++;
+            if (framestorecord > 0) {
 
-                    framecapture_capframe();
-                    frames_captured++;
+                framecapture_capframe();
+                frames_captured++;
 
-                    framecapture_capframe();
-                    frames_captured++;
-                }
+                framecapture_capframe();
+                frames_captured++;
 
-                dump();
+                framecapture_capframe();
+                frames_captured++;
             }
 
+            dump();
+        }
 
-            if (texturerecording) {
+        if (texturerecording) {
 
-                #if 0
+#if 0
                 unsigned char* p = (unsigned char*)malloc(1280 * 720 * 4);
                 glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, p);
                 void *pPNG_data;
@@ -107,30 +104,31 @@ static void signalhandler(int sig, siginfo_t *si, void *context)
                 fwrite(pPNG_data, 1, png_data_size, pFile);
                 chmod("frame.png", 0666);
                 fclose(pFile);
-                #endif
-            }
+#endif
+        }
 
-            printf("tditracer:#traces = %d\n", trace_counter);
+        printf("tditracer:#traces = %d\n", trace_counter);
 
-            abort();
-
-        break;
-
-        case SIGQUIT:
-
-            printf("tditracer: received SIGQUIT, rewinding tracebuffer\n");
-
-            tditrace_rewind();
+        abort();
 
         break;
-   }
+
+    case SIGQUIT:
+
+        printf("tditracer: received SIGQUIT, rewinding tracebuffer\n");
+
+        tditrace_rewind();
+
+        break;
+    }
 }
 
-
-static void dump(void)
-{
+static void dump(void) {
     if (texturerecording || (framestorecord > 0) || shaderrecording) {
-        printf("dumping, #shaders captured = %d, #textures captured = %d, #frames captured = %d\n", shaders_captured, textures_captured, frames_captured);
+        printf(
+            "dumping, #shaders captured = %d, #textures captured = %d, #frames "
+            "captured = %d\n",
+            shaders_captured, textures_captured, frames_captured);
 
         if (shaderrecording) {
             shadercapture_writeshaders();
@@ -147,9 +145,7 @@ static void dump(void)
     }
 }
 
-
-static void init(void)
-{
+static void init(void) {
     static bool inited = false;
     if (!inited) {
 
@@ -161,7 +157,6 @@ static void init(void)
         sigaction(SIGINT, &sVal, NULL);
         // Register for SIGQUIT
         sigaction(SIGQUIT, &sVal, NULL);
-
 
         if (getenv("LIBC")) {
             libcrecording = (atoi(getenv("LIBC")) >= 1);
@@ -192,13 +187,11 @@ static void init(void)
             texturerecording = true;
         }
 
-        printf("tditracer: init, libc:%s, pthread:%s, shaders:%s, textures:%s, renderbuffers:%s, frames:%d\n",
-            libcrecording ? "yes":"no",
-            pthreadrecording ? "yes":"no",
-            shaderrecording ? "yes":"no",
-            texturerecording ? "yes":"no",
-            renderbufferrecording ? "yes":"no",
-            framestorecord);
+        printf("tditracer: init, libc:%s, pthread:%s, shaders:%s, textures:%s, "
+               "renderbuffers:%s, frames:%d\n",
+               libcrecording ? "yes" : "no", pthreadrecording ? "yes" : "no",
+               shaderrecording ? "yes" : "no", texturerecording ? "yes" : "no",
+               renderbufferrecording ? "yes" : "no", framestorecord);
 
         inited = true;
     }
