@@ -152,6 +152,28 @@ extern "C" void glFlush(void) {
         tditrace_ex("@T-glFlush()");
 }
 
+extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
+                                      GLboolean normalized, GLsizei stride,
+                                      const GLvoid *pointer) {
+    static void (*__glVertexAttribPointer)(GLuint, GLint, GLenum, GLboolean,
+                                           GLsizei, const GLvoid *) = NULL;
+
+    if (__glVertexAttribPointer == NULL) {
+        __glVertexAttribPointer =
+            (void (*)(GLuint, GLint, GLenum, GLboolean, GLsizei,
+                      const GLvoid *))dlsym(RTLD_NEXT, "glVertexAttribPointer");
+        if (NULL == __glVertexAttribPointer) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (glesrecording)
+        tditrace_ex("glVertexAttribPointer() %d,%d,%s,%d,0x%x", index, size,
+                    TYPESTRING(type), stride, pointer);
+
+    __glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+}
+
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     static void (*__glDrawArrays)(GLenum, GLint, GLsizei) = NULL;
 
@@ -172,7 +194,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
         if (glesrecording || gldrawrecording)
             tditrace_ex(
                 "@T+glDrawArrays() "
-                "#%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
+                "@%d,#%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawArrays_counter, MODESTRING(mode), count,
                 boundtexture, currentprogram, boundframebuffer,
                 framebuffertexture[boundframebuffer & 0x3ff],
@@ -185,7 +207,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
     } else {
         if (glesrecording || gldrawrecording)
-            tditrace_ex("@T+glDrawArrays() #%d,%d,%s,#i=%d,t=%u,p=%u",
+            tditrace_ex("@T+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawArrays_counter, MODESTRING(mode),
                         count, boundtexture, currentprogram);
     }
@@ -239,10 +261,10 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
         if (glesrecording || gldrawrecording)
             tditrace_ex(
                 "@T+glDrawElements() "
-                "#%d,%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
-                current_frame, glDrawElements_counter, MODESTRING(mode), count,
-                boundtexture, currentprogram, boundframebuffer,
-                framebuffertexture[boundframebuffer & 0x3ff],
+                "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
+                current_frame, glDrawElements_counter, MODESTRING(mode),
+                TYPESTRING(mode), count, boundtexture, currentprogram,
+                boundframebuffer, framebuffertexture[boundframebuffer & 0x3ff],
                 framebufferrenderbuffer[boundframebuffer & 0x3ff],
                 renderbufferwidth
                     [framebufferrenderbuffer[boundframebuffer & 0x3ff] & 0x3ff],
@@ -252,9 +274,9 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
 
     } else {
         if (glesrecording || gldrawrecording)
-            tditrace_ex("@T+glDrawElements() #%d,%d,%s,#i=%d,t=%u,p=%u",
+            tditrace_ex("@T+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawElements_counter, MODESTRING(mode),
-                        count, boundtexture, currentprogram);
+                        TYPESTRING(type), count, boundtexture, currentprogram);
     }
 
     __glDrawElements(mode, count, type, indices);
@@ -629,6 +651,23 @@ extern "C" GLvoid glClear(GLbitfield mask) {
 
     if (glesrecording)
         tditrace_ex("@T-glClear()");
+}
+
+extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
+    static void (*__glBindBuffer)(GLenum, GLuint) = NULL;
+
+    if (__glBindBuffer == NULL) {
+        __glBindBuffer =
+            (void (*)(GLenum, GLuint))dlsym(RTLD_NEXT, "glBindBuffer");
+        if (NULL == __glBindBuffer) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (glesrecording)
+        tditrace_ex("glBindBuffer() %u", buffer);
+
+    __glBindBuffer(target, buffer);
 }
 
 extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {

@@ -4,6 +4,7 @@ typedef void *EGLDisplay;
 typedef void *EGLSurface;
 typedef void *EGLContext;
 
+typedef int GLboolean;
 typedef char GLchar;
 typedef unsigned int GLenum;
 typedef unsigned int GLuint;
