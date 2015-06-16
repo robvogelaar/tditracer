@@ -15,9 +15,9 @@ extern "C" int SGXQueueTransfer(void *hTransferContext,
         }
     }
 
-    TDITRACE("@T+SGXQueueTransfer()");
+    tditrace_ex("@T+SGXQueueTransfer()");
     int ret = __SGXQueueTransfer(hTransferContext, psQueueTransfer);
-    TDITRACE("@T-SGXQueueTransfer()");
+    tditrace_ex("@T-SGXQueueTransfer()");
 
     return ret;
 }
@@ -204,11 +204,11 @@ extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex,
 
     package_t *ppackage = (package_t *)data;
 
-    TDITRACE("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
+    tditrace_ex("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
     int ret = __drmCommandWrite(fd, drmCommandIndex, data, size);
     /*
      * cannot trace here...
-     * TDITRACE("drmCommandWrite()");
+     * tditrace_ex("drmCommandWrite()");
      */
     return ret;
 }

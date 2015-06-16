@@ -42,7 +42,7 @@ extern "C" void* dlopen(const char* filename, int flag)
      */
     init();
 
-    // TDITRACE("dlopen() %s", filename);
+    // tditrace_ex("dlopen() %s", filename);
 
     bool intercept = false;
     if (filename) {
@@ -129,7 +129,7 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
     return EACCES;
 #endif
 
-    TDITRACE("connect()");
+    tditrace_ex("connect()");
 
     return __connect(sockfd,serv_addr,addrlen);
 
@@ -159,13 +159,13 @@ extern "C" int open(const char *pathname, int flags, ...) {
     va_end(args);
 
     if (libcrecording) {
-        TDITRACE("@T+open()_%s", pathname);
+        tditrace_ex("@T+open()_%s", pathname);
     }
 
     int ret = __open(pathname, flags, a1);
 
     if (libcrecording) {
-        TDITRACE("@T-open()_%s %d", pathname, ret);
+        tditrace_ex("@T-open()_%s %d", pathname, ret);
     }
 
     return ret;
@@ -184,13 +184,13 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+read() %d %d", fd, count);
+        tditrace_ex("@T+read() %d %d", fd, count);
     }
 
     ssize_t s = __read(fd, buf, count);
 
     if (libcrecording) {
-        TDITRACE("@T-read()");
+        tditrace_ex("@T-read()");
     }
 
     return s;
@@ -210,13 +210,13 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+write() %d %d", fd, count);
+        tditrace_ex("@T+write() %d %d", fd, count);
     }
 
     ssize_t s = __write(fd, buf, count);
 
     if (libcrecording) {
-        TDITRACE("@T-write()");
+        tditrace_ex("@T-write()");
     }
 
     return s;
@@ -240,13 +240,13 @@ extern "C" int ioctl(int d, int request, ...) {
     va_end(args);
 
     if (libcrecording) {
-        TDITRACE("@T+ioctl() %d 0x%x", d, request);
+        tditrace_ex("@T+ioctl() %d 0x%x", d, request);
     }
 
     int ret = __ioctl(d, request, a1);
 
     if (libcrecording) {
-        TDITRACE("@T-ioctl()");
+        tditrace_ex("@T-ioctl()");
     }
 
     return ret;
@@ -266,13 +266,13 @@ extern "C" void *memcpy(void *dest, const void *src, size_t n) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+memcpy() 0x%x 0x%x %d", dest, src, n);
+        tditrace_ex("@T+memcpy() 0x%x 0x%x %d", dest, src, n);
     }
 
     void *ret = __memcpy(dest, src, n);
 
     if (libcrecording) {
-        TDITRACE("@T-memcpy()");
+        tditrace_ex("@T-memcpy()");
     }
 
     return ret;
@@ -291,13 +291,13 @@ extern "C" void *memset(void *dest, int c, size_t n) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+memset() 0x%x,0x%x,%d", dest, c, n);
+        tditrace_ex("@T+memset() 0x%x,0x%x,%d", dest, c, n);
     }
 
     void *ret = __memset(dest, c, n);
 
     if (libcrecording) {
-        TDITRACE("@T-memset()");
+        tditrace_ex("@T-memset()");
     }
 
     return ret;
@@ -316,13 +316,13 @@ extern "C" char *strcpy(char *dest, const char *src) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+strcpy() 0x%x,0x%x", dest, src);
+        tditrace_ex("@T+strcpy() 0x%x,0x%x", dest, src);
     }
 
     char *ret = __strcpy(dest, src);
 
     if (libcrecording) {
-        TDITRACE("@T-strcpy()");
+        tditrace_ex("@T-strcpy()");
     }
 
     return ret;
@@ -342,13 +342,13 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+strncpy() 0x%x 0x%x %d", dest, src, n);
+        tditrace_ex("@T+strncpy() 0x%x 0x%x %d", dest, src, n);
     }
 
     char *ret = __strncpy(dest, src, n);
 
     if (libcrecording) {
-        TDITRACE("@T-strncpy()");
+        tditrace_ex("@T-strncpy()");
     }
 
     return ret;
@@ -367,13 +367,13 @@ extern "C" void *malloc(size_t size) {
     }
 
     if (libcrecording) {
-        TDITRACE("@T+malloc() %d", size);
+        tditrace_ex("@T+malloc() %d", size);
     }
 
     void *ret = __malloc(size);
 
     if (libcrecording) {
-        TDITRACE("@T-malloc()");
+        tditrace_ex("@T-malloc()");
     }
 
     return ret;

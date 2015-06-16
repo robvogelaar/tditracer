@@ -13,9 +13,9 @@ extern "C" int extra(int in, int *out) {
         }
     }
 
-    TDITRACE("@T+extra()");
+    tditrace_ex("@T+extra()");
     int ret = __extra(in, out);
-    TDITRACE("@T-extra()");
+    tditrace_ex("@T-extra()");
 
     return ret;
 }

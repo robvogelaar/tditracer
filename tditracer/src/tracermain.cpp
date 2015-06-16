@@ -10,6 +10,7 @@
 
 #include "tdi.h"
 
+#include "tracermain.h"
 #include "tracerutils.h"
 
 extern int trace_counter;
@@ -44,6 +45,9 @@ bool renderbufferrecording;
 bool shaderrecording;
 bool libcrecording;
 bool pthreadrecording;
+bool eglrecording;
+bool glesrecording;
+bool gldrawrecording;
 
 int shaders_captured = 0;
 int textures_captured = 0;
@@ -168,6 +172,24 @@ static void init(void) {
             pthreadrecording = (atoi(getenv("PTHREAD")) >= 1);
         } else {
             pthreadrecording = false;
+        }
+
+        if (getenv("EGL")) {
+            eglrecording = (atoi(getenv("EGL")) >= 1);
+        } else {
+            eglrecording = true;
+        }
+
+        if (getenv("GLES")) {
+            glesrecording = (atoi(getenv("GLES")) >= 1);
+        } else {
+            glesrecording = true;
+        }
+
+        if (getenv("GLDRAW")) {
+            gldrawrecording = (atoi(getenv("GLDRAW")) >= 1);
+        } else {
+            gldrawrecording = true;
         }
 
         if (getenv("TR")) {
