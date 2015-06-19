@@ -5,8 +5,7 @@
 #include <time.h>
 
 
-
-extern void tditrace(const char* format, ...);
+extern void tditrace(const char* format, ...) __attribute__((weak));
 
 
 int main(int argc, char **argv)
