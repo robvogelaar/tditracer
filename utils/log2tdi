@@ -21,6 +21,8 @@ def addnote (logfilename, logline, matches):
 
    for match in matches:
 
+      #sys.stderr.write('match:\'%s\'\n' % match)
+
       prog = re.compile('.*' + match + '.*')
 
       if prog.match(logline):
@@ -33,48 +35,65 @@ def addnote (logfilename, logline, matches):
          names.append(name)
          print('NAM 7 %d %s' %((7 * 1000 + names.index(name)) , '[' + logfilename + ']' + name.replace(' ', '_')))
 
+      #attempt to detect multiple timestamp formats
+
       #150610-22:42:34.855932
       tstamp = re.findall("\d{6}-\d{2}:\d{2}:\d{2}\.\d+", logline)
       if tstamp:
          if tstamp[0]:
-
             t = datetime.strptime(tstamp[0], '%y%m%d-%H:%M:%S.%f')
             sec = int((t - datetime(1970, 1, 1)).total_seconds())
             nsec = int(t.microsecond * 1000)
             stamp = long(sec * 1000000000 + nsec);
 
       #20150610 22:41:36.082
-      tstamp = re.findall("\d{8} \d{2}:\d{2}:\d{2}\.\d+", logline)
-      if tstamp:
-         if tstamp[0]:
-            
-            t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
-            sec = int((t - datetime(1970, 1, 1)).total_seconds())
-            nsec = int(t.microsecond * 1000)
-            stamp = long(sec * 1000000000 + nsec);
+      else:
+         tstamp = re.findall("\d{8} \d{2}:\d{2}:\d{2}\.\d+", logline)
+         if tstamp:
+            if tstamp[0]:
+               t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
+               sec = int((t - datetime(1970, 1, 1)).total_seconds())
+               nsec = int(t.microsecond * 1000)
+               stamp = long(sec * 1000000000 + nsec);
+         else:
+            #2015-06-10T20:04:27.941
+            tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
+            if tstamp:
+               if tstamp[0]:
+                  t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+                  sec = int((t - datetime(1970, 1, 1)).total_seconds())
+                  nsec = int(t.microsecond * 1000)
+                  stamp = long(sec * 1000000000 + nsec);
+            else:
+               # 1434754719      168720
+               tstamp = re.findall("\d{8,}\t\d+", logline)
+               if tstamp:
 
-      #2015-06-10T20:04:27.941
-      tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
-      if tstamp:
-         if tstamp[0]:
+                  if tstamp[0]:
+                     pat = re.compile("[\t]")
+                     fields = pat.split(tstamp[0])
+                     sec = int(fields[0])
+                     nsec = int(fields[1]) * 1000
+                     stamp = long(sec * 1000000000 + nsec);
+                     #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
-            t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
-            sec = int((t - datetime(1970, 1, 1)).total_seconds())
-            nsec = int(t.microsecond * 1000)
-            stamp = long(sec * 1000000000 + nsec);
 
-      if (offset_sec == 0):
-         offset_sec = sec;
-         offset_nsec = nsec;
+      if (tstamp):
+         if (offset_sec == 0):
+            offset_sec = sec;
+            offset_nsec = nsec;
 
-      if prev_stamp:
-         if stamp < prev_stamp:
-            sys.stderr.write('stamp < prev_stamp\n')
+         if prev_stamp:
+            if stamp < prev_stamp:
+               sys.stderr.write('stamp < prev_stamp\n')
 
-      prev_stamp = stamp
+         prev_stamp = stamp
 
-      print('OCC 7 %d %d' %((7 * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
-      print('DSC 0 0 %s' % logline.replace(" ", "_"))
+         print('OCC 7 %d %d' %((7 * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
+         print('DSC 0 0 %s' % logline.replace(" ", "_").replace("\t", "_"))
+
+      else:
+         sys.stderr.write('no timestamp found, skipping logline: \'%s\'\n' % logline)
 
 
 def main():
@@ -86,14 +105,20 @@ def main():
       textfile.close()
 
       matches = []
-      for arg in sys.argv[2:]:
-         matches.append(arg)
+      if len(sys.argv) == 2:
+         matches = ['.+']
+         totalmatch = '.+'
+      else:
+         for arg in sys.argv[2:]:
+            matches.append(arg)
 
-      totalmatch = ''
-      for match in matches:
-         totalmatch = totalmatch + '.*' + match + '.*|'
+         totalmatch = ''
+         for match in matches:
+            totalmatch = totalmatch + '.*' + match + '.*|'
 
-      totalmatch = totalmatch[:-1]
+         totalmatch = totalmatch[:-1]
+
+      #sys.stderr.write('totalmatch:\'%s\'\n' % totalmatch)
 
       loglinematches = re.findall(totalmatch, filetext)
 
@@ -103,13 +128,15 @@ def main():
 
       for logline in loglinematches:
 
+         #sys.stderr.write('logline is \'%s\'\n' % logline)
+
          addnote(sys.argv[1], logline, matches)
 
       print('END %d' % (offset_sec * 1000000000 + offset_nsec));
 
    else:
 
-      print("Usage: %s logfile regexp..." % sys.argv[0])
+      print("Usage: %s logfile [regexp1] [regexp2]..." % sys.argv[0])
 
 if __name__ == "__main__":
    main()
