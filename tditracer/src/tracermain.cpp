@@ -36,7 +36,7 @@ static void tditracer_constructor() {
 }
 
 static void tditracer_destructor() {
-    printf("tditracer:#traces = %d\n", trace_counter);
+    printf("tditracer: exit, #traces = %d\n", trace_counter);
 }
 
 int framestorecord;

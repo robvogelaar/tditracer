@@ -562,6 +562,17 @@ int tditrace_init(void) {
 
     get_process_name_by_pid(pid, procname);
 
+    if (strcmp(procname, "mkdir") == 0) {
+        printf("tdi: init, procname is 'mkdir' ; not tracing\n");
+        return;
+    }
+
+    if (strcmp(procname, "sh") == 0) {
+        printf("tdi: init, procname is 'sh' ; not tracing\n");
+        return;
+    }
+
+
     char tracebufferfilename[128];
 
     sprintf(tracebufferfilename, (char *)"/tmp/.tditracebuffer:%s:%d", procname,
@@ -584,11 +595,34 @@ int tditrace_init(void) {
                 sprintf(procpid, (char *)"/proc/%d",
                         atoi(strrchr(ep->d_name, ':') + 1));
 
+                char procpid_plus1[128];
+                sprintf(procpid_plus1, (char *)"/proc/%d",
+                        atoi(strrchr(ep->d_name, ':') + 1) + 1);
+                printf("tdi: init, checking \"%s\"\n", procpid_plus1);
+
+                char procpid_plus2[128];
+                sprintf(procpid_plus1, (char *)"/proc/%d",
+                        atoi(strrchr(ep->d_name, ':') + 1) + 2);
+                printf("tdi: init, checking \"%s\"\n", procpid_plus2);
+
+
                 char fullname[128];
                 sprintf(fullname, "/tmp/%s", ep->d_name);
 
                 struct stat sts;
+
                 if (stat(procpid, &sts) == -1) {
+                    printf("not found \"%s\"\n", procpid);
+                }
+                if (stat(procpid_plus1, &sts) == -1) {
+                    printf("not found \"%s\"\n", procpid_plus1);
+                }
+                if (stat(procpid_plus2, &sts) == -1) {
+                    printf("not found \"%s\"\n", procpid_plus2);
+                }
+
+
+                if ((stat(procpid, &sts) == -1) && (stat(procpid_plus1, &sts) == -1) && (stat(procpid_plus2, &sts) == -1)) {
 
                     printf("tdi: init, removed: \"%s\"\n", fullname);
                     unlink(fullname);
@@ -628,12 +662,21 @@ int tditrace_init(void) {
     trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
 
     // obtain timeofday timestamp and write to buffer
+    // for now use monotonic as timeofday due to some procs are started in 1970
+    _u64    timeofday_timestamp = timestamp_monotonic_nsec();
+
+    // obtain monotonic timestamp and write to buffer
+    _u64    monotonic_timestamp = timestamp_monotonic_nsec();
+
     trace_buffer_ptr +=
-        sprintf(trace_buffer_ptr, (char *)"%lld\f", timestamp_timeofday_nsec());
+        sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
 
     // obtain monotonic timestamp and write to buffer
     trace_buffer_ptr +=
-        sprintf(trace_buffer_ptr, (char *)"%lld\f", timestamp_monotonic_nsec());
+        sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
+
+    printf("tdi: init, timeofday_timestamp : %lld\n", timeofday_timestamp);
+    printf("tdi: init, monotonic_timestamp : %lld\n", monotonic_timestamp);
 
     reported_full = 0;
 
