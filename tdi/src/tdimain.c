@@ -549,13 +549,9 @@ static void get_process_name_by_pid(const int pid, char *name) {
     }
 }
 
-int tditrace_init(void) {
+static int do_init(void) {
     struct timeval mytime;
     int i;
-
-    if (tditrace_inited) {
-        return 0;
-    }
 
     pid_t pid = getpid();
     char procname[128];
@@ -563,15 +559,14 @@ int tditrace_init(void) {
     get_process_name_by_pid(pid, procname);
 
     if (strcmp(procname, "mkdir") == 0) {
-        printf("tdi: init, procname is 'mkdir' ; not tracing\n");
+        printf("tdi: init, procname is \"mkdir\" ; not tracing\n");
         return;
-    }
-
-    if (strcmp(procname, "sh") == 0) {
-        printf("tdi: init, procname is 'sh' ; not tracing\n");
+    } else if (strcmp(procname, "sh") == 0) {
+        printf("tdi: init, procname is \"sh\" ; not tracing\n");
         return;
+    } else {
+        printf("tdi: init, procname is \"%s\", pid is \"%d\"\n", procname, pid);
     }
-
 
     char tracebufferfilename[128];
 
@@ -598,34 +593,32 @@ int tditrace_init(void) {
                 char procpid_plus1[128];
                 sprintf(procpid_plus1, (char *)"/proc/%d",
                         atoi(strrchr(ep->d_name, ':') + 1) + 1);
-                printf("tdi: init, checking \"%s\"\n", procpid_plus1);
 
                 char procpid_plus2[128];
-                sprintf(procpid_plus1, (char *)"/proc/%d",
+                sprintf(procpid_plus2, (char *)"/proc/%d",
                         atoi(strrchr(ep->d_name, ':') + 1) + 2);
-                printf("tdi: init, checking \"%s\"\n", procpid_plus2);
-
 
                 char fullname[128];
                 sprintf(fullname, "/tmp/%s", ep->d_name);
 
                 struct stat sts;
 
-                if (stat(procpid, &sts) == -1) {
-                    printf("not found \"%s\"\n", procpid);
+                if (stat(procpid, &sts) != -1) {
+                    printf("found \"%s\"\n", procpid);
                 }
-                if (stat(procpid_plus1, &sts) == -1) {
-                    printf("not found \"%s\"\n", procpid_plus1);
+                if (stat(procpid_plus1, &sts) != -1) {
+                    printf("found \"%s\" + 1\n", procpid);
                 }
-                if (stat(procpid_plus2, &sts) == -1) {
-                    printf("not found \"%s\"\n", procpid_plus2);
+                if (stat(procpid_plus2, &sts) != -1) {
+                    printf("found \"%s\" + 2\n", procpid);
                 }
 
+                if ((stat(procpid, &sts) == -1) &&
+                    (stat(procpid_plus1, &sts) == -1) &&
+                    (stat(procpid_plus2, &sts) == -1)) {
 
-                if ((stat(procpid, &sts) == -1) && (stat(procpid_plus1, &sts) == -1) && (stat(procpid_plus2, &sts) == -1)) {
-
-                    printf("tdi: init, removed: \"%s\"\n", fullname);
                     unlink(fullname);
+                    printf("tdi: init, removed: \"%s\"\n", fullname);
                 } else {
 
                     printf("tdi: init, not removed: \"%s\"\n", fullname);
@@ -635,8 +628,6 @@ int tditrace_init(void) {
 
         closedir(dp);
     }
-
-    // find_process_name("tditest");
 
     FILE *file;
     if ((file = fopen(tracebufferfilename, "w+")) == 0) {
@@ -662,11 +653,10 @@ int tditrace_init(void) {
     trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
 
     // obtain timeofday timestamp and write to buffer
-    // for now use monotonic as timeofday due to some procs are started in 1970
-    _u64    timeofday_timestamp = timestamp_monotonic_nsec();
+    _u64 timeofday_timestamp = timestamp_timeofday_nsec();
 
     // obtain monotonic timestamp and write to buffer
-    _u64    monotonic_timestamp = timestamp_monotonic_nsec();
+    _u64 monotonic_timestamp = timestamp_monotonic_nsec();
 
     trace_buffer_ptr +=
         sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
@@ -701,6 +691,78 @@ int tditrace_init(void) {
     simplefu_mutex_unlock(&myMutex);
 
     return 0;
+}
+
+static int thedelay;
+
+void *delayed_init_thread(void *param) {
+
+    int *pdelay = (int *)param;
+    int delay = *pdelay;
+
+    printf("tdi: init, delay is %d\n", delay);
+
+    if (delay < 0) {
+
+        while (1) {
+            struct timeval tv;
+            struct tm *ptm;
+            char time_string[40];
+            gettimeofday(&tv, NULL);
+            ptm = localtime(&tv.tv_sec);
+            strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S",
+                     ptm);
+
+            if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
+                printf("tdi: init, delay until timeofday is set, \"%s\", "
+                       "timeofday is set\n",
+                       time_string);
+                break;
+            }
+
+            ptm = localtime(&tv.tv_sec);
+            strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S",
+                     ptm);
+            printf("tdi: init, delay until timeofday is set, \"%s\", timeofday "
+                   "is not set\n",
+                   time_string);
+
+            usleep(1 * 1000000);
+        }
+
+    } else {
+
+        while (delay > 0) {
+            printf("tdi: init, delay %d second(s)...\n", delay);
+            usleep(1 * 1000000);
+            delay--;
+        }
+    }
+
+    do_init();
+
+    pthread_exit(NULL);
+    return NULL;
+}
+
+int tditrace_init(void) {
+    struct timeval mytime;
+    int i;
+
+    if (tditrace_inited) {
+        return 0;
+    }
+
+    if (getenv("DELAY")) {
+        thedelay = atoi(getenv("DELAY"));
+        pthread_t delayed_init_thread_id;
+        pthread_create(&delayed_init_thread_id, NULL, delayed_init_thread,
+                       &thedelay);
+
+        return 0;
+    }
+
+    do_init();
 }
 
 void tditrace_rewind() {

@@ -28,7 +28,7 @@ char *addrinfo(void *addr) {
         snprintf(text, 256, "0x%08x %s (%s)", (int)addr,
                  demangle(dli.dli_sname), dli.dli_fname);
     } else {
-        sprintf(text, "0x%08x ? (?)");
+        sprintf(text, "0x%08x ? (?)", 0);
     }
     return text;
 }

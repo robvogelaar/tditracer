@@ -6,6 +6,8 @@
 
 
 extern void tditrace(const char* format, ...) __attribute__((weak));
+extern void tditrace_ex(const char* format, ...) __attribute__((weak));
+
 
 
 int main(int argc, char **argv)
@@ -15,24 +17,31 @@ int main(int argc, char **argv)
     struct timeval  mytimeval;
     struct timespec mytimespec;
 
-
-    printf("start...\n");
-
     #if 0
     for (i = 0; i < 150; i++) {
-        gettimeofday(&mytimeval, 0); printf("%d,%d\n", (int)mytimeval.tv_sec, (int)mytimeval.tv_usec);
+        gettimeofday(&mytimeval, 0);
+        printf("gettimeofday() : %d,%d\n", (int)mytimeval.tv_sec, (int)mytimeval.tv_usec);
         usleep(10000);
     }
     #endif
 
     #if 0
     for (i = 0; i < 150; i++) {
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec); printf("%d,%d\n", (int)mytimespec.tv_sec, (int)mytimespec.tv_nsec);
+        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+        printf("clock_gettime(CLOCK_MONOTONIC) : %d,%d\n", (int)mytimespec.tv_sec, (int)mytimespec.tv_nsec);
         usleep(10000);
     }
     #endif
 
-    for (i = 0; i < 50; i++) {
+    printf("start\n");
+
+    if (tditrace) printf("tditrace\n"); else printf("no tditrace\n");
+    if (tditrace_ex) printf("tditrace_ex\n"); else printf("no tditrace_ex\n");
+
+    for (i = 0; i < 25; i++) {
+
+        printf("%d\n", i);
+
         // will all appear in the same "HELLO" , "NOTES"-timeline
         if (tditrace) tditrace("HELLO");
         if (tditrace) tditrace("HELLO %d", i);
@@ -114,7 +123,7 @@ int main(int argc, char **argv)
     usleep(100000);
     if (tditrace) tditrace("END");
 
-    printf("...end\n");
+    printf("stop\n");
 
     return 0;
 }
