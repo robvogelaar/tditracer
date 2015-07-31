@@ -88,20 +88,20 @@ typedef unsigned long long _u64;
 struct simplefu_mutex myMutex;
 
 // 100 queues of 1000 chars each
-static char tasks_array[1000][100];
+static char tasks_array[1024][128];
 static int nr_tasks = 0;
 
 // 100 queues of 1000 chars each
-static char queues_array[1000][100];
+static char queues_array[1024][128];
 static int nr_queues = 0;
-static int prev_queues[100];
+static int prev_queues[128];
 
 // 100 events of 1000 chars each
-static char events_array[1000][100];
+static char events_array[1024][128];
 static int nr_events = 0;
 
 // 100 notes of 1000 chars each
-static char notes_array[1000][100];
+static char notes_array[1024][128];
 static int nr_notes = 0;
 
 static _u64 timestamp_timeofday_nsec(void) {
@@ -129,7 +129,7 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     char name[256];
     int value = 0;
 
-    char text_in1[256];
+    char text_in1[1024];
     char *text = text_in1;
 
     if ((strncmp(text_in, "@T+", 3) == 0) ||

@@ -153,6 +153,7 @@ static void init(void) {
     static bool inited = false;
     if (!inited) {
 
+        #if 0
         static struct sigaction sVal;
 
         sVal.sa_flags = SA_SIGINFO;
@@ -161,6 +162,8 @@ static void init(void) {
         sigaction(SIGINT, &sVal, NULL);
         // Register for SIGQUIT
         sigaction(SIGQUIT, &sVal, NULL);
+
+        #endif
 
         if (getenv("LIBC")) {
             libcrecording = (atoi(getenv("LIBC")) >= 1);

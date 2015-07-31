@@ -1,11 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <poll.h>
 
 #include "tracermain.h"
 #include "tdi.h"
+
+#define MAXSTRLEN 768
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
 #if 0
 /*
@@ -187,13 +194,15 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
         tditrace_ex("@T+read() %d %d", fd, count);
     }
 
-    ssize_t s = __read(fd, buf, count);
+    ssize_t ret = __read(fd, buf, count);
 
     if (libcrecording) {
-        tditrace_ex("@T-read()");
+        char s[MAXSTRLEN];
+        tditrace_ex("@T-read() %d %s", ret,
+                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret)));
     }
 
-    return s;
+    return ret;
 }
 #endif
 
@@ -210,18 +219,321 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@T+write() %d %d", fd, count);
+        char s[MAXSTRLEN];
+        tditrace_ex("@T+write() %d %d %s", fd, count,
+                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count)));
     }
 
-    ssize_t s = __write(fd, buf, count);
+    ssize_t ret = __write(fd, buf, count);
 
     if (libcrecording) {
-        tditrace_ex("@T-write()");
+        tditrace_ex("@T-write() %d", ret);
     }
 
-    return s;
+    return ret;
 }
 #endif
+
+#if 1
+extern "C" int socket(int domain, int type, int protocol) {
+    static int (*__socket)(int, int, int) = NULL;
+
+    if (__socket == NULL) {
+        __socket = (int (*)(int, int, int))dlsym(RTLD_NEXT, "socket");
+        if (NULL == __socket) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+socket() %d %d %d", domain, type, protocol);
+    }
+
+    ssize_t ret = __socket(domain, type, protocol);
+
+    if (libcrecording) {
+        tditrace_ex("@T-socket() %d", ret);
+    }
+
+    return ret;
+}
+#endif
+
+extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
+    static ssize_t (*__send)(int, const void *, size_t, int) = NULL;
+
+    if (__send == NULL) {
+        __send = (ssize_t (*)(int, const void *, size_t, int))dlsym(RTLD_NEXT,
+                                                                    "send");
+        if (NULL == __send) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        char s[MAXSTRLEN];
+        strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
+        s[MIN(MAXSTRLEN - 1, len)] = '\0';       
+        tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+    }
+
+    ssize_t ret = __send(sockfd, buf, len, flags);
+
+    if (libcrecording) {
+        tditrace_ex("@T-send() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+                          const struct sockaddr *dest_addr, socklen_t addrlen) {
+    static ssize_t (*__sendto)(int, const void *, size_t, int,
+                               const struct sockaddr *, socklen_t) = NULL;
+
+    if (__sendto == NULL) {
+        __sendto = (ssize_t (*)(int, const void *, size_t, int,
+                                const struct sockaddr *,
+                                socklen_t))dlsym(RTLD_NEXT, "sendto");
+        if (NULL == __sendto) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        char s[MAXSTRLEN];
+        strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
+        s[MIN(MAXSTRLEN - 1, len)] = '\0';       
+        tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+    }
+
+    ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+
+    if (libcrecording) {
+        tditrace_ex("@T-sendto() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
+    static ssize_t (*__sendmsg)(int, const struct msghdr *, int) = NULL;
+
+    if (__sendmsg == NULL) {
+        __sendmsg = (ssize_t (*)(int, const struct msghdr *, int))dlsym(
+            RTLD_NEXT, "sendmsg");
+        if (NULL == __sendmsg) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+sendmsg() %d 0x%x 0x%x", sockfd, msg, flags);
+    }
+
+    ssize_t ret = __sendmsg(sockfd, msg, flags);
+
+    if (libcrecording) {
+        tditrace_ex("@T-sendmsg() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+                        int flags) {
+    static int (*__sendmmsg)(int, struct mmsghdr *, unsigned int, int) = NULL;
+
+    if (__sendmmsg == NULL) {
+        __sendmmsg = (int (*)(int, struct mmsghdr *, unsigned int, int))dlsym(
+            RTLD_NEXT, "sendmmsg");
+        if (NULL == __sendmmsg) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+sendmmsg() %d 0x%x 0x%x", sockfd, msgvec, flags);
+    }
+
+    int ret = __sendmmsg(sockfd, msgvec, vlen, flags);
+
+    if (libcrecording) {
+        tditrace_ex("@T-sendmmsg() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
+    static ssize_t (*__recv)(int, void *, size_t, int) = NULL;
+
+    if (__recv == NULL) {
+        __recv =
+            (ssize_t (*)(int, void *, size_t, int))dlsym(RTLD_NEXT, "recv");
+        if (NULL == __recv) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+recv() %d %d 0x%x", sockfd, len, flags);
+    }
+
+    ssize_t ret = __recv(sockfd, buf, len, flags);
+
+    if (libcrecording) {
+        if (ret == -1) {
+            tditrace_ex("@T-recv() -1");
+        } else if (ret == 0) {
+            tditrace_ex("@T-recv() 0");
+        } else {
+            char s[MAXSTRLEN];
+            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
+            s[MIN(MAXSTRLEN - 1, ret)] = '\0';       
+            tditrace_ex("@T-recv() %d %s", ret, s);
+        }
+    }
+
+    return ret;
+}
+
+extern "C" ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+                            struct sockaddr *src_addr, socklen_t *addrlen) {
+    static ssize_t (*__recvfrom)(int, void *, size_t, int, struct sockaddr *,
+                                 socklen_t *) = NULL;
+
+    if (__recvfrom == NULL) {
+        __recvfrom = (ssize_t (*)(int, void *, size_t, int, struct sockaddr *,
+                                  socklen_t *))dlsym(RTLD_NEXT, "recvfrom");
+        if (NULL == __recvfrom) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+recvfrom() %d %d 0x%x", sockfd, len, flags);
+    }
+
+    ssize_t ret = __recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+
+    if (libcrecording) {
+        if (ret == -1) {
+            tditrace_ex("@T-recvfrom() -1");
+        } else if (ret == 0) {
+            tditrace_ex("@T-recvfrom() 0");
+        } else {
+            char s[MAXSTRLEN];
+            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
+            s[MIN(MAXSTRLEN - 1, ret)] = '\0';
+            tditrace_ex("@T-recvfrom() %d %s", ret, s);
+        }
+    }
+
+    return ret;
+}
+
+extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
+    static ssize_t (*__recvmsg)(int, struct msghdr *, int) = NULL;
+
+    if (__recvmsg == NULL) {
+        __recvmsg =
+            (ssize_t (*)(int, struct msghdr *, int))dlsym(RTLD_NEXT, "recvmsg");
+        if (NULL == __recvmsg) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+recvmsg() %d 0x%x 0x%x", sockfd, msg, flags);
+    }
+
+    ssize_t ret = __recvmsg(sockfd, msg, flags);
+
+    if (libcrecording) {
+        tditrace_ex("@T-recvmsg() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+                        int flags, const timespec *timeout) {
+    static int (*__recvmmsg)(int, struct mmsghdr *, unsigned int, int,
+                             const timespec *) = NULL;
+
+    if (__recvmmsg == NULL) {
+        __recvmmsg = (int (*)(int, struct mmsghdr *, unsigned int, int,
+                              const timespec *))dlsym(RTLD_NEXT, "recvmmsg");
+        if (NULL == __recvmmsg) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+recvmmsg() %d 0x%x %d 0x%x", sockfd, msgvec, vlen,
+                    flags);
+    }
+
+    int ret = __recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+
+    if (libcrecording) {
+        tditrace_ex("@T-recvmmsg() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" int select(int nfds, fd_set *readfds, fd_set *writefds,
+                      fd_set *exceptfds, struct timeval *timeout) {
+    static int (*__select)(int, fd_set *, fd_set *, fd_set *,
+                           struct timeval *) = NULL;
+
+    if (__select == NULL) {
+        __select = (int (*)(int, fd_set *, fd_set *, fd_set *,
+                            struct timeval *))dlsym(RTLD_NEXT, "select");
+        if (NULL == __select) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+select() %d %x %x %x", nfds, readfds, writefds,
+                    exceptfds);
+    }
+
+    int ret = __select(nfds, readfds, writefds, exceptfds, timeout);
+
+    if (libcrecording) {
+        tditrace_ex("@T-select() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
+    static int (*__poll)(struct pollfd *, nfds_t, int) = NULL;
+
+    if (__poll == NULL) {
+        __poll =
+            (int (*)(struct pollfd *, nfds_t, int))dlsym(RTLD_NEXT, "poll");
+        if (NULL == __poll) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+poll() %x %d", fds, nfds);
+    }
+
+    int ret = __poll(fds, nfds, timeout);
+
+    if (libcrecording) {
+        tditrace_ex("@T-poll() %d", ret);
+    }
+
+    return ret;
+}
 
 #if 1
 extern "C" int ioctl(int d, int request, ...) {
@@ -304,7 +616,7 @@ extern "C" void *memset(void *dest, int c, size_t n) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" char *strcpy(char *dest, const char *src) {
     static char *(*__strcpy)(char *, const char *) = NULL;
 
@@ -329,7 +641,7 @@ extern "C" char *strcpy(char *dest, const char *src) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" char *strncpy(char *dest, const char *src, size_t n) {
     static char *(*__strncpy)(char *, const char *, size_t) = NULL;
 
