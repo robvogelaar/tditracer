@@ -1,0 +1,6 @@
+
+log2tdi ocapri_log.txt  'rf4ceKeyCallback' 'Received service selection' 'USING PRIME!' 'starting decode' 'AudioMute' > ocapri_log.tdi
+log2tdi mwslog.txt  'cgpc- Sending selectService' > mwslog.tdi
+log2tdi konsole.txt  'MapPlayer' 'keyState' > konsole.tdi
+
+tdimerge 2.tdi ocapri_log.tdi konsole.tdi mwslog.tdi > combined.tdi

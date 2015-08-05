@@ -11,7 +11,7 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-#define MAXSTRLEN 768
+#define MAXSTRLEN 4
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
 #if 0
@@ -179,6 +179,79 @@ extern "C" int open(const char *pathname, int flags, ...) {
 }
 #endif
 
+extern "C" FILE *fopen(const char *path, const char *mode)
+{
+    static FILE* (*__fopen)(const char *, const char *) = NULL;
+
+    if (__fopen == NULL) {
+        __fopen = (FILE* (*)(const char *, const char *))dlsym(RTLD_NEXT, "fopen");
+        if (NULL == __fopen) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+fopen() %s", path);
+    }
+
+    FILE* ret = __fopen(path, mode);
+
+    if (libcrecording) {
+        tditrace_ex("@T-fopen() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" FILE *fdopen(int fd, const char *mode)
+{
+    static FILE* (*__fdopen)(int, const char *) = NULL;
+
+    if (__fdopen == NULL) {
+        __fdopen = (FILE* (*)(int, const char *))dlsym(RTLD_NEXT, "fdopen");
+        if (NULL == __fdopen) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+fdopen() %d", fd);
+    }
+
+    FILE* ret = __fdopen(fd, mode);
+
+    if (libcrecording) {
+        tditrace_ex("@T-fdopen() %d", ret);
+    }
+
+    return ret;
+}
+
+extern "C" FILE *freopen(const char *path, const char *mode, FILE *stream)
+{
+    static FILE* (*__freopen)(const char *, const char *, FILE*) = NULL;
+
+    if (__freopen == NULL) {
+        __freopen = (FILE* (*)(const char *, const char *, FILE*))dlsym(RTLD_NEXT, "freopen");
+        if (NULL == __freopen) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@T+freopen() %s", path);
+    }
+
+    FILE* ret = __freopen(path, mode, stream);
+
+    if (libcrecording) {
+        tditrace_ex("@T-freopen() %d", ret);
+    }
+
+    return ret;
+}
+
+
 #if 1
 extern "C" ssize_t read(int fd, void *buf, size_t count) {
     static ssize_t (*__read)(int, void *, size_t) = NULL;
@@ -197,9 +270,20 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
     ssize_t ret = __read(fd, buf, count);
 
     if (libcrecording) {
-        char s[MAXSTRLEN];
-        tditrace_ex("@T-read() %d %s", ret,
-                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret)));
+        if (ret == -1) {
+            tditrace_ex("@T-read() -1");
+        } else if (ret == 0) {
+            tditrace_ex("@T-read() 0");
+        } else {
+            if (0) {
+                char s[MAXSTRLEN];
+                strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
+                s[MIN(MAXSTRLEN - 1, ret)] = '\0';       
+                tditrace_ex("@T-read() %d %s", ret, s);
+            } else {
+                tditrace_ex("@T-read() %d", ret);
+            }
+        }
     }
 
     return ret;
@@ -218,17 +302,26 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
         }
     }
 
+    #if 1
     if (libcrecording) {
-        char s[MAXSTRLEN];
-        tditrace_ex("@T+write() %d %d %s", fd, count,
-                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count)));
+        if (0) {
+            char s[MAXSTRLEN];
+            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, count));
+            s[MIN(MAXSTRLEN - 1, count)] = '\0';       
+            tditrace_ex("@T+write() %d %d %s", fd, count, s);
+        } else {
+            tditrace_ex("@T+write() %d %d", fd, count);
+        }
     }
+    #endif
 
     ssize_t ret = __write(fd, buf, count);
 
+    #if 1
     if (libcrecording) {
         tditrace_ex("@T-write() %d", ret);
     }
+    #endif
 
     return ret;
 }
@@ -249,7 +342,7 @@ extern "C" int socket(int domain, int type, int protocol) {
         tditrace_ex("@T+socket() %d %d %d", domain, type, protocol);
     }
 
-    ssize_t ret = __socket(domain, type, protocol);
+    int ret = __socket(domain, type, protocol);
 
     if (libcrecording) {
         tditrace_ex("@T-socket() %d", ret);
@@ -271,10 +364,14 @@ extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
     }
 
     if (libcrecording) {
-        char s[MAXSTRLEN];
-        strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
-        s[MIN(MAXSTRLEN - 1, len)] = '\0';       
-        tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+        if (0) {
+            char s[MAXSTRLEN];
+            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
+            s[MIN(MAXSTRLEN - 1, len)] = '\0';       
+            tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+        } else {
+            tditrace_ex("@T+send() %d %d 0x%x", sockfd, len, flags);
+        }
     }
 
     ssize_t ret = __send(sockfd, buf, len, flags);
@@ -301,10 +398,14 @@ extern "C" ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     if (libcrecording) {
-        char s[MAXSTRLEN];
-        strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
-        s[MIN(MAXSTRLEN - 1, len)] = '\0';       
-        tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+        if (0) {
+            char s[MAXSTRLEN];
+            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, len));
+            s[MIN(MAXSTRLEN - 1, len)] = '\0';       
+            tditrace_ex("@T+send() %d %d 0x%x %s", sockfd, len, flags, s);
+        } else {
+            tditrace_ex("@T+send() %d %d 0x%x", sockfd, len, flags);
+        }
     }
 
     ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
@@ -388,10 +489,14 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
         } else if (ret == 0) {
             tditrace_ex("@T-recv() 0");
         } else {
-            char s[MAXSTRLEN];
-            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
-            s[MIN(MAXSTRLEN - 1, ret)] = '\0';       
-            tditrace_ex("@T-recv() %d %s", ret, s);
+            if (0) {
+                char s[MAXSTRLEN];
+                strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
+                s[MIN(MAXSTRLEN - 1, ret)] = '\0';       
+                tditrace_ex("@T-recv() %d %s", ret, s);
+            } else {
+                tditrace_ex("@T-recv() %d", ret);
+            }
         }
     }
 
@@ -423,10 +528,14 @@ extern "C" ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         } else if (ret == 0) {
             tditrace_ex("@T-recvfrom() 0");
         } else {
-            char s[MAXSTRLEN];
-            strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
-            s[MIN(MAXSTRLEN - 1, ret)] = '\0';
-            tditrace_ex("@T-recvfrom() %d %s", ret, s);
+            if (0) {
+                char s[MAXSTRLEN];
+                strncpy(s, (const char *)buf, MIN(MAXSTRLEN - 1, ret));
+                s[MIN(MAXSTRLEN - 1, ret)] = '\0';
+                tditrace_ex("@T-recvfrom() %d %s", ret, s);
+            } else {
+                tditrace_ex("@T-recvfrom() %d", ret);
+            }
         }
     }
 
@@ -565,7 +674,7 @@ extern "C" int ioctl(int d, int request, ...) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" void *memcpy(void *dest, const void *src, size_t n) {
     static void *(*__memcpy)(void *, const void *, size_t) = NULL;
 
@@ -591,7 +700,7 @@ extern "C" void *memcpy(void *dest, const void *src, size_t n) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" void *memset(void *dest, int c, size_t n) {
     static void *(*__memset)(void *, int, size_t) = NULL;
 
@@ -667,7 +776,7 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" void *malloc(size_t size) {
     static void *(*__malloc)(size_t) = NULL;
 

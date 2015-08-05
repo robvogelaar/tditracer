@@ -36,7 +36,7 @@ static void tditracer_constructor() {
 }
 
 static void tditracer_destructor() {
-    printf("tditracer: exit, #traces = %d\n", trace_counter);
+    printf("tditracer: exit[%d], #traces = %d\n", getpid(), trace_counter);
 }
 
 int framestorecord;
@@ -110,8 +110,6 @@ static void signalhandler(int sig, siginfo_t *si, void *context) {
                 fclose(pFile);
 #endif
         }
-
-        printf("tditracer:#traces = %d\n", trace_counter);
 
         abort();
 
@@ -212,8 +210,8 @@ static void init(void) {
             texturerecording = true;
         }
 
-        printf("tditracer: init, libc:%s, pthread:%s, shaders:%s, textures:%s, "
-               "renderbuffers:%s, frames:%d\n",
+        printf("tditracer: init[%d], libc:%s, pthread:%s, shaders:%s, textures:%s, "
+               "renderbuffers:%s, frames:%d\n", getpid(),
                libcrecording ? "yes" : "no", pthreadrecording ? "yes" : "no",
                shaderrecording ? "yes" : "no", texturerecording ? "yes" : "no",
                renderbufferrecording ? "yes" : "no", framestorecord);
