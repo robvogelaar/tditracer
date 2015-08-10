@@ -1,0 +1,220 @@
+#!/usr/bin/env python
+
+import re
+import os
+import string
+import sys
+import xml.etree.ElementTree as ET
+import subprocess
+
+
+#extern "C" int extra(int in, int *out) {
+#    static int (*__extra)(int, int *) = NULL;
+#
+#    if (__extra == NULL) {
+#        __extra = (int (*)(int, int *))dlsym(RTLD_NEXT, "extra");
+#        if (NULL == __extra) {
+#            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+#        }
+#    }
+#
+#    tditrace_ex("@T+extra()");
+#    int ret = __extra(in, out);
+#    tditrace_ex("@T-extra()");
+#
+#    return ret;
+#}
+
+
+def get_type(root, type_id):
+
+    for FundamentalType in root.iter('FundamentalType'):
+        if (FundamentalType.attrib["id"] == type_id):
+            #print "FundamentalType : %s"%FundamentalType.attrib["name"]
+            return FundamentalType.attrib["name"];
+
+    for Typedef in root.iter('Typedef'):
+        if (Typedef.attrib["id"] == type_id):
+            #print "Typedef : %s"%Typedef.attrib["name"]
+            return Typedef.attrib["name"];
+
+    for Enumeration in root.iter('Enumeration'):
+        if (Enumeration.attrib["id"] == type_id):
+            #print "Enumeration : %s"%Enumeration.attrib["name"]
+            return Enumeration.attrib["name"];
+
+    for CvQualifiedType in root.iter('CvQualifiedType'):
+        if (CvQualifiedType.attrib["id"] == type_id):
+            #print "CvQualifiedType : %s"%Typedef.attrib["name"]
+            return CvQualifiedType.attrib["name"]
+
+    for PointerType in root.iter('PointerType'):
+
+        if (PointerType.attrib["id"] == type_id):
+
+            #print "PointerType.attrib : %s"%PointerType.attrib["id"]
+
+            for FundamentalType in root.iter('FundamentalType'):
+                if (FundamentalType.attrib["id"] == PointerType.attrib["type"]):
+                    #print "Argument PointerType FundamentalType : %s"%FundamentalType.attrib["name"]
+                    return Typedef.attrib["name"] + ' *'
+
+            for Typedef in root.iter('Typedef'):
+                if (Typedef.attrib["id"] == PointerType.attrib["type"]):
+                    #print "PointerType Typedef : %s"%Typedef.attrib["name"]
+                    return Typedef.attrib["name"] + ' *'
+
+            for Enumeration in root.iter('Enumeration'):
+                if (Enumeration.attrib["id"] == type_id):
+                    #print "PointerType Enumeration : %s"%Enumeration.attrib["name"]
+                    return Enumeration.attrib["name"];
+
+
+            for CvQualifiedType in root.iter('CvQualifiedType'):
+                if (CvQualifiedType.attrib["id"] == PointerType.attrib["type"]):
+
+                    for FundamentalType in root.iter('FundamentalType'):
+                        if (FundamentalType.attrib["id"] == CvQualifiedType.attrib["type"]):
+                            #print "PointerType CvQualifiedType FundamentalType : %s"%FundamentalType.attrib["name"]
+                            return 'const ' + Typedef.attrib["name"] + ' *'
+
+                    for Typedef in root.iter('Typedef'):
+                        if (Typedef.attrib["id"] == CvQualifiedType.attrib["type"]):
+                            #print "PointerType CvQualifiedType Typedef : %s"%Typedef.attrib["name"]
+                            return 'const ' + Typedef.attrib["name"] + ' *'
+
+
+
+
+def parse_xml(input_xml):
+
+    tree = ET.parse(input_xml)
+
+    root = tree.getroot()
+
+
+    for Function in root.iter('Function'):
+
+        if (Function.attrib["name"].startswith('NEXUS')):
+            #print "Function : %s"%Function.attrib["name"]
+            function_name = Function.attrib["name"]
+
+
+            argument_names = []
+            argument_types = []
+
+            return_type = get_type(root, Function.attrib["returns"])
+
+            for Arguments in Function.iter('Argument'):
+                #print "Argument name : %s"%Arguments.attrib["name"]
+                argument_names.append(Arguments.attrib["name"])
+                argument_types.append(get_type(root, Arguments.attrib["type"]))
+              
+            #print '----'
+            #print function_name
+            #print return_type
+            #print argument_names
+            #print argument_types
+            #print '----'
+
+            #extern "C" int extra(int in, int *out) {
+            #    static int (*__extra)(int, int *) = NULL;
+            #
+            #    if (__extra == NULL) {
+            #        __extra = (int (*)(int, int *))dlsym(RTLD_NEXT, "extra");
+            #        if (__extra == NULL) {
+            #            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+            #        }
+            #    }
+            #
+            #    tditrace_ex("@T+extra()");
+            #    int ret = __extra(in, out);
+            #    tditrace_ex("@T-extra()");
+            #
+            #    return ret;
+            #}
+
+            print '\nextern \"C\" %s %s'%(return_type,function_name),
+
+            if not argument_types:
+                print '(void)'
+            else:
+                print '(',
+                for index in range(len(argument_names)):
+                    if (index > 0):
+                        print ', ',
+                    print argument_types[index] + ' ' + argument_names[index],
+                print ')'
+
+            print '{'
+
+            if not argument_types:
+                print 'static ' + return_type + ' (* __' + function_name + ') (void) = NULL;'
+            else:
+                print 'static ' + return_type + ' (* __' + function_name + ')',
+                print '(',
+                for index in range(len(argument_names)):
+                    if (index > 0):
+                        print ', ',
+                    print argument_types[index],
+                print ') = NULL;'
+
+            print 'if (__' +  function_name + ' == NULL) {'
+
+            print '   __' + function_name + ' = (' + return_type + ' (*)',
+            if not argument_types:
+                print '(void))',
+            else:
+                print '(',
+                for index in range(len(argument_names)):
+                    if (index > 0):
+                        print ', ',
+                    print argument_types[index],
+                print '))',
+
+            print 'dlsym(RTLD_NEXT, \"' + function_name + '\");'
+            print '   if (__' +  function_name + ' == NULL) {'
+            print '      fprintf(stderr, \"Error in dlsym: %s\\n\", dlerror());'
+            print '      }'
+            print '   }'
+
+
+            print 'tditrace_ex("@T+' + function_name + '()\");'
+
+            if return_type == 'void':
+                print function_name,
+            else:
+                print return_type + ' ret = ' + function_name,
+
+            if not argument_types:
+                print '();'
+            else:
+                print '(',
+                for index in range(len(argument_names)):
+                    if (index > 0):
+                        print ', ',
+                    print argument_names[index],
+                print ');'
+
+
+            #    int ret = __extra(in, out);
+            #    tditrace_ex("@T-extra()");
+            #
+            print 'tditrace_ex("@T-' + function_name + '()\");'
+            print '}'
+            
+
+def main():
+
+    if len(sys.argv) >= 2:
+
+        for input_xml in sys.argv[1:]:
+
+            parse_xml(input_xml)
+
+    else:
+
+        print("Usage: %s xmlfile" % sys.argv[0])
+
+if __name__ == "__main__":
+        main()
