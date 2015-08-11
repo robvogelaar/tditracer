@@ -201,6 +201,9 @@ def parse_xml(input_xml):
             #    tditrace_ex("@T-extra()");
             #
             print 'tditrace_ex("@T-' + function_name + '()\");'
+
+            if return_type != 'void':
+                print 'return ret;'
             print '}'
             
 
