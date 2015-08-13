@@ -45,13 +45,21 @@ def get_type(root, type_id):
 
     for CvQualifiedType in root.iter('CvQualifiedType'):
         if (CvQualifiedType.attrib["id"] == type_id):
-            #print "CvQualifiedType : %s"%Typedef.attrib["name"]
-            return CvQualifiedType.attrib["name"]
+            #print "CvQualifiedType : %s"%CvQualifiedType.attrib["type"]
+
+            for FundamentalType in root.iter('FundamentalType'):
+                if (FundamentalType.attrib["id"] == CvQualifiedType.attrib["type"]):
+                    #print "CvQualifiedType FundamentalType : %s"%FundamentalType.attrib["name"]
+                    return 'const ' + Typedef.attrib["name"] + ' *'
+
+            for Typedef in root.iter('Typedef'):
+                if (Typedef.attrib["id"] == CvQualifiedType.attrib["type"]):
+                    #print "CvQualifiedType Typedef : %s"%Typedef.attrib["name"]
+                    return 'const ' + Typedef.attrib["name"] + ' *'
 
     for PointerType in root.iter('PointerType'):
 
         if (PointerType.attrib["id"] == type_id):
-
             #print "PointerType.attrib : %s"%PointerType.attrib["id"]
 
             for FundamentalType in root.iter('FundamentalType'):
@@ -65,13 +73,13 @@ def get_type(root, type_id):
                     return Typedef.attrib["name"] + ' *'
 
             for Enumeration in root.iter('Enumeration'):
-                if (Enumeration.attrib["id"] == type_id):
+                if (Enumeration.attrib["id"] == PointerType.attrib["type"]):
                     #print "PointerType Enumeration : %s"%Enumeration.attrib["name"]
-                    return Enumeration.attrib["name"];
-
+                    return Enumeration.attrib["name"] + ' *';
 
             for CvQualifiedType in root.iter('CvQualifiedType'):
                 if (CvQualifiedType.attrib["id"] == PointerType.attrib["type"]):
+                    #print "PointerType CvQualifiedType : %s"%CvQualifiedType.attrib["type"]
 
                     for FundamentalType in root.iter('FundamentalType'):
                         if (FundamentalType.attrib["id"] == CvQualifiedType.attrib["type"]):
@@ -85,20 +93,25 @@ def get_type(root, type_id):
 
 
 
+    print "ERROR in " + type_id
+
 
 def parse_xml(input_xml):
+
 
     tree = ET.parse(input_xml)
 
     root = tree.getroot()
 
+    prog = re.compile(sys.argv[2])
 
     for Function in root.iter('Function'):
 
-        if (Function.attrib["name"].startswith('NEXUS')):
-            #print "Function : %s"%Function.attrib["name"]
-            function_name = Function.attrib["name"]
+        function_name = Function.attrib["name"]
 
+        if (prog.match(function_name)):
+
+            #print "Function : %s"%Function.attrib["name"]
 
             argument_names = []
             argument_types = []
@@ -149,9 +162,9 @@ def parse_xml(input_xml):
             print '{'
 
             if not argument_types:
-                print 'static ' + return_type + ' (* __' + function_name + ') (void) = NULL;'
+                print '   static ' + return_type + ' (* __' + function_name + ') (void) = NULL;'
             else:
-                print 'static ' + return_type + ' (* __' + function_name + ')',
+                print '   static ' + return_type + ' (* __' + function_name + ')',
                 print '(',
                 for index in range(len(argument_names)):
                     if (index > 0):
@@ -159,9 +172,9 @@ def parse_xml(input_xml):
                     print argument_types[index],
                 print ') = NULL;'
 
-            print 'if (__' +  function_name + ' == NULL) {'
+            print '   if (__' +  function_name + ' == NULL) {'
 
-            print '   __' + function_name + ' = (' + return_type + ' (*)',
+            print '      __' + function_name + ' = (' + return_type + ' (*)',
             if not argument_types:
                 print '(void))',
             else:
@@ -173,18 +186,18 @@ def parse_xml(input_xml):
                 print '))',
 
             print 'dlsym(RTLD_NEXT, \"' + function_name + '\");'
-            print '   if (__' +  function_name + ' == NULL) {'
-            print '      fprintf(stderr, \"Error in dlsym: %s\\n\", dlerror());'
+            print '      if (__' +  function_name + ' == NULL) {'
+            print '         fprintf(stderr, \"Error in dlsym: %s\\n\", dlerror());'
             print '      }'
             print '   }'
 
 
-            print 'tditrace_ex("@T+' + function_name + '()\");'
+            print '   tditrace_ex("@T+' + function_name + '()\");'
 
             if return_type == 'void':
-                print function_name,
+                print '   __' + function_name,
             else:
-                print return_type + ' ret = ' + function_name,
+                print '   ' + return_type + ' ret = ' + '__' + function_name,
 
             if not argument_types:
                 print '();'
@@ -200,24 +213,22 @@ def parse_xml(input_xml):
             #    int ret = __extra(in, out);
             #    tditrace_ex("@T-extra()");
             #
-            print 'tditrace_ex("@T-' + function_name + '()\");'
+            print '   tditrace_ex("@T-' + function_name + '()\");'
 
             if return_type != 'void':
-                print 'return ret;'
+                print '   return ret;'
             print '}'
             
 
 def main():
 
-    if len(sys.argv) >= 2:
+    if len(sys.argv) >= 3:
 
-        for input_xml in sys.argv[1:]:
-
-            parse_xml(input_xml)
+        parse_xml(sys.argv[1])
 
     else:
 
-        print("Usage: %s xmlfile" % sys.argv[0])
+        print("Usage: %s xmlfile functionpattern" % sys.argv[0])
 
 if __name__ == "__main__":
         main()
