@@ -137,6 +137,8 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     char text_in1[1024];
     char *text = text_in1;
 
+    //fprintf(stderr, "addentry:[%s]\n", text_in);
+
     if ((strncmp(text_in, "@T+", 3) == 0) ||
         (strncmp(text_in, "@T-", 3) == 0) ||
         (strncmp(text_in, "@E+", 3) == 0)) {
@@ -485,6 +487,7 @@ static void parse(int bid) {
                 token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
                 if (token) {
 
+                    // token is tid
                     tracebuffers[bid].text = token;
                     tracebuffers[bid].valid = 1;
                 }
@@ -814,6 +817,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
         while (--tracebufferid) {
 
+
             if (strstr(argv[tracebufferid], ".tditracebuffer:") != 0) {
 
                 FILE *file;
@@ -957,6 +961,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     }
 
+
     if (buffers == 0) {
 
         fprintf(stderr, "Not found: \"/tmp/.tditracebuffer:*:*\"\n");
@@ -981,6 +986,7 @@ void tditrace_exit(int argc, char *argv[]) {
     fprintf(stdout, "TIME %d\n", 1000000000);
     fprintf(stdout, "SPEED %d\n", 1000000000);
     fprintf(stdout, "DNM 0 0 >\n");
+
 
     while (1) {
 
@@ -1010,8 +1016,6 @@ void tditrace_exit(int argc, char *argv[]) {
                 }
             }
         }
-
-        //printf("addentry\n");
 
         addentry(stdout, tracebuffers[d].text,
 
