@@ -3,14 +3,11 @@
 import sys
 import re
 from datetime import datetime
-import csv
-
 
 TASKS  = 0
 QUEUES = 3
 EVENTS = 4
 NOTES  = 7
-
 
 tasksnames = []
 queuesnames = []
@@ -28,13 +25,14 @@ def build(tdifilename):
 
    global nams
    global evts
+   global offset_nsec
    global first_tstamp
 
    f = open(tdifilename)
 
    for line in f:
       if line.startswith('END'):
-         offset = int(line[4:])
+         offset_nsec = int(line[4:])
 
 
    f.seek(0)
@@ -57,9 +55,7 @@ def build(tdifilename):
          if first_tstamp == 0:
             first_tstamp = tstamp
 
-
          dscwords = f.next().split()
-
 
          for nam in nams:
             namwords = nam.split()
@@ -70,7 +66,7 @@ def build(tdifilename):
 
                   thenam = namwords[2]
 
-         evts.append(str(offset + tstamp) + ' ' + occwords[1] + ' ' + 'OCC' + ' ' +  thenam + ' ' + dscwords[3])
+         evts.append(str(offset_nsec + tstamp) + ' ' + occwords[1] + ' ' + 'OCC' + ' ' +  thenam + ' ' + dscwords[3])
 
 
       if line.startswith('STA'):
@@ -96,7 +92,7 @@ def build(tdifilename):
 
                      thenam = namwords[2]
 
-            evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + 'STA' + ' ' + thenam + ' ' + dscwords[3])
+            evts.append(str(offset_nsec + tstamp) + ' ' + stawords[1] + ' ' + 'STA' + ' ' + thenam + ' ' + dscwords[3])
 
 
          if int(stawords[1]) == 4: # @E+  STA STO DSC
@@ -114,7 +110,7 @@ def build(tdifilename):
 
                      thenam = namwords[2]
 
-            evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + 'STASTO' + ' ' + thenam + ' ' + dscwords[3])
+            evts.append(str(offset_nsec + tstamp) + ' ' + stawords[1] + ' ' + 'STASTO' + ' ' + thenam + ' ' + dscwords[3])
 
 
          if int(stawords[1]) == 3: # ~ STA / STO
@@ -128,7 +124,7 @@ def build(tdifilename):
             
                      thenam = namwords[2]
 
-            evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + stawords[0] + ' ' + thenam + ' ' + stawords[4])
+            evts.append(str(offset_nsec + tstamp) + ' ' + stawords[1] + ' ' + stawords[0] + ' ' + thenam + ' ' + stawords[4])
 
 
 
@@ -155,7 +151,7 @@ def build(tdifilename):
 
                      thenam = namwords[2]
 
-            evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + 'STO' + ' ' + thenam + ' ' + dscwords[3])
+            evts.append(str(offset_nsec + tstamp) + ' ' + stowords[1] + ' ' + 'STO' + ' ' + thenam + ' ' + dscwords[3])
 
 
          if int(stowords[1]) == 3: # ~ STA / STO
@@ -169,7 +165,7 @@ def build(tdifilename):
             
                      thenam = namwords[2]
             
-            evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + stowords[0] + ' ' + thenam + ' ' + stowords[4])
+            evts.append(str(offset_nsec + tstamp) + ' ' + stowords[1] + ' ' + stowords[0] + ' ' + thenam + ' ' + stowords[4])
 
 
    #for evt in evts:
@@ -178,26 +174,33 @@ def build(tdifilename):
    f.close()
 
 
+def print_result(curr_evtwords):
+   i = 0;
+   for item in curr_evtwords:
+      if i % 2:
+         print ",",item,',',
+      else:
+         print "\"%s\"" %item,
+
+      i+= 1
+   print
+
+
 def main():
 
-   if len(sys.argv) >= 2:
+   if len(sys.argv) >= 4:
 
-      for tdifilename in sys.argv[1:]:
+      build(sys.argv[1])
 
-         build(tdifilename)
-
-
-      match1 = 'pbPostInputKeyEvent'
-      match2 = 'vlhal_view_MuteAudio'
-
-      prog1 = re.compile('.*' + match1 + '.*')
-      prog2 = re.compile('.*' + match2 + '.*')
-
-      state = 'NONE_FOUND'
+      matches = []
+      progs = []
+      for match in sys.argv[2:]:
+         matches.append(match) 
 
       curr_evtwords = []
 
-      out = csv.writer(open("myfile.csv","w"), delimiter=',', quoting=csv.QUOTE_ALL)
+      state = 'MATCH_FIRST'
+      last_match = 0;
 
       for evt in evts:
 
@@ -207,54 +210,83 @@ def main():
 
          evtwords = evt.split()
 
-         if state == 'NONE_FOUND':
+         if state == 'MATCH_FIRST':
 
-            if (prog1.match(evtwords[3]) and (evtwords[2] == 'STA')):
-               curr_evtwords.append(0)
-               curr_evtwords.append(match1)
+            if (re.compile(matches[0]).findall(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+
+               #print 'MATCH_FIRST match first', evtwords[0], evtwords[4], offset_nsec
+
+               #print re.compile(matches[0]).search(evtwords[4]).group(0)
+
+               curr_evtwords.append(re.compile(matches[0]).search(evtwords[4]).group(0))
+               curr_evtwords.append("%08.3f" % (round((int(evtwords[0]) - offset_nsec) / 1000000000.0, 3)))
                tstamp_begin = int(evtwords[0])
-               state = '1_FOUND'
+               last_match = 0;
+               state = 'MATCH_NEXT'
 
-         elif state == '1_FOUND':
+         elif state == 'MATCH_NEXT':
 
-            if (prog1.match(evtwords[3]) and (evtwords[2] == 'STA')):
-               curr_evtwords.append((int(evtwords[0]) - tstamp_begin) / 1000000000.0 ) 
-               curr_evtwords.append(match1)
-               state = '1_FOUND'
+            if (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
 
-            elif (prog2.match(evtwords[3]) and (evtwords[2] == 'STA')):
-               curr_evtwords.append((int(evtwords[0]) - tstamp_begin) / 1000000000.0 ) 
-               curr_evtwords.append(match2)
+               #print 'MATCH_NEXT match again', evtwords[0], evtwords[4]
+
+               curr_evtwords.append(re.compile(matches[last_match]).search(evtwords[4]).group(0))
+               curr_evtwords.append("%06.3f" % (round((int(evtwords[0]) - tstamp_begin) / 1000000000.0, 3)))
+
+            elif (re.compile(matches[last_match + 1]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+
+               #print 'MATCH_NEXT match next', last_match, len(matches), evtwords[0], evtwords[4]
+
+               curr_evtwords.append(re.compile(matches[last_match + 1]).search(evtwords[4]).group(0))
+               curr_evtwords.append("%06.3f" % (round((int(evtwords[0]) - tstamp_begin) / 1000000000.0, 3)))
                tstamp_end = int(evtwords[0])
-               state = '2_FOUND'
+               last_match += 1
+               if last_match + 1 == len(matches):
+                  state = 'MATCH_FINAL'
 
-         elif state == '2_FOUND':
+         elif state == 'MATCH_FINAL':
 
-            if (prog1.match(evtwords[3]) and (evtwords[2] == 'STA')):
+            # if we find the first again we are done
+            if (re.compile(matches[0]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
 
+               #print 'MATCH_FINAL match first', last_match, len(matches), evtwords[0], evtwords[4]
                delta = tstamp_end - tstamp_begin
 
-               print(delta)
-               print(curr_evtwords)
+               print_result(curr_evtwords)
 
-               out.writerow(curr_evtwords)
+               #i = 0;
+               #for item in curr_evtwords:
+               #   if i % 2:
+               #      print '@',item,
+               #   else:
+               #      print '"', item, '"',
+               #
+               #   i+= 1
+
 
                curr_evtwords = []
-               curr_evtwords.append(0)
-               curr_evtwords.append(match1)
+               curr_evtwords.append(re.compile(matches[0]).search(evtwords[4]).group(0))
+               curr_evtwords.append("%08.3f" % (round((int(evtwords[0]) - offset_nsec) / 1000000000.0, 3)))
                tstamp_begin = int(evtwords[0])
 
-               state = '1_FOUND'
+               last_match = 0;
+               state = 'MATCH_NEXT'
 
-            elif (prog2.match(evtwords[3]) and (evtwords[2] == 'STA')):
+            # if we find the last again
+            elif (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+
+               #print 'MATCH_FINAL match again', last_match, len(matches), '<', evtwords[0], evtwords[4]
+
                tstamp_end = int(evtwords[0])
-               curr_evtwords.append((int(evtwords[0]) - tstamp_begin) / 1000000000.0 ) 
-               curr_evtwords.append(match2)
-               state == '2_FOUND'
+               curr_evtwords.append(re.compile(matches[last_match]).search(evtwords[4]).group(0))
+               curr_evtwords.append("%06.3f" % (round((int(evtwords[0]) - tstamp_begin) / 1000000000.0, 3)))
+
+      # print final one
+      print_result(curr_evtwords)
 
    else:
 
-      print("Usage: %s tdifile pattern1 pattern2" % sys.argv[0])
+      print("Usage: %s tdifile pattern1 pattern2 ..." % sys.argv[0])
 
 
 if __name__ == "__main__":
