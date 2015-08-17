@@ -26,22 +26,31 @@ import subprocess
 #}
 
 
-def get_type(root, type_id):
+def get_type(root, type_id, pointer=""):
+
+    for PointerType in root.iter('PointerType'):
+        if (PointerType.attrib["id"] == type_id):
+
+            #print "PointerType.id : %s"%PointerType.attrib["id"]
+            #print "PointerType.type : %s"%PointerType.attrib["type"]
+
+            return get_type(root, PointerType.attrib["type"], " * ") + pointer
+
 
     for FundamentalType in root.iter('FundamentalType'):
         if (FundamentalType.attrib["id"] == type_id):
             #print "FundamentalType : %s"%FundamentalType.attrib["name"]
-            return FundamentalType.attrib["name"];
+            return FundamentalType.attrib["name"] + pointer;
 
     for Typedef in root.iter('Typedef'):
         if (Typedef.attrib["id"] == type_id):
             #print "Typedef : %s"%Typedef.attrib["name"]
-            return Typedef.attrib["name"];
+            return Typedef.attrib["name"] + pointer;
 
     for Enumeration in root.iter('Enumeration'):
         if (Enumeration.attrib["id"] == type_id):
             #print "Enumeration : %s"%Enumeration.attrib["name"]
-            return Enumeration.attrib["name"];
+            return Enumeration.attrib["name"] + pointer;
 
     for CvQualifiedType in root.iter('CvQualifiedType'):
         if (CvQualifiedType.attrib["id"] == type_id):
@@ -50,46 +59,20 @@ def get_type(root, type_id):
             for FundamentalType in root.iter('FundamentalType'):
                 if (FundamentalType.attrib["id"] == CvQualifiedType.attrib["type"]):
                     #print "CvQualifiedType FundamentalType : %s"%FundamentalType.attrib["name"]
-                    return 'const ' + Typedef.attrib["name"] + ' *'
+                    return 'const ' + FundamentalType.attrib["name"] + pointer
 
             for Typedef in root.iter('Typedef'):
                 if (Typedef.attrib["id"] == CvQualifiedType.attrib["type"]):
                     #print "CvQualifiedType Typedef : %s"%Typedef.attrib["name"]
-                    return 'const ' + Typedef.attrib["name"] + ' *'
+                    return 'const ' + Typedef.attrib["name"] + pointer
 
-    for PointerType in root.iter('PointerType'):
+            for PointerType in root.iter('PointerType'):
+                if (PointerType.attrib["id"] == CvQualifiedType.attrib["type"]):
 
-        if (PointerType.attrib["id"] == type_id):
-            #print "PointerType.attrib : %s"%PointerType.attrib["id"]
+                    #print "PointerType.id : %s"%PointerType.attrib["id"]
+                    #print "PointerType.type : %s"%PointerType.attrib["type"]
 
-            for FundamentalType in root.iter('FundamentalType'):
-                if (FundamentalType.attrib["id"] == PointerType.attrib["type"]):
-                    #print "Argument PointerType FundamentalType : %s"%FundamentalType.attrib["name"]
-                    return Typedef.attrib["name"] + ' *'
-
-            for Typedef in root.iter('Typedef'):
-                if (Typedef.attrib["id"] == PointerType.attrib["type"]):
-                    #print "PointerType Typedef : %s"%Typedef.attrib["name"]
-                    return Typedef.attrib["name"] + ' *'
-
-            for Enumeration in root.iter('Enumeration'):
-                if (Enumeration.attrib["id"] == PointerType.attrib["type"]):
-                    #print "PointerType Enumeration : %s"%Enumeration.attrib["name"]
-                    return Enumeration.attrib["name"] + ' *';
-
-            for CvQualifiedType in root.iter('CvQualifiedType'):
-                if (CvQualifiedType.attrib["id"] == PointerType.attrib["type"]):
-                    #print "PointerType CvQualifiedType : %s"%CvQualifiedType.attrib["type"]
-
-                    for FundamentalType in root.iter('FundamentalType'):
-                        if (FundamentalType.attrib["id"] == CvQualifiedType.attrib["type"]):
-                            #print "PointerType CvQualifiedType FundamentalType : %s"%FundamentalType.attrib["name"]
-                            return 'const ' + Typedef.attrib["name"] + ' *'
-
-                    for Typedef in root.iter('Typedef'):
-                        if (Typedef.attrib["id"] == CvQualifiedType.attrib["type"]):
-                            #print "PointerType CvQualifiedType Typedef : %s"%Typedef.attrib["name"]
-                            return 'const ' + Typedef.attrib["name"] + ' *'
+                    return get_type(root, PointerType.attrib["type"], " * ") + pointer
 
 
 
@@ -115,14 +98,22 @@ def parse_xml(input_xml):
 
             argument_names = []
             argument_types = []
+            ellipsis = False
 
             return_type = get_type(root, Function.attrib["returns"])
 
+            i = 1;
             for Arguments in Function.iter('Argument'):
-                #print "Argument name : %s"%Arguments.attrib["name"]
-                argument_names.append(Arguments.attrib["name"])
+                if "name" in Arguments.attrib:
+                    argument_names.append(Arguments.attrib["name"])
+                else:
+                    argument_names.append('arg' + str(i))
+                    i+= 1
                 argument_types.append(get_type(root, Arguments.attrib["type"]))
-              
+
+            if Function.find('Ellipsis') is not None:
+                ellipsis = True
+
             #print '----'
             #print function_name
             #print return_type
@@ -147,16 +138,20 @@ def parse_xml(input_xml):
             #    return ret;
             #}
 
-            print '\nextern \"C\" %s %s'%(return_type,function_name),
+            print '\nextern \"C\" %s %s'%(return_type, function_name),
 
-            if not argument_types:
+            if not argument_types and not ellipsis:
                 print '(void)'
             else:
                 print '(',
-                for index in range(len(argument_names)):
-                    if (index > 0):
-                        print ', ',
-                    print argument_types[index] + ' ' + argument_names[index],
+                if argument_types:
+                    for index in range(len(argument_names)):
+                        if (index > 0):
+                            print ', ',
+                        print argument_types[index] + ' ' + argument_names[index],
+                
+                if ellipsis:
+                    print ', ...',
                 print ')'
 
             print '{'
@@ -218,7 +213,7 @@ def parse_xml(input_xml):
             if return_type != 'void':
                 print '   return ret;'
             print '}'
-            
+
 
 def main():
 
