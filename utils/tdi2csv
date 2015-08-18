@@ -34,7 +34,6 @@ def build(tdifilename):
       if line.startswith('END'):
          offset_nsec = int(line[4:])
 
-
    f.seek(0)
 
    for line in f:
@@ -188,9 +187,14 @@ def print_result(curr_evtwords):
 
 def main():
 
+   global offset_nsec
+   global first_tstamp
+
    if len(sys.argv) >= 4:
 
       build(sys.argv[1])
+
+      offset_nsec += first_tstamp;
 
       matches = []
       progs = []
@@ -212,11 +216,9 @@ def main():
 
          if state == 'MATCH_FIRST':
 
-            if (re.compile(matches[0]).findall(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+            if (re.compile(matches[0]).findall(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
 
                #print 'MATCH_FIRST match first', evtwords[0], evtwords[4], offset_nsec
-
-               #print re.compile(matches[0]).search(evtwords[4]).group(0)
 
                curr_evtwords.append(re.compile(matches[0]).search(evtwords[4]).group(0))
                curr_evtwords.append("%08.3f" % (round((int(evtwords[0]) - offset_nsec) / 1000000000.0, 3)))
@@ -226,14 +228,14 @@ def main():
 
          elif state == 'MATCH_NEXT':
 
-            if (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+            if (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
 
                #print 'MATCH_NEXT match again', evtwords[0], evtwords[4]
 
                curr_evtwords.append(re.compile(matches[last_match]).search(evtwords[4]).group(0))
                curr_evtwords.append("%06.3f" % (round((int(evtwords[0]) - tstamp_begin) / 1000000000.0, 3)))
 
-            elif (re.compile(matches[last_match + 1]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+            elif (re.compile(matches[last_match + 1]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
 
                #print 'MATCH_NEXT match next', last_match, len(matches), evtwords[0], evtwords[4]
 
@@ -244,10 +246,23 @@ def main():
                if last_match + 1 == len(matches):
                   state = 'MATCH_FINAL'
 
+            else:
+
+               for i in range(last_match + 2, len(matches)):
+
+                  if (re.compile(matches[i]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
+
+                     #print 'MATCH_NEXT bad match', evtwords[0], evtwords[4]
+                     
+                     curr_evtwords = []
+                     state = 'MATCH_FIRST'
+                     break
+
+
          elif state == 'MATCH_FINAL':
 
             # if we find the first again we are done
-            if (re.compile(matches[0]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+            if (re.compile(matches[0]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
 
                #print 'MATCH_FINAL match first', last_match, len(matches), evtwords[0], evtwords[4]
                delta = tstamp_end - tstamp_begin
@@ -273,7 +288,7 @@ def main():
                state = 'MATCH_NEXT'
 
             # if we find the last again
-            elif (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC')):
+            elif (re.compile(matches[last_match]).search(evtwords[4]) and (evtwords[2] == 'STA' or evtwords[2] == 'OCC' or evtwords[2] == 'STASTO')):
 
                #print 'MATCH_FINAL match again', last_match, len(matches), '<', evtwords[0], evtwords[4]
 
