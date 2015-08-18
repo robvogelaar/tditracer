@@ -438,7 +438,6 @@ typedef struct {
     char procname[64];
     int pid;
     char *bufmmapped;
-    char *buf;
     int bufsize;
     char *ptr;
     char *saveptr;
@@ -851,19 +850,17 @@ void tditrace_exit(int argc, char *argv[]) {
                     }
 
                     tracebuffers[buffers].bufmmapped = (char *)mmap(
-                        0, st.st_size, PROT_READ, MAP_SHARED, fileno(file), 0);
+                        0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
                     tracebuffers[buffers].bufsize = st.st_size;
-                    tracebuffers[buffers].buf = malloc(st.st_size);
-                    memcpy(tracebuffers[buffers].buf,
-                           tracebuffers[buffers].bufmmapped, st.st_size);
-                    tracebuffers[buffers].ptr = tracebuffers[buffers].buf;
+
+                    tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
 
                     // token should hold "TDITRACEBUFFER"
                     if (strncmp("TDITRACEBUFFER",
                                 strtok_r(tracebuffers[buffers].ptr, search,
                                          &tracebuffers[buffers].saveptr),
                                 14) != 0) {
-                        printf("invalid tracebuffer, skipping\n");
+                        fprintf(stderr, "invalid tracebuffer, skipping\n");
                         break;
                     }
 
@@ -926,19 +923,16 @@ void tditrace_exit(int argc, char *argv[]) {
                         }
 
                         tracebuffers[buffers].bufmmapped = (char *)mmap(
-                            0, st.st_size, PROT_READ, MAP_SHARED, fileno(file), 0);
+                            0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
                         tracebuffers[buffers].bufsize = st.st_size;
-                        tracebuffers[buffers].buf = malloc(st.st_size);
-                        memcpy(tracebuffers[buffers].buf,
-                               tracebuffers[buffers].bufmmapped, st.st_size);
-                        tracebuffers[buffers].ptr = tracebuffers[buffers].buf;
+                        tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
 
                         // token should hold "TDITRACEBUFFER"
                         if (strncmp("TDITRACEBUFFER",
                                     strtok_r(tracebuffers[buffers].ptr, search,
                                              &tracebuffers[buffers].saveptr),
                                     14) != 0) {
-                            printf("tdi: init[%d][%s], invalid tracebuffer, skipping\n", gpid, gprocname);
+                            fprintf(stderr, "tdi: init[%d][%s], invalid tracebuffer, skipping\n", gpid, gprocname);
                             break;
                         }
 
@@ -1026,7 +1020,7 @@ void tditrace_exit(int argc, char *argv[]) {
                  tracebuffers[d].procname, tracebuffers[d].pid,
                  tracebuffers[d].tid);
 
-        pctused = (((tracebuffers[d].text - tracebuffers[d].buf) * 100.0) /
+        pctused = (((tracebuffers[d].text - tracebuffers[d].bufmmapped) * 100.0) /
                    tracebuffers[d].bufsize) +
                   1;
 
