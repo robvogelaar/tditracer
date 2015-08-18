@@ -5,6 +5,8 @@ extern bool renderbufferrecording;
 extern bool shaderrecording;
 
 extern bool libcrecording;
+extern bool libcioctlrecording;
+
 extern bool pthreadrecording;
 
 extern bool eglrecording;

@@ -44,6 +44,7 @@ bool texturerecording;
 bool renderbufferrecording;
 bool shaderrecording;
 bool libcrecording;
+bool libcioctlrecording;
 bool pthreadrecording;
 bool eglrecording;
 bool glesrecording;
@@ -165,8 +166,14 @@ static void init(void) {
 
         if (getenv("LIBC")) {
             libcrecording = (atoi(getenv("LIBC")) >= 1);
+            libcioctlrecording = true;
         } else {
             libcrecording = false;
+            libcioctlrecording = false;
+        }
+
+        if (getenv("LIBCIOCTL")) {
+            libcioctlrecording = (atoi(getenv("LIBCIOCTL")) >= 1);
         }
 
         if (getenv("PTHREAD")) {

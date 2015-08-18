@@ -690,13 +690,13 @@ extern "C" int ioctl(int d, int request, ...) {
     int a1 = va_arg(args, int);
     va_end(args);
 
-    if (libcrecording) {
+    if (libcrecording && libcioctlrecording) {
         tditrace_ex("@T+ioctl() %d 0x%x", d, request);
     }
 
     int ret = __ioctl(d, request, a1);
 
-    if (libcrecording) {
+    if (libcrecording && libcioctlrecording) {
         tditrace_ex("@T-ioctl() =%d", ret);
     }
 
