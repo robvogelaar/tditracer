@@ -454,6 +454,7 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
 
     if (libcrecording) {
         tditrace_ex("@T-sendmsg() =%d", ret);
+        tditrace_ex("@E+sendmsg()_%d =%d %d \"\"", sockfd, ret, msg->msg_iovlen);
     }
 
     return ret;
@@ -584,14 +585,15 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     }
 
     if (libcrecording) {
-        //tditrace_ex("@T+recvmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_base);
-        tditrace_ex("@T+recvmsg() %d %d \"\"", sockfd, msg->msg_iovlen);
+        tditrace_ex("@T+recvmsg() %d %d", sockfd, msg->msg_iovlen);
     }
 
     ssize_t ret = __recvmsg(sockfd, msg, flags);
 
     if (libcrecording) {
-        tditrace_ex("@T-recvmsg() =%d", ret);
+        //tditrace_ex("@T+recvmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_base);
+        tditrace_ex("@T-recvmsg() =%d \"\"", ret);
+        tditrace_ex("@E+recvmsg()_%d =%d \"\"", sockfd, ret);
     }
 
     return ret;
