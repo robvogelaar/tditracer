@@ -5,46 +5,23 @@ import re
 from datetime import datetime
 
 
-TASKS  = 0
+TASKS = 0
+ISRS = 1
+SEMAS = 2
 QUEUES = 3
 EVENTS = 4
 NOTES  = 7
 
 
 tasksnames = []
+isrsnames = []
 queuesnames = []
 eventsnames = []
+semasnames = []
 notesnames = []
 
 offset_nsec = 0
-
 first_tstamp = 0
-
-
-def addnote (evt):
-
-   global notesnames
-   global offset_sec
-   global offset_nsec
-
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   else:
-      if int(evtwords[0]) < offset_nsec:
-         offset_nsec = int(evtwords[0])
-
-
-   if evtwords[3] not in notesnames:
-
-      notesnames.append(evtwords[3])
-      print('NAM ' + str(NOTES) + ' %d %s' %((NOTES * 1000 + notesnames.index(evtwords[3])) , evtwords[3]))
-
-
-   print('OCC ' + str(NOTES) + ' %d %d' %((NOTES * 1000 + notesnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
-   print('DSC 0 0 %s' % evtwords[4])
 
 
 def addtask (evt):
@@ -53,9 +30,7 @@ def addtask (evt):
    global offset_sec
    global offset_nsec
 
-
    evtwords = evt.split()
-
 
    if offset_nsec == 0:
       offset_nsec = int(evtwords[0])
@@ -73,16 +48,13 @@ def addtask (evt):
    print(evtwords[2] + ' ' + str(TASKS) + ' %d %d' %((TASKS * 1000 + tasksnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
+def addisr (evt):
 
-def addevent (evt):
-
-   global eventsnames
+   global isrsnames
    global offset_sec
    global offset_nsec
 
-
    evtwords = evt.split()
-
 
    if offset_nsec == 0:
       offset_nsec = int(evtwords[0])
@@ -90,15 +62,80 @@ def addevent (evt):
       if int(evtwords[0]) < offset_nsec:
          offset_nsec = int(evtwords[0])
 
+   if evtwords[3] not in isrsnames:
+
+      isrsnames.append(evtwords[3])
+      print('NAM ' + str(ISRS) + ' %d %s' %((ISRS * 1000 + isrsnames.index(evtwords[3])) , evtwords[3]))
+
+
+   print(evtwords[2] + ' ' + str(ISRS) + ' %d %d' %((ISRS * 1000 + isrsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
+   print('DSC 0 0 %s' % evtwords[4])
+
+
+def addevent (evt):
+
+   global eventsnames
+   global offset_sec
+   global offset_nsec
+
+   evtwords = evt.split()
+
+   if offset_nsec == 0:
+      offset_nsec = int(evtwords[0])
+   else:
+      if int(evtwords[0]) < offset_nsec:
+         offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in eventsnames:
 
       eventsnames.append(evtwords[3])
       print('NAM ' + str(EVENTS) + ' %d %s' %((EVENTS * 1000 + eventsnames.index(evtwords[3])) , evtwords[3]))
 
+   print('OCC ' + str(EVENTS) + ' %d %d' %((EVENTS * 1000 + eventsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
+   print('DSC 0 0 %s' % evtwords[4])
 
-   print('STA' + ' ' + str(EVENTS) + ' %d %d' %((EVENTS * 1000 + eventsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
-   print('STO' + ' ' + str(EVENTS) + ' %d %d' %((EVENTS * 1000 + eventsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
+def addsema (evt):
+
+   global semasnames
+   global offset_sec
+   global offset_nsec
+
+   evtwords = evt.split()
+
+   if offset_nsec == 0:
+      offset_nsec = int(evtwords[0])
+   else:
+      if int(evtwords[0]) < offset_nsec:
+         offset_nsec = int(evtwords[0])
+
+   if evtwords[3] not in semasnames:
+
+      semasnames.append(evtwords[3])
+      print('NAM ' + str(SEMAS) + ' %d %s' %((SEMAS * 1000 + semasnames.index(evtwords[3])) , evtwords[3]))
+
+   print('OCC ' + str(SEMAS) + ' %d %d' %((SEMAS * 1000 + semasnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
+   print('DSC 0 0 %s' % evtwords[4])
+
+def addnote (evt):
+
+   global notesnames
+   global offset_sec
+   global offset_nsec
+
+   evtwords = evt.split()
+
+   if offset_nsec == 0:
+      offset_nsec = int(evtwords[0])
+   else:
+      if int(evtwords[0]) < offset_nsec:
+         offset_nsec = int(evtwords[0])
+
+   if evtwords[3] not in notesnames:
+
+      notesnames.append(evtwords[3])
+      print('NAM ' + str(NOTES) + ' %d %s' %((NOTES * 1000 + notesnames.index(evtwords[3])), evtwords[3]))
+
+   print('OCC ' + str(NOTES) + ' %d %d' %((NOTES * 1000 + notesnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
 
@@ -108,9 +145,7 @@ def addqueue (evt):
    global offset_sec
    global offset_nsec
 
-
    evtwords = evt.split()
-
 
    if offset_nsec == 0:
       offset_nsec = int(evtwords[0])
@@ -118,23 +153,25 @@ def addqueue (evt):
       if int(evtwords[0]) < offset_nsec:
          offset_nsec = int(evtwords[0])
 
-
    if evtwords[3] not in queuesnames:
 
       queuesnames.append(evtwords[3])
       print('NAM ' + str(QUEUES) + ' %d %s' %((QUEUES * 1000 + queuesnames.index(evtwords[3])) , evtwords[3]))
 
-
    print(evtwords[2] + ' ' + str(QUEUES) + ' %d %d %s' %((QUEUES * 1000 + queuesnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp, evtwords[4]))
 
 
 nams = []  # tdifilename  + ' ' + 0 / 3 / 4 / 7 + ' ' + 0.. / 3000.. / 4000.. / 7000..
+isrs = []
 evts = []  # epoch-tstamp + ' ' + 0 / 3 / 4 / 7 + ' ' + thenam + ' ' + 'OCC/STA/STO/' + ' ' + 0.. / 3000.. / 4000.. / 7000.. + ' ' + descr
+semas = []
 
 def build(tdifilename):
 
    global nams
+   global isrs
    global evts
+   global semas
    global first_tstamp
 
    f = open(tdifilename)
@@ -151,22 +188,17 @@ def build(tdifilename):
       if line.startswith('NAM'):
 
          namwords = line.split()
-
          nams.append(tdifilename + ' ' + namwords[2] + ' ' + namwords[3])
-
 
       if line.startswith('OCC'):
 
          occwords = line.split()
-
          tstamp = int(occwords[3])
 
          if first_tstamp == 0:
             first_tstamp = tstamp
 
-
          dscwords = f.next().split()
-
 
          for nam in nams:
             namwords = nam.split()
@@ -183,14 +215,12 @@ def build(tdifilename):
       if line.startswith('STA'):
 
          stawords = line.split()
-
          tstamp = int(stawords[3])
 
          if first_tstamp == 0:
             first_tstamp = tstamp
 
-
-         if int(stawords[1]) == 0: # @T+ STA DSC
+         if int(stawords[1]) == TASKS or int(stawords[1]) == ISRS:
 
             dscwords = f.next().split()
 
@@ -206,25 +236,7 @@ def build(tdifilename):
             evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + 'STA' + ' ' + thenam + ' ' + dscwords[3])
 
 
-         if int(stawords[1]) == 4: # @E+  STA STO DSC
-
-            stowords = f.next().split()
-
-            dscwords = f.next().split()
-
-            for nam in nams:
-               namwords = nam.split()
-
-               if namwords[0] == tdifilename:
-
-                  if stawords[2] == namwords[1]:
-
-                     thenam = namwords[2]
-
-            evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + 'STASTO' + ' ' + thenam + ' ' + dscwords[3])
-
-
-         if int(stawords[1]) == 3: # ~ STA / STO
+         if int(stawords[1]) == QUEUES: # ~ STA / STO
 
             for nam in nams:
                namwords = nam.split()
@@ -242,14 +254,13 @@ def build(tdifilename):
       if line.startswith('STO'):
 
          stowords = line.split()
-
          tstamp = int(stowords[3])
 
          if first_tstamp == 0:
             first_tstamp = tstamp
 
 
-         if int(stowords[1]) == 0: # @T+ STO DSC
+         if int(stowords[1]) == TASKS or int(stowords[1]) == ISRS: # @T+ STO DSC
 
             dscwords = f.next().split()
 
@@ -265,7 +276,7 @@ def build(tdifilename):
             evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + 'STO' + ' ' + thenam + ' ' + dscwords[3])
 
 
-         if int(stowords[1]) == 3: # ~ STA / STO
+         if int(stowords[1]) == QUEUES: # ~ STA / STO
 
             for nam in nams:
                namwords = nam.split()
@@ -302,7 +313,7 @@ def main():
 
          build(tdifilename)
 
-      evts.sort(key=sortby)
+      evts.sort(key = sortby)
 
       print('TIME 1000000000')
       print('SPEED 1000000000')
@@ -316,18 +327,22 @@ def main():
          if int(evtwords[1]) == NOTES:
             addnote(evt)
 
+         if int(evtwords[1]) == ISRS:
+            addisr(evt)
+
          if int(evtwords[1]) == TASKS:
             addtask(evt)
 
          if int(evtwords[1]) == EVENTS:
             addevent(evt)
 
+         if int(evtwords[1]) == SEMAS:
+            addsema(evt)
+
          if int(evtwords[1]) == QUEUES:
             addqueue(evt)
 
-
       print('END %d' % (offset_nsec));
-
 
    else:
 

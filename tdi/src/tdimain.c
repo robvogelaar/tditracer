@@ -15,10 +15,8 @@
 
 #include <dirent.h>
 
-
 pid_t gpid;
 char gprocname[128];
-
 
 struct simplefu_semaphore {
     int avail;
@@ -74,6 +72,8 @@ void simplefu_up(simplefu who) {
 }
 
 #define TASKS 0
+#define ISRS 1
+#define SEMAS 2
 #define QUEUES 3
 #define EVENTS 4
 #define NOTES 7
@@ -92,9 +92,17 @@ typedef unsigned long long _u64;
 
 struct simplefu_mutex myMutex;
 
-// 100 queues of 1000 chars each
+// 100 tasks of 1000 chars each
 static char tasks_array[1024][128];
 static int nr_tasks = 0;
+
+// 100 isrs of 1000 chars each
+static char isrs_array[1024][128];
+static int nr_isrs = 0;
+
+// 100 semas of 1000 chars each
+static char semas_array[1024][128];
+static int nr_semas = 0;
 
 // 100 queues of 1000 chars each
 static char queues_array[1024][128];
@@ -137,10 +145,13 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     char text_in1[1024];
     char *text = text_in1;
 
-    //fprintf(stderr, "addentry:[%s]\n", text_in);
+    // fprintf(stderr, "addentry:[%s]\n", text_in);
 
     if ((strncmp(text_in, "@T+", 3) == 0) ||
         (strncmp(text_in, "@T-", 3) == 0) ||
+        (strncmp(text_in, "@I+", 3) == 0) ||
+        (strncmp(text_in, "@I-", 3) == 0) ||
+        (strncmp(text_in, "@S+", 3) == 0) ||
         (strncmp(text_in, "@E+", 3) == 0)) {
 
         strncpy(text_in1, text_in, 3);
@@ -213,13 +224,159 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
             fwrite(fullentry, strlen(fullentry), 1, stdout);
         }
 
-        // Add the STA STO entry
+        // Add the STA or STO entry
         if (enter_not_exit) {
             sprintf(fullentry, "STA %d %d %lld\n", TASKS, TASKS * 1000 + entry,
                     timestamp);
             fwrite(fullentry, strlen(fullentry), 1, stdout);
         } else {
             sprintf(fullentry, "STO %d %d %lld\n", TASKS, TASKS * 1000 + entry,
+                    timestamp);
+            fwrite(fullentry, strlen(fullentry), 1, stdout);
+        }
+
+        // Add the DSC entry, replace any spaces with commas
+        sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text);
+        for (i = 8; i < (int)strlen(fullentry); i++) {
+            if (fullentry[i] == 32)
+                fullentry[i] = 0x2c;
+        }
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        return;
+    }
+
+    /*
+     * SEMAS entry
+     *
+     */
+    if (strncmp(text, "@S+", 3) == 0) {
+
+        text += 3;
+        // if the entry has not been seen before, add a new entry for it and
+        // issue a NAM
+        entry = -1;
+        for (i = 0; i < nr_semas; i++) {
+            char *pos;
+            char comparestr[1024];
+
+            strcpy(comparestr, text);
+            /*
+             * the portion of the text before the first space in the text
+             * is considered the unique part of the text
+             */
+            pos = strchr(comparestr, ' ');
+            if (pos) {
+                *pos = 0;
+            }
+
+            if (strcmp(semas_array[i], comparestr) == 0) {
+                // found the entry
+                entry = i;
+                break;
+            }
+        }
+
+        // Do we need to add the entry?
+        if (entry == -1) {
+            int len;
+            char *pos;
+
+            pos = strchr(text, ' ');
+            if (pos)
+                len = pos - text;
+            else
+                len = strlen(text);
+
+            strncpy(semas_array[nr_semas], text, len);
+            entry = nr_semas;
+            nr_semas++;
+
+            // Since we added a new entry we need to create a NAM, with only the
+            // first part of the text
+            sprintf(fullentry, "NAM %d %d %s\n", SEMAS, SEMAS * 1000 + entry,
+                    semas_array[entry]);
+            fwrite(fullentry, strlen(fullentry), 1, stdout);
+        }
+
+        // Add the OCC entry
+        sprintf(fullentry, "OCC %d %d %lld\n", SEMAS, SEMAS * 1000 + entry,
+                timestamp);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        // Add the DSC entry, replace any spaces with commas
+        sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text);
+        for (i = 8; i < (int)strlen(fullentry); i++) {
+            if (fullentry[i] == 32)
+                fullentry[i] = 0x2c;
+        }
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        return;
+    }
+
+    /*
+     * ISRS entry
+     *
+     */
+    if ((strncmp(text, "@I+", 3) == 0) || (strncmp(text, "@I-", 3) == 0)) {
+
+        int enter_not_exit = (strncmp(text + 2, "+", 1) == 0);
+
+        text += 3;
+        // if the entry has not been seen before, add a new entry for it and
+        // issue a NAM
+        entry = -1;
+        for (i = 0; i < nr_isrs; i++) {
+            char *pos;
+            char comparestr[1024];
+
+            strcpy(comparestr, text);
+            /*
+             * the portion of the text before the first space in the text
+             * is considered the unique part of the text
+             */
+            pos = strchr(comparestr, ' ');
+            if (pos) {
+                *pos = 0;
+            }
+
+            if (strcmp(isrs_array[i], comparestr) == 0) {
+                // found the entry
+                entry = i;
+                break;
+            }
+        }
+
+        // Do we need to add the entry?
+        if (entry == -1) {
+            int len;
+            char *pos;
+
+            pos = strchr(text, ' ');
+            if (pos)
+                len = pos - text;
+            else
+                len = strlen(text);
+
+            strncpy(isrs_array[nr_isrs], text, len);
+            entry = nr_isrs;
+            nr_isrs++;
+
+            // Since we added a new entry we need to create a NAM, with only the
+            // first part of the text
+            sprintf(fullentry, "NAM %d %d %s\n", ISRS, ISRS * 1000 + entry,
+                    isrs_array[entry]);
+            fwrite(fullentry, strlen(fullentry), 1, stdout);
+        }
+
+        // Add the STA or STO entry
+        if (enter_not_exit) {
+            sprintf(fullentry, "STA %d %d %lld\n", ISRS, ISRS * 1000 + entry,
+                    timestamp);
+            fwrite(fullentry, strlen(fullentry), 1, stdout);
+        } else {
+            sprintf(fullentry, "STO %d %d %lld\n", ISRS, ISRS * 1000 + entry,
                     timestamp);
             fwrite(fullentry, strlen(fullentry), 1, stdout);
         }
@@ -288,11 +445,8 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
             fwrite(fullentry, strlen(fullentry), 1, stdout);
         }
 
-        // Add the STA STO entry
-        sprintf(fullentry, "STA %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
-                timestamp);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
-        sprintf(fullentry, "STO %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
+        // Add the OCC entry
+        sprintf(fullentry, "OCC %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
                 timestamp);
         fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -560,8 +714,7 @@ static int do_init(void) {
     struct timeval mytime;
     int i;
 
-    
-    #if 0
+#if 0
     /*
      * remove inactive tracefiles
      */
@@ -618,12 +771,12 @@ static int do_init(void) {
         closedir(dp);
     }
 
-    #endif
+#endif
 
     char tracebufferfilename[128];
 
-    sprintf(tracebufferfilename, (char *)"/tmp/.tditracebuffer:%s:%d", gprocname,
-            gpid);
+    sprintf(tracebufferfilename, (char *)"/tmp/.tditracebuffer:%s:%d",
+            gprocname, gpid);
 
     FILE *file;
     if ((file = fopen(tracebufferfilename, "w+")) == 0) {
@@ -640,7 +793,8 @@ static int do_init(void) {
         gtrace_buffer[i] = 0;
     }
 
-    printf("tdi: init[%d][%s], allocated: \"%s\" (16MB)\n", gpid, gprocname, tracebufferfilename);
+    printf("tdi: init[%d][%s], allocated: \"%s\" (16MB)\n", gpid, gprocname,
+           tracebufferfilename);
 
     trace_buffer_ptr = gtrace_buffer;
     trace_counter = 0;
@@ -661,7 +815,9 @@ static int do_init(void) {
     trace_buffer_ptr +=
         sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
 
-    printf("tdi: init[%d][%s], timeofday_timestamp:%lld, monotonic_timestamp:%lld\n", gpid, gprocname, timeofday_timestamp, monotonic_timestamp);
+    printf("tdi: init[%d][%s], timeofday_timestamp:%lld, "
+           "monotonic_timestamp:%lld\n",
+           gpid, gprocname, timeofday_timestamp, monotonic_timestamp);
 
     reported_full = 0;
 
@@ -709,18 +865,20 @@ void *delayed_init_thread(void *param) {
                      ptm);
 
             if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
-                printf("tdi: init[%d][%s], delay until timeofday is set, \"%s\", "
-                       "timeofday is set\n", gpid, gprocname,
-                       time_string);
+                printf(
+                    "tdi: init[%d][%s], delay until timeofday is set, \"%s\", "
+                    "timeofday is set\n",
+                    gpid, gprocname, time_string);
                 break;
             }
 
             ptm = localtime(&tv.tv_sec);
             strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S",
                      ptm);
-            printf("tdi: init[%d][%s], delay until timeofday is set, \"%s\", timeofday "
-                   "is not set\n", gpid, gprocname,
-                   time_string);
+            printf("tdi: init[%d][%s], delay until timeofday is set, \"%s\", "
+                   "timeofday "
+                   "is not set\n",
+                   gpid, gprocname, time_string);
 
             usleep(1 * 1000000);
         }
@@ -728,7 +886,8 @@ void *delayed_init_thread(void *param) {
     } else {
 
         while (delay > 0) {
-            printf("tdi: init[%d][%s], delay %d second(s)...\n", gpid, gprocname, delay);
+            printf("tdi: init[%d][%s], delay %d second(s)...\n", gpid,
+                   gprocname, delay);
             usleep(1 * 1000000);
             delay--;
         }
@@ -749,10 +908,12 @@ int tditrace_init(void) {
     get_process_name_by_pid(gpid, gprocname);
 
     if (strcmp(gprocname, "mkdir") == 0) {
-        printf("tdi: init[%d][%s], procname is \"mkdir\" ; not tracing\n", gpid, gprocname);
+        printf("tdi: init[%d][%s], procname is \"mkdir\" ; not tracing\n", gpid,
+               gprocname);
         return;
     } else if (strcmp(gprocname, "sh") == 0) {
-        printf("tdi: init[%d][%s], procname is \"sh\" ; not tracing\n", gpid, gprocname);
+        printf("tdi: init[%d][%s], procname is \"sh\" ; not tracing\n", gpid,
+               gprocname);
         return;
     } else {
         printf("tdi: init[%d][%s]\n", gpid, gprocname);
@@ -816,12 +977,12 @@ void tditrace_exit(int argc, char *argv[]) {
 
         while (--tracebufferid) {
 
-
             if (strstr(argv[tracebufferid], ".tditracebuffer:") != 0) {
 
                 FILE *file;
 
-                sprintf(tracebuffers[buffers].filename, "%s", argv[tracebufferid]);
+                sprintf(tracebuffers[buffers].filename, "%s",
+                        argv[tracebufferid]);
 
                 if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                     NULL) {
@@ -849,11 +1010,13 @@ void tditrace_exit(int argc, char *argv[]) {
                         break;
                     }
 
-                    tracebuffers[buffers].bufmmapped = (char *)mmap(
-                        0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
+                    tracebuffers[buffers].bufmmapped =
+                        (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE,
+                                     MAP_PRIVATE, fileno(file), 0);
                     tracebuffers[buffers].bufsize = st.st_size;
 
-                    tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
+                    tracebuffers[buffers].ptr =
+                        tracebuffers[buffers].bufmmapped;
 
                     // token should hold "TDITRACEBUFFER"
                     if (strncmp("TDITRACEBUFFER",
@@ -876,11 +1039,9 @@ void tditrace_exit(int argc, char *argv[]) {
                     buffers++;
                 }
             }
-
         }
 
     } else {
-
 
         DIR *dp;
         struct dirent *ep;
@@ -894,7 +1055,8 @@ void tditrace_exit(int argc, char *argv[]) {
 
                     FILE *file;
 
-                    sprintf(tracebuffers[buffers].filename, "/tmp/%s", ep->d_name);
+                    sprintf(tracebuffers[buffers].filename, "/tmp/%s",
+                            ep->d_name);
 
                     if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                         NULL) {
@@ -904,15 +1066,15 @@ void tditrace_exit(int argc, char *argv[]) {
                         fprintf(stderr, "Found \"%s\"\n",
                                 tracebuffers[buffers].filename);
 
-                        strncpy(tracebuffers[buffers].procname,
-                                (const char *)&tracebuffers[buffers].filename[21],
-                                strchr(&tracebuffers[buffers].filename[21], ':') -
-                                    &tracebuffers[buffers].filename[21]);
+                        strncpy(
+                            tracebuffers[buffers].procname,
+                            (const char *)&tracebuffers[buffers].filename[21],
+                            strchr(&tracebuffers[buffers].filename[21], ':') -
+                                &tracebuffers[buffers].filename[21]);
 
                         tracebuffers[buffers].pid = atoi(
-                            &tracebuffers[buffers]
-                                 .filename[22 +
-                                           strlen(tracebuffers[buffers].procname)]);
+                            &tracebuffers[buffers].filename
+                                 [22 + strlen(tracebuffers[buffers].procname)]);
 
                         struct stat st;
                         stat(tracebuffers[buffers].filename, &st);
@@ -922,26 +1084,33 @@ void tditrace_exit(int argc, char *argv[]) {
                             break;
                         }
 
-                        tracebuffers[buffers].bufmmapped = (char *)mmap(
-                            0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
+                        tracebuffers[buffers].bufmmapped =
+                            (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE,
+                                         MAP_PRIVATE, fileno(file), 0);
                         tracebuffers[buffers].bufsize = st.st_size;
-                        tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
+                        tracebuffers[buffers].ptr =
+                            tracebuffers[buffers].bufmmapped;
 
                         // token should hold "TDITRACEBUFFER"
                         if (strncmp("TDITRACEBUFFER",
                                     strtok_r(tracebuffers[buffers].ptr, search,
                                              &tracebuffers[buffers].saveptr),
                                     14) != 0) {
-                            fprintf(stderr, "tdi: init[%d][%s], invalid tracebuffer, skipping\n", gpid, gprocname);
+                            fprintf(stderr, "tdi: init[%d][%s], invalid "
+                                            "tracebuffer, skipping\n",
+                                    gpid, gprocname);
                             break;
                         }
 
-                        // token should hold "timeofday timestamp offset in nsecs"
-                        tracebuffers[buffers].timeofday_offset = (_u64)atoll(
-                            strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+                        // token should hold "timeofday timestamp offset in
+                        // nsecs"
+                        tracebuffers[buffers].timeofday_offset =
+                            (_u64)atoll(strtok_r(
+                                NULL, search, &tracebuffers[buffers].saveptr));
 
-                        tracebuffers[buffers].monotonic_offset = (_u64)atoll(
-                            strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+                        tracebuffers[buffers].monotonic_offset =
+                            (_u64)atoll(strtok_r(
+                                NULL, search, &tracebuffers[buffers].saveptr));
 
                         fclose(file);
 
@@ -952,16 +1121,13 @@ void tditrace_exit(int argc, char *argv[]) {
 
             closedir(dp);
         }
-
     }
-
 
     if (buffers == 0) {
 
         fprintf(stderr, "Not found: \"/tmp/.tditracebuffer:*:*\"\n");
         return;
     }
-
 
     _u64 abs_timeofday = 0;
     _u64 last_timestamp = 0;
@@ -980,7 +1146,6 @@ void tditrace_exit(int argc, char *argv[]) {
     fprintf(stdout, "TIME %d\n", 1000000000);
     fprintf(stdout, "SPEED %d\n", 1000000000);
     fprintf(stdout, "DNM 0 0 >\n");
-
 
     while (1) {
 
@@ -1020,9 +1185,10 @@ void tditrace_exit(int argc, char *argv[]) {
                  tracebuffers[d].procname, tracebuffers[d].pid,
                  tracebuffers[d].tid);
 
-        pctused = (((tracebuffers[d].text - tracebuffers[d].bufmmapped) * 100.0) /
-                   tracebuffers[d].bufsize) +
-                  1;
+        pctused =
+            (((tracebuffers[d].text - tracebuffers[d].bufmmapped) * 100.0) /
+             tracebuffers[d].bufsize) +
+            1;
 
         last_timestamp = tracebuffers[d].timeofday_offset - abs_timeofday +
                          tracebuffers[d].monotonic_timestamp -
