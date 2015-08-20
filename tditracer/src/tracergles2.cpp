@@ -57,12 +57,12 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
     }
 
     if (eglrecording)
-        tditrace_ex("@T+eglSwapBuffers()");
+        tditrace_ex("@I+eglSwapBuffers()");
 
     EGLBoolean ret = __eglSwapBuffers(display, surface);
 
     if (eglrecording)
-        tditrace_ex("@T-eglSwapBuffers()");
+        tditrace_ex("@I-eglSwapBuffers()");
 
     if (eglrecording)
         tditrace_ex("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d",
@@ -107,11 +107,11 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
 
     if (eglrecording)
         tditrace_ex(
-            "@T+eglMakeCurrent() display=%d draw=0x%x read=0x%x context=0x%x",
+            "@I+eglMakeCurrent() display=%d draw=0x%x read=0x%x context=0x%x",
             display, draw, read, context);
     EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
     if (eglrecording)
-        tditrace_ex("@T-eglMakeCurrent()");
+        tditrace_ex("@I-eglMakeCurrent()");
 
     boundframebuffer = 0;
 
@@ -129,10 +129,10 @@ extern "C" void glFinish(void) {
     }
 
     if (glesrecording)
-        tditrace_ex("@T+glFinish()");
+        tditrace_ex("@I+glFinish()");
     __glFinish();
     if (glesrecording)
-        tditrace_ex("@T-glFinish()");
+        tditrace_ex("@I-glFinish()");
 }
 
 extern "C" void glFlush(void) {
@@ -146,10 +146,10 @@ extern "C" void glFlush(void) {
     }
 
     if (glesrecording)
-        tditrace_ex("@T+glFlush()");
+        tditrace_ex("@I+glFlush()");
     __glFlush();
     if (glesrecording)
-        tditrace_ex("@T-glFlush()");
+        tditrace_ex("@I-glFlush()");
 }
 
 extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
@@ -193,7 +193,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     if (boundframebuffer != 0) {
         if (glesrecording || gldrawrecording)
             tditrace_ex(
-                "@T+glDrawArrays() "
+                "@I+glDrawArrays() "
                 "@%d,#%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawArrays_counter, MODESTRING(mode), count,
                 boundtexture, currentprogram, boundframebuffer,
@@ -207,7 +207,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
     } else {
         if (glesrecording || gldrawrecording)
-            tditrace_ex("@T+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
+            tditrace_ex("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawArrays_counter, MODESTRING(mode),
                         count, boundtexture, currentprogram);
     }
@@ -235,7 +235,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     }
 
     if (glesrecording || gldrawrecording)
-        tditrace_ex("@T-glDrawArrays()");
+        tditrace_ex("@I-glDrawArrays()");
 }
 
 extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
@@ -260,7 +260,7 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
     if (boundframebuffer) {
         if (glesrecording || gldrawrecording)
             tditrace_ex(
-                "@T+glDrawElements() "
+                "@I+glDrawElements() "
                 "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawElements_counter, MODESTRING(mode),
                 TYPESTRING(mode), count, boundtexture, currentprogram,
@@ -274,7 +274,7 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
 
     } else {
         if (glesrecording || gldrawrecording)
-            tditrace_ex("@T+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
+            tditrace_ex("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawElements_counter, MODESTRING(mode),
                         TYPESTRING(type), count, boundtexture, currentprogram);
     }
@@ -303,7 +303,7 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
     }
 
     if (glesrecording || gldrawrecording)
-        tditrace_ex("@T-glDrawElements()");
+        tditrace_ex("@I-glDrawElements()");
 }
 
 extern "C" void glGenTextures(GLsizei n, GLuint *textures) {
@@ -362,7 +362,7 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
     }
 
     if (glesrecording)
-        tditrace_ex("@T+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
+        tditrace_ex("@I+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
                     ++glTexImage2D_counter, width, height, TYPESTRING(type),
                     FORMATSTRING(format), boundtexture, pixels);
 
@@ -377,7 +377,7 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
                    type, pixels);
 
     if (glesrecording)
-        tditrace_ex("@T-glTexImage2D()");
+        tditrace_ex("@I-glTexImage2D()");
 }
 
 extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
@@ -399,7 +399,7 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
     }
 
     if (glesrecording)
-        tditrace_ex("@T+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
+        tditrace_ex("@I+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
                     ++glTexSubImage2D_counter, width, height, xoffset, yoffset,
                     TYPESTRING(type), FORMATSTRING(format), boundtexture,
                     pixels);
@@ -415,7 +415,7 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
                       type, pixels);
 
     if (glesrecording)
-        tditrace_ex("@T-glTexSubImage2D()");
+        tditrace_ex("@I-glTexSubImage2D()");
 }
 
 extern "C" GLvoid glCopyTexImage2D(GLenum target, GLint level,
@@ -645,12 +645,12 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     // addrinfo(__builtin_return_address(0)));
 
     if (glesrecording)
-        tditrace_ex("@T+glClear() %s", CLEARSTRING(mask));
+        tditrace_ex("@I+glClear() %s", CLEARSTRING(mask));
 
     __glClear(mask);
 
     if (glesrecording)
-        tditrace_ex("@T-glClear()");
+        tditrace_ex("@I-glClear()");
 }
 
 extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {

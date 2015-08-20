@@ -8,7 +8,6 @@ SEMA = 2
 EVENT = 4
 NOTE = 7
 
-
 names = []
 offset_sec = 0
 offset_nsec = 0
@@ -23,20 +22,14 @@ def addnes (type, logfilename, logline, matches):
    global offset_sec
    global offset_nsec
 
-
    for match in matches:
-
       #sys.stderr.write('match:\'%s\'\n' % match)
-
       prog = re.compile('.*' + match + '.*')
-
       if prog.match(logline):
          name = match;
 
    if name:
-
       if name not in names:
-
          names.append(name)
          print('NAM %d %d %s' %(type, (type * 1000 + names.index(name)), '[' + logfilename + ']' + name.replace(' ', '_')))
 
@@ -76,14 +69,12 @@ def addnes (type, logfilename, logline, matches):
                tstamp = re.findall("\d{8,}\s*\d+", logline)
                if tstamp:
                   if tstamp[0]:
-
                      pat = re.compile("\s*")
                      fields = pat.split(tstamp[0])
                      sec = int(fields[0])
                      nsec = int(fields[1]) * 1000
                      stamp = long(sec * 1000000000 + nsec);
                      #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
-
 
       if (tstamp):
          if (offset_sec == 0):
@@ -108,19 +99,16 @@ def main():
    if len(sys.argv) >= 2:
 
       i = 1;
-      type = NOTE;
+      type = SEMA;
       if (sys.argv[1] == '-n'):
          i = 2;
-      if (sys.argv[1] == '-e'):
+         type = NOTE;
+      elif (sys.argv[1] == '-e'):
          i = 2;
          type = EVENT;
-      if (sys.argv[1] == '-s'):
+      elif (sys.argv[1] == '-s'):
          i = 2;
          type = SEMA;
-
-      textfile = open(sys.argv[i], 'r')
-      filetext = textfile.read()
-      textfile.close()
 
       matches = []
       if len(sys.argv) == i + 1:
@@ -137,17 +125,23 @@ def main():
          totalmatch = totalmatch[:-1]
 
       #sys.stderr.write('totalmatch:\'%s\'\n' % totalmatch)
+      
+      loglinematches = []
 
-      loglinematches = re.findall(totalmatch, filetext)
+      f = open(sys.argv[i])
+      for line in f:
+         m = re.match(totalmatch, line)
+         if m:
+            loglinematches.append(m.group())
+
+      f.close()
 
       print('TIME 1000000000')
       print('SPEED 1000000000')
-      print('DNM 0 0 >')
 
       for logline in loglinematches:
 
          #sys.stderr.write('logline is \'%s\'\n' % logline)
-
          addnes(type, sys.argv[i], logline, matches)
 
       print('END %d' % (offset_sec * 1000000000 + offset_nsec));

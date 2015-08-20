@@ -77,6 +77,7 @@ void simplefu_up(simplefu who) {
 #define QUEUES 3
 #define EVENTS 4
 #define NOTES 7
+#define AGENTS 8
 
 #define TRACEBUFFERSIZE (16 * 1024 * 1024)
 
@@ -117,6 +118,10 @@ static int nr_events = 0;
 static char notes_array[1024][128];
 static int nr_notes = 0;
 
+// 100 notes of 1000 agents each
+static char agents_array[1024][128];
+static int nr_agents = 0;
+
 static _u64 timestamp_timeofday_nsec(void) {
     struct timeval mytime;
 
@@ -139,7 +144,7 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     int entry;
     char fullentry[1024];
 
-    char name[256];
+    char name[1024];
     int value = 0;
 
     char text_in1[1024];
@@ -151,6 +156,8 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
         (strncmp(text_in, "@T-", 3) == 0) ||
         (strncmp(text_in, "@I+", 3) == 0) ||
         (strncmp(text_in, "@I-", 3) == 0) ||
+        (strncmp(text_in, "@A+", 3) == 0) ||
+        (strncmp(text_in, "@A-", 3) == 0) ||
         (strncmp(text_in, "@S+", 3) == 0) ||
         (strncmp(text_in, "@E+", 3) == 0)) {
 
@@ -225,15 +232,9 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
         }
 
         // Add the STA or STO entry
-        if (enter_not_exit) {
-            sprintf(fullentry, "STA %d %d %lld\n", TASKS, TASKS * 1000 + entry,
-                    timestamp);
-            fwrite(fullentry, strlen(fullentry), 1, stdout);
-        } else {
-            sprintf(fullentry, "STO %d %d %lld\n", TASKS, TASKS * 1000 + entry,
-                    timestamp);
-            fwrite(fullentry, strlen(fullentry), 1, stdout);
-        }
+        sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
+                TASKS, TASKS * 1000 + entry, timestamp);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
 
         // Add the DSC entry, replace any spaces with commas
         sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text);
@@ -371,15 +372,9 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
         }
 
         // Add the STA or STO entry
-        if (enter_not_exit) {
-            sprintf(fullentry, "STA %d %d %lld\n", ISRS, ISRS * 1000 + entry,
-                    timestamp);
-            fwrite(fullentry, strlen(fullentry), 1, stdout);
-        } else {
-            sprintf(fullentry, "STO %d %d %lld\n", ISRS, ISRS * 1000 + entry,
-                    timestamp);
-            fwrite(fullentry, strlen(fullentry), 1, stdout);
-        }
+        sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
+                ISRS, ISRS * 1000 + entry, timestamp);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
 
         // Add the DSC entry, replace any spaces with commas
         sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text);
@@ -462,19 +457,103 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     }
 
     /*
+     * AGENTS entry
+     *
+     */
+    if ((strncmp(text, "@A+", 3) == 0) || (strncmp(text, "@A-", 3) == 0)) {
+
+        // fprintf(stderr, "text=\"%s\"\n", text);
+
+        int enter_not_exit = (strncmp(text + 2, "+", 1) == 0);
+
+        text += 3;
+        // if the entry has not been seen before, add a new entry for it and
+        // issue a NAM
+        entry = -1;
+        for (i = 0; i < nr_agents; i++) {
+            char *pos;
+            char comparestr[1024];
+
+            strcpy(comparestr, text);
+            /*
+             * the portion of the text before the first space in the text
+             * is considered the unique part of the text
+             */
+            pos = strchr(comparestr, ' ');
+            if (pos) {
+                *pos = 0;
+            }
+
+            if (strcmp(agents_array[i], comparestr) == 0) {
+                // found the entry
+                entry = i;
+                break;
+            }
+        }
+
+        // Do we need to add the entry?
+        if (entry == -1) {
+            int len;
+            char *pos;
+
+            pos = strchr(text, ' ');
+            if (pos)
+                len = pos - text;
+            else
+                len = strlen(text);
+
+            strncpy(agents_array[nr_agents], text, len);
+            entry = nr_agents;
+            nr_agents++;
+
+            // Since we added a new entry we need to create a NAM, with only the
+            // first part of the text
+            sprintf(fullentry, "NAM %d %d %s\n", AGENTS, AGENTS * 1000 + entry,
+                    agents_array[entry]);
+            fwrite(fullentry, strlen(fullentry), 1, stdout);
+        }
+
+        // Add the STA or STO entry
+        sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
+                AGENTS, AGENTS * 1000 + entry, timestamp);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        // Add the DSC entry, replace any spaces with commas
+        sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text);
+        for (i = 8; i < (int)strlen(fullentry); i++) {
+            if (fullentry[i] == 32)
+                fullentry[i] = 0x2c;
+        }
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        return;
+    }
+
+    /*
      * QUEUES entry
      *
      * if text is of the form name~value then interpret this as a queue and add
-     *a queue entry for it.
+     * a queue entry for it.
      * check whether '~' exists and pull out the name and value
      */
+
     name[0] = 0;
-    for (i = 0; i < (int)strlen(text); i++) {
-        if (text[i] == 126) {
-            strncpy(name, text, i);
-            name[i] = 0;
-            value = atoi(text + i + 1);
-            text[i] = 32; // create split marker
+    if (strchr(text, '~')) {
+
+        for (i = 0; i < (int)strlen(text); i++) {
+            if (text[i] == 32)
+                break;
+            if (text[i] == 126) {
+
+                // fprintf(stderr, "text1=\"%s\"\n", text);
+
+                strncpy(name, text, i);
+                name[i] = 0;
+                value = atoi(text + i + 1);
+                text[i] = 32; // create split marker
+
+                // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
+            }
         }
     }
 
