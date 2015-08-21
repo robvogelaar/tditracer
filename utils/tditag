@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+red = 0
+blue = 1
+yellow = 2
+pink = 3
+purple = 4
+beige = 5
+lightblue = 6
+green = 7
+
+def main():
+
+   if len(sys.argv) >= 3:
+
+      matches = []
+      colors = []
+      i = 0
+      for match in sys.argv[2:]:
+         matches.append(match)
+         colors.append(i)
+         i = (i + 1) & 7
+
+      f = open(sys.argv[1])
+
+      # pass 1
+
+      nam = False;
+      last_tstamp = 0;
+      first = True;
+      nams = []
+
+      agentnams = []
+
+      for line in f:
+
+         if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
+            last_tstamp = line.split()[3]
+
+         if line.startswith('OCC') or line.startswith('STA'):
+
+            line = f.next()
+            dscwords = line.split()
+
+            i = 0
+            for match in matches:
+
+               if re.compile(match).findall(dscwords[3]):
+
+                  if not match in nams:
+                     #agentnams.append('NAM 8 %d %s' (% (80000 + i), match))
+                     agentnams.append("NAM 8 %d %s" % ( (80000 + i), match))
+                     nams.append(match)
+
+               i = i + 1
+
+
+      f.seek(0)
+
+
+      # pass 2
+      nam = False;
+      last_tstamp = 0;
+      first = True;
+      nams = []
+      printagentnams = True
+
+      for line in f:
+
+         if printagentnams:
+            if line.startswith('NAM'):
+
+               for match in matches:
+                  for agentnam in agentnams:
+                     if match == agentnam.split()[3]:
+                        print agentnam
+
+               printagentnams = False
+
+         print line,
+
+         if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
+            last_tstamp = line.split()[3]
+
+         if line.startswith('OCC') or line.startswith('STA'):
+
+            line = f.next()
+            print line,
+            dscwords = line.split()
+            
+            i = 0
+            for match in matches:
+
+               if re.compile(match).findall(dscwords[3]):
+
+                  if first:
+                     first = False
+                     print 'STA 8 %d' % (80000 + i), last_tstamp
+                     print 'DSC 0 0', match
+                     print 'DSC 3 0', 1 + colors[i]
+                  else:
+                     print 'STO 8 %d' % (80000 + i), last_tstamp
+                     print 'STA 8 %d' % (80000 + i), last_tstamp
+                     print 'DSC 0 0', match
+                     print 'DSC 3 0', 1 + colors[i]
+
+                  colors[i] = colors[i] ^ 7
+
+               i = i + 1
+
+      f.close()
+
+   else:
+      print("Usage: %s tdifile pattern1 [pattern2]..." % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

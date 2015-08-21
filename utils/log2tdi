@@ -26,7 +26,7 @@ def addnes (type, logfilename, logline, matches):
       #sys.stderr.write('match:\'%s\'\n' % match)
       prog = re.compile('.*' + match + '.*')
       if prog.match(logline):
-         name = match;
+         name = match
 
    if name:
       if name not in names:
@@ -42,7 +42,7 @@ def addnes (type, logfilename, logline, matches):
             t = datetime.strptime(tstamp[0], '%y%m%d-%H:%M:%S.%f')
             sec = int((t - datetime(1970, 1, 1)).total_seconds())
             nsec = int(t.microsecond * 1000)
-            stamp = long(sec * 1000000000 + nsec);
+            stamp = long(sec * 1000000000 + nsec)
 
       else:
          #20150610 22:41:36.082
@@ -52,40 +52,50 @@ def addnes (type, logfilename, logline, matches):
                t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
                sec = int((t - datetime(1970, 1, 1)).total_seconds())
                nsec = int(t.microsecond * 1000)
-               stamp = long(sec * 1000000000 + nsec);
+               stamp = long(sec * 1000000000 + nsec)
 
          else:
-            #2015-06-10T20:04:27.941
-            tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
+            #DAWN 08-20T22:16:45.281Z
+            tstamp = re.findall("DAWN \d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
             if tstamp:
                if tstamp[0]:
-                  t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+                  t = datetime.strptime('2015-' + tstamp[0][5:], '%Y-%m-%dT%H:%M:%S.%f')
                   sec = int((t - datetime(1970, 1, 1)).total_seconds())
                   nsec = int(t.microsecond * 1000)
-                  stamp = long(sec * 1000000000 + nsec);
+                  stamp = long(sec * 1000000000 + nsec)
 
             else:
-               # 1434754719      168720
-               tstamp = re.findall("\d{8,}\s*\d+", logline)
+               #2015-06-10T20:04:27.941
+               tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
                if tstamp:
                   if tstamp[0]:
-                     pat = re.compile("\s*")
-                     fields = pat.split(tstamp[0])
-                     sec = int(fields[0])
-                     nsec = int(fields[1]) * 1000
-                     stamp = long(sec * 1000000000 + nsec);
-                     #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
+                     t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+                     sec = int((t - datetime(1970, 1, 1)).total_seconds())
+                     nsec = int(t.microsecond * 1000)
+                     stamp = long(sec * 1000000000 + nsec)
+
+               else:
+                  # 1434754719      168720
+                  tstamp = re.findall("\d{8,}\s*\d+", logline)
+                  if tstamp:
+                     if tstamp[0]:
+                        pat = re.compile("\s*")
+                        fields = pat.split(tstamp[0])
+                        sec = int(fields[0])
+                        nsec = int(fields[1]) * 1000
+                        stamp = long(sec * 1000000000 + nsec)
+                        #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
       if (tstamp):
          if (offset_sec == 0):
-            offset_sec = sec;
-            offset_nsec = nsec;
+            offset_sec = sec
+            offset_nsec = nsec
 
          if prev_stamp:
             if stamp < prev_stamp:
                sys.stderr.write('stamp < prev_stamp\n')
 
-         prev_stamp = stamp
+         prev_stamp = long(stamp)
 
          print('OCC %d %d %d' %(type, (type * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
          print('DSC 0 0 %s' % logline.replace(" ", "_").replace("\t", "_"))

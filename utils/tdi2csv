@@ -301,7 +301,7 @@ def main():
 
    else:
 
-      print("Usage: %s tdifile pattern1 pattern2 ..." % sys.argv[0])
+      print("Usage: %s tdifile pattern1 pattern2 [pattern3]..." % sys.argv[0])
 
 
 if __name__ == "__main__":
