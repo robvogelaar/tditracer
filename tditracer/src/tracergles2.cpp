@@ -378,6 +378,12 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
 
     if (glesrecording)
         tditrace_ex("@I-glTexImage2D()");
+
+    GLenum err = GL_NO_ERROR;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        tditrace_ex("@S+GLERROR 0x%x", err);
+    }
+
 }
 
 extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,

@@ -287,3 +287,15 @@ typedef float GLclampf;
                ? "GL_DEPTH_ATTACHMENT"                                         \
                : attachment == GL_STENCIL_ATTACHMENT ? "GL_STENCIL_ATTACHMENT" \
                                                      : "???")
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+GLenum glGetError(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#define GL_NO_ERROR        0

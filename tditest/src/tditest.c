@@ -47,10 +47,15 @@ int main(int argc, char **argv) {
         // will all appear in the same "HELLO" , "NOTES"-timeline
         if (tditrace)
             tditrace("HELLO");
+        printf("HELLO\n");
+
         if (tditrace)
             tditrace("HELLO %d", i);
+        printf("HELLO %d\n", i);
+
         if (tditrace)
             tditrace("HELLO %d %s %s", i, "yes", "no");
+        printf("HELLO %d %s %s\n", i, "yes", "no");
 
         // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
         if (tditrace)

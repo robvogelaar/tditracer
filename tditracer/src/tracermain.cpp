@@ -43,8 +43,27 @@ int framestorecord;
 bool texturerecording;
 bool renderbufferrecording;
 bool shaderrecording;
+
 bool libcrecording;
+bool libcopenrecording;
+bool libcfopenrecording;
+bool libcfdopenrecording;
+bool libcfreopenrecording;
+bool libcreadrecording;
+bool libcwriterecording;
+bool libcsocketrecording;
+bool libcsendrecording;
+bool libcsendtorecording;
+bool libcsendmsgrecording;
+bool libcsendmmsgrecording;
+bool libcrecvrecording;
+bool libcrecvfromrecording;
+bool libcrecvmsgrecording;
+bool libcrecvmmsgrecording;
+bool libcselectrecording;
+bool libcpollrecording;
 bool libcioctlrecording;
+
 bool pthreadrecording;
 bool eglrecording;
 bool glesrecording;
@@ -152,7 +171,7 @@ static void init(void) {
     static bool inited = false;
     if (!inited) {
 
-        #if 0
+#if 0
         static struct sigaction sVal;
 
         sVal.sa_flags = SA_SIGINFO;
@@ -162,18 +181,52 @@ static void init(void) {
         // Register for SIGQUIT
         sigaction(SIGQUIT, &sVal, NULL);
 
-        #endif
-
-        if (getenv("LIBC")) {
-            libcrecording = (atoi(getenv("LIBC")) >= 1);
+#endif
+        char* env;
+        if (env = getenv("LIBC")) {
+            libcrecording = (atoi(env) >= 1);
+            libcopenrecording = true;
+            libcfopenrecording = true;
+            libcfdopenrecording = true;
+            libcfreopenrecording = true;
+            libcreadrecording = true;
+            libcwriterecording = true;
+            libcsocketrecording = true;
+            libcsendrecording = true;
+            libcsendtorecording = true;
+            libcsendmsgrecording = true;
+            libcsendmmsgrecording = true;
+            libcrecvrecording = true;
+            libcrecvfromrecording = true;
+            libcrecvmsgrecording = true;
+            libcrecvmmsgrecording = true;
+            libcselectrecording = true;
+            libcpollrecording = true;
             libcioctlrecording = true;
+
         } else {
             libcrecording = false;
             libcioctlrecording = false;
         }
 
-        if (getenv("LIBCIOCTL")) {
-            libcioctlrecording = (atoi(getenv("LIBCIOCTL")) >= 1);
+        if (env = getenv("LIBCOPEN")) {
+            libcopenrecording = libcfopenrecording = libcfdopenrecording = libcfreopenrecording = (atoi(env) >= 1);
+        }
+        if (env = getenv("LIBCREAD")) {
+            libcreadrecording = (atoi(env) >= 1);
+        }
+        if (env = getenv("LIBCWRITE")) {
+            libcwriterecording = (atoi(env) >= 1);
+        }
+        if (env = getenv("LIBCSOCKET")) {
+            libcsocketrecording = (atoi(env) >= 1);
+            libcsendrecording = libcsendtorecording = libcsendmsgrecording = libcsendmmsgrecording = (atoi(env) >= 1);
+            libcrecvrecording = libcrecvfromrecording = libcrecvmsgrecording = libcrecvmmsgrecording = (atoi(env) >= 1);
+            libcselectrecording = (atoi(env) >= 1);
+            libcpollrecording = (atoi(env) >= 1);
+        }
+        if (env = getenv("LIBCIOCTL")) {
+            libcioctlrecording = (atoi(env) >= 1);
         }
 
         if (getenv("PTHREAD")) {
@@ -217,10 +270,12 @@ static void init(void) {
             texturerecording = true;
         }
 
-        printf("tditracer: init[%d], libc:%s, pthread:%s, shaders:%s, textures:%s, "
-               "renderbuffers:%s, frames:%d\n", getpid(),
-               libcrecording ? "yes" : "no", pthreadrecording ? "yes" : "no",
-               shaderrecording ? "yes" : "no", texturerecording ? "yes" : "no",
+        printf("tditracer: init[%d], libc:%s, pthread:%s, shaders:%s, "
+               "textures:%s, "
+               "renderbuffers:%s, frames:%d\n",
+               getpid(), libcrecording ? "yes" : "no",
+               pthreadrecording ? "yes" : "no", shaderrecording ? "yes" : "no",
+               texturerecording ? "yes" : "no",
                renderbufferrecording ? "yes" : "no", framestorecord);
 
         inited = true;
