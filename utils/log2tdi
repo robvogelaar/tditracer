@@ -3,7 +3,6 @@
 import sys
 import re
 from datetime import datetime
-from datetime import timedelta
 
 SEMA = 2
 EVENT = 4
@@ -94,11 +93,13 @@ def addnes (type, logfilename, logline, matches):
                      tstamp = re.findall("\d{2}:\d{2}:\d{2}.\d+", logline)
                      if tstamp:
                         if tstamp[0]:
-                           t = datetime.strptime('2015-08-25-' + tstamp[0], '%Y-%m-%d-%H:%M:%S.%f')
+
+                           t = datetime.strptime('2015' + '-' + 
+                                                  str(datetime.now().month) + '-' +
+                                                  str(datetime.now().day) + '-' +
+                                                  tstamp[0], '%Y-%m-%d-%H:%M:%S.%f')
 
                            sec = int((t - datetime(1970, 1, 1)).total_seconds())
-                           sec = sec - 7200
-
                            nsec = int(t.microsecond * 1000)
                            stamp = long(sec * 1000000000 + nsec)
 
@@ -162,15 +163,15 @@ def main():
 
       f.close()
 
-      print('TIME 1000000000')
-      print('SPEED 1000000000')
+      print 'TIME 1000000000'
+      print 'SPEED 1000000000'
 
       for logline in loglinematches:
 
          #sys.stderr.write('logline is \'%s\'\n' % logline)
          addnes(type, sys.argv[i], logline, matches)
 
-      print('END %d' % (offset_sec * 1000000000 + offset_nsec));
+      print 'END %d UTC' % (offset_sec * 1000000000 + offset_nsec), datetime.utcfromtimestamp(offset_sec).strftime('%Y-%m-%d %H:%M:%S')
 
    else:
 

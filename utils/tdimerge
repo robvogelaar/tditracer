@@ -2,6 +2,7 @@
 
 import sys
 import re
+from datetime import datetime
 
 TASKS = 0
 ISRS = 1
@@ -24,18 +25,12 @@ evts = []
 
 offset_nsec = 0
 first_tstamp = 0
+ref_offset = 0
 
-def addtask(evt):
+def addtask(evtwords):
 
    global tasksnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in tasksnames:
       tasksnames.append(evtwords[3])
@@ -44,17 +39,10 @@ def addtask(evt):
    print(evtwords[2] + ' ' + str(TASKS) + ' %d %d' %((TASKS * 1000 + tasksnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addisr(evt):
+def addisr(evtwords):
 
    global isrsnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in isrsnames:
       isrsnames.append(evtwords[3])
@@ -63,17 +51,10 @@ def addisr(evt):
    print(evtwords[2] + ' ' + str(ISRS) + ' %d %d' %((ISRS * 1000 + isrsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addagent(evt):
+def addagent(evtwords):
 
    global agentsnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in agentsnames:
 
@@ -83,17 +64,10 @@ def addagent(evt):
    print(evtwords[2] + ' ' + str(AGENTS) + ' %d %d' %((AGENTS * 1000 + agentsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addevent(evt):
+def addevent(evtwords):
 
    global eventsnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in eventsnames:
       eventsnames.append(evtwords[3])
@@ -102,17 +76,10 @@ def addevent(evt):
    print('OCC ' + str(EVENTS) + ' %d %d' %((EVENTS * 1000 + eventsnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addsema(evt):
+def addsema(evtwords):
 
    global semasnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in semasnames:
       semasnames.append(evtwords[3])
@@ -121,17 +88,10 @@ def addsema(evt):
    print('OCC ' + str(SEMAS) + ' %d %d' %((SEMAS * 1000 + semasnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addnote(evt):
+def addnote(evtwords):
 
    global notesnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in notesnames:
       notesnames.append(evtwords[3])
@@ -140,17 +100,10 @@ def addnote(evt):
    print('OCC ' + str(NOTES) + ' %d %d' %((NOTES * 1000 + notesnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp))
    print('DSC 0 0 %s' % evtwords[4])
 
-def addqueue(evt):
+def addqueue(evtwords):
 
    global queuesnames
    global offset_nsec
-
-   evtwords = evt.split()
-
-   if offset_nsec == 0:
-      offset_nsec = int(evtwords[0])
-   elif int(evtwords[0]) < offset_nsec:
-      offset_nsec = int(evtwords[0])
 
    if evtwords[3] not in queuesnames:
       queuesnames.append(evtwords[3])
@@ -163,12 +116,26 @@ def build(tdifilename):
    global nams
    global evts
    global first_tstamp
+   global ref_offset
 
    f = open(tdifilename)
 
    for line in f:
       if line.startswith('END'):
-         offset = int(line[4:])
+         offset = int(line.split()[1])
+
+   if ref_offset == 0:
+      ref_offset = offset
+   else:
+      if abs(ref_offset - offset) > (1800 * 1000000000):
+         #sys.stderr.write('abs diff is %d %d %d\n' % (ref_offset, offset, abs(ref_offset - offset)))
+         #sys.stderr.write('hours %d\n' % (1 + abs(ref_offset - offset) / 3600000000000))
+
+         if offset > ref_offset:
+            offset = offset - (3600000000000 * (1 + (abs(ref_offset - offset) / 3600000000000)))
+
+         else:
+            offset = offset + (3600000000000 * (1 + (abs(ref_offset - offset) / 3600000000000)))
 
    f.seek(0)
 
@@ -267,12 +234,13 @@ def build(tdifilename):
 
 def sortby(x):
     try:
-        return int(x.split(' ')[0])
+        return int(x.split(' ', 1)[0])
     except ValueError:
         return float('inf')
 
 def main():
    global first_tstamp
+   global offset_nsec
 
    if len(sys.argv) >= 2:
 
@@ -289,28 +257,31 @@ def main():
       for evt in evts:
          evtwords = evt.split()
 
+         if offset_nsec == 0:
+            offset_nsec = int(evtwords[0])
+
          if int(evtwords[1]) == NOTES:
-            addnote(evt)
+            addnote(evtwords)
 
          elif int(evtwords[1]) == ISRS:
-            addisr(evt)
+            addisr(evtwords)
 
          elif int(evtwords[1]) == TASKS:
-            addtask(evt)
+            addtask(evtwords)
 
          elif int(evtwords[1]) == AGENTS:
-            addagent(evt)
+            addagent(evtwords)
 
          elif int(evtwords[1]) == EVENTS:
-            addevent(evt)
+            addevent(evtwords)
 
          elif int(evtwords[1]) == SEMAS:
-            addsema(evt)
+            addsema(evtwords)
 
          elif int(evtwords[1]) == QUEUES:
-            addqueue(evt)
+            addqueue(evtwords)
 
-      print('END %d' % (offset_nsec));
+      print 'END %d UTC' % (offset_nsec), datetime.utcfromtimestamp(offset_nsec / 1000000000).strftime('%Y-%m-%d %H:%M:%S')
 
    else:
       print("Usage: %s tdifile1 tdifile2..." % sys.argv[0])

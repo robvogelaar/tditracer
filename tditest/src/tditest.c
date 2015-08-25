@@ -13,6 +13,24 @@ int main(int argc, char **argv) {
     struct timeval mytimeval;
     struct timespec mytimespec;
 
+#if 1
+
+    time_t t;
+    t = time(NULL);
+    printf("Local time and date: %s\n", asctime(localtime(&t)));
+    printf("UTC time and date: %s\n", asctime(gmtime(&t)));
+
+    struct timespec mytime;
+    mytime.tv_nsec = 0;
+    mytime.tv_sec = 0;
+    printf("0 -> time and date: %s\n", ctime((const time_t*)&mytime));
+    printf("0 -> UTC time and date: %s\n", asctime(gmtime((const time_t*)&mytime)));
+
+#endif
+
+time_t mktime(struct tm *tm);
+
+
 #if 0
     for (i = 0; i < 150; i++) {
         gettimeofday(&mytimeval, 0);

@@ -863,7 +863,7 @@ static int do_init(void) {
         return -1;
     }
 
-    (void)ftruncate(fileno(file), TRACEBUFFERSIZE);
+    i = ftruncate(fileno(file), TRACEBUFFERSIZE);
 
     gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fileno(file), 0);
@@ -1224,7 +1224,6 @@ void tditrace_exit(int argc, char *argv[]) {
 
     fprintf(stdout, "TIME %d\n", 1000000000);
     fprintf(stdout, "SPEED %d\n", 1000000000);
-    fprintf(stdout, "DNM 0 0 >\n");
 
     while (1) {
 
@@ -1285,7 +1284,12 @@ void tditrace_exit(int argc, char *argv[]) {
     addentry(stdout, "TDITRACE_EXIT\0", last_timestamp + 100 * 1000000, "", 0,
              0);
 
-    fprintf(stdout, "END %lld\n", abs_timeofday);
+    struct timespec atime;
+
+    atime.tv_sec = abs_timeofday / 1000000000;
+    atime.tv_nsec = abs_timeofday - atime.tv_sec * 1000000000;
+
+    fprintf(stdout, "END %lld UTC %s", abs_timeofday, asctime(gmtime((const time_t*)&atime)));
 }
 
 void tditrace(const char *format, ...) {
