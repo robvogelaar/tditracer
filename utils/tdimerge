@@ -111,6 +111,11 @@ def addqueue(evtwords):
 
    print(evtwords[2] + ' ' + str(QUEUES) + ' %d %d %s' %((QUEUES * 1000 + queuesnames.index(evtwords[3])), int(evtwords[0]) - offset_nsec + first_tstamp, evtwords[4]))
 
+
+def roundToNearest(number, multiple):
+   half = multiple / 2;
+   return number + half - (number + half) % multiple;
+
 def build(tdifilename):
 
    global nams
@@ -124,18 +129,17 @@ def build(tdifilename):
       if line.startswith('END'):
          offset = int(line.split()[1])
 
-   if ref_offset == 0:
-      ref_offset = offset
-   else:
-      if abs(ref_offset - offset) > (1800 * 1000000000):
-         #sys.stderr.write('abs diff is %d %d %d\n' % (ref_offset, offset, abs(ref_offset - offset)))
-         #sys.stderr.write('hours %d\n' % (1 + abs(ref_offset - offset) / 3600000000000))
-
-         if offset > ref_offset:
-            offset = offset - (3600000000000 * (1 + (abs(ref_offset - offset) / 3600000000000)))
-
+         if ref_offset == 0:
+            ref_offset = offset
          else:
-            offset = offset + (3600000000000 * (1 + (abs(ref_offset - offset) / 3600000000000)))
+            hours = roundToNearest(abs(ref_offset - offset), 3600000000000) / 3600000000000
+            sys.stderr.write('abs is %d, hours is %d\n' % (abs(ref_offset - offset), hours))
+
+            if offset > ref_offset:
+               offset = offset - (3600000000000 * hours)
+
+            else:
+               offset = offset + (3600000000000 * hours)
 
    f.seek(0)
 

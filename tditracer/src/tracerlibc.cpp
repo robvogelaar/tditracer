@@ -213,7 +213,7 @@ extern "C" FILE *fdopen(int fd, const char *mode) {
         }
     }
 
-    if (libcrecording  && libcfdopenrecording) {
+    if (libcrecording && libcfdopenrecording) {
         tditrace_ex("@A+fdopen() %d", fd);
     }
 
@@ -828,9 +828,226 @@ extern "C" void *malloc(size_t size) {
     void *ret = __malloc(size);
 
     if (libcrecording) {
-        tditrace_ex("@A-malloc()");
+        tditrace_ex("@A-malloc() =0x%x", ret);
     }
 
     return ret;
 }
+
+extern "C" void *calloc(size_t nmemb, size_t size) {
+    static void *(*__calloc)(size_t, size_t) = NULL;
+
+    if (__calloc == NULL) {
+        __calloc = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
+        if (NULL == __calloc) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@A+calloc() %d %d", nmemb, size);
+    }
+
+    void *ret = __calloc(nmemb, size);
+
+    if (libcrecording) {
+        tditrace_ex("@A-calloc() =%x", ret);
+    }
+
+    return ret;
+}
+
+extern "C" void free(void *ptr) {
+    static void (*__free)(void *) = NULL;
+
+    if (__free == NULL) {
+        __free = (void (*)(void *))dlsym(RTLD_NEXT, "free");
+        if (NULL == __free) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        tditrace_ex("@A+free() 0x%x", ptr);
+    }
+
+    __free(ptr);
+
+    if (libcrecording) {
+        tditrace_ex("@A-free()");
+    }
+}
 #endif
+
+extern "C" int brk(void *__addr) {
+    static int (*__brk)(void *) = NULL;
+    if (__brk == NULL) {
+        __brk = (int (*)(void *))dlsym(RTLD_NEXT, "brk");
+        if (__brk == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+brk()");
+    int ret = __brk(__addr);
+    tditrace_ex("@A-brk()");
+    return ret;
+}
+
+extern "C" void *sbrk(intptr_t __delta) {
+    static void *(*__sbrk)(intptr_t) = NULL;
+    if (__sbrk == NULL) {
+        __sbrk = (void *(*)(intptr_t))dlsym(RTLD_NEXT, "sbrk");
+        if (__sbrk == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+sbrk()");
+    void *ret = __sbrk(__delta);
+    tditrace_ex("@A-sbrk()");
+    return ret;
+}
+
+extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
+                      int __fd, __off_t __offset) {
+    static void *(*__mmap)(void *, size_t, int, int, int, __off_t) = NULL;
+    if (__mmap == NULL) {
+        __mmap = (void *(*)(void *, size_t, int, int, int, __off_t))dlsym(
+            RTLD_NEXT, "mmap");
+        if (__mmap == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+mmap()");
+    void *ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
+    tditrace_ex("@A-mmap()");
+    return ret;
+}
+
+extern "C" int munmap(void *__addr, size_t __len) {
+    static int (*__munmap)(void *, size_t) = NULL;
+    if (__munmap == NULL) {
+        __munmap = (int (*)(void *, size_t))dlsym(RTLD_NEXT, "munmap");
+        if (__munmap == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+munmap()");
+    int ret = __munmap(__addr, __len);
+    tditrace_ex("@A-munmap()");
+    return ret;
+}
+
+extern "C" void *pvalloc(size_t __size) {
+    static void *(*__pvalloc)(size_t) = NULL;
+    if (__pvalloc == NULL) {
+        __pvalloc = (void *(*)(size_t))dlsym(RTLD_NEXT, "pvalloc");
+        if (__pvalloc == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+pvalloc()");
+    void *ret = __pvalloc(__size);
+    tditrace_ex("@A-pvalloc()");
+    return ret;
+}
+
+extern "C" void *aligned_alloc(size_t __alignment, size_t __size) {
+    static void *(*__aligned_alloc)(size_t, size_t) = NULL;
+    if (__aligned_alloc == NULL) {
+        __aligned_alloc =
+            (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "aligned_alloc");
+        if (__aligned_alloc == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+aligned_alloc()");
+    void *ret = __aligned_alloc(__alignment, __size);
+    tditrace_ex("@A-aligned_alloc()");
+    return ret;
+}
+
+extern "C" void *valloc(size_t __size) {
+    static void *(*__valloc)(size_t) = NULL;
+    if (__valloc == NULL) {
+        __valloc = (void *(*)(size_t))dlsym(RTLD_NEXT, "valloc");
+        if (__valloc == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+valloc()");
+    void *ret = __valloc(__size);
+    tditrace_ex("@A-valloc()");
+    return ret;
+}
+
+extern "C" void *memalign(size_t __alignment, size_t __size) {
+    static void *(*__memalign)(size_t, size_t) = NULL;
+    if (__memalign == NULL) {
+        __memalign = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "memalign");
+        if (__memalign == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+memalign()");
+    void *ret = __memalign(__alignment, __size);
+    tditrace_ex("@A-memalign()");
+    return ret;
+}
+
+extern "C" int posix_memalign(void **__memptr, size_t __alignment,
+                              size_t __size) {
+    static int (*__posix_memalign)(void **, size_t, size_t) = NULL;
+    if (__posix_memalign == NULL) {
+        __posix_memalign = (int (*)(void **, size_t, size_t))dlsym(
+            RTLD_NEXT, "posix_memalign");
+        if (__posix_memalign == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+posix_memalign()");
+    int ret = __posix_memalign(__memptr, __alignment, __size);
+    tditrace_ex("@A-posix_memalign()");
+    return ret;
+}
+
+extern "C" int mprotect(void *__addr, size_t __len, int __prot) {
+    static int (*__mprotect)(void *, size_t, int) = NULL;
+    if (__mprotect == NULL) {
+        __mprotect = (int (*)(void *, size_t, int))dlsym(RTLD_NEXT, "mprotect");
+        if (__mprotect == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+mprotect()");
+    int ret = __mprotect(__addr, __len, __prot);
+    tditrace_ex("@A-mprotect()");
+    return ret;
+}
+
+extern "C" int msync(void *__addr, size_t __len, int __flags) {
+    static int (*__msync)(void *, size_t, int) = NULL;
+    if (__msync == NULL) {
+        __msync = (int (*)(void *, size_t, int))dlsym(RTLD_NEXT, "msync");
+        if (__msync == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+msync()");
+    int ret = __msync(__addr, __len, __flags);
+    tditrace_ex("@A-msync()");
+    return ret;
+}
+
+extern "C" int madvise(void *__addr, size_t __len, int __advice) {
+    static int (*__madvise)(void *, size_t, int) = NULL;
+    if (__madvise == NULL) {
+        __madvise = (int (*)(void *, size_t, int))dlsym(RTLD_NEXT, "madvise");
+        if (__madvise == NULL) {
+            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+        }
+    }
+    tditrace_ex("@A+madvise()");
+    int ret = __madvise(__addr, __len, __advice);
+    tditrace_ex("@A-madvise()");
+    return ret;
+}

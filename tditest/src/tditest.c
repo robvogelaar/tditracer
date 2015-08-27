@@ -75,6 +75,11 @@ time_t mktime(struct tm *tm);
             tditrace("HELLO %d %s %s", i, "yes", "no");
         printf("HELLO %d %s %s\n", i, "yes", "no");
 
+        printf("malloc(1 * 1024)\n");
+        
+        char*d = malloc(1 * 1024);
+        d[0] = 0;
+
         // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
         if (tditrace)
             tditrace("HELLO%d", i);
