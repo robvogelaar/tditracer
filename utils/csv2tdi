@@ -4,20 +4,14 @@ import sys
 import re
 from datetime import datetime
 
-SEMA = 2
 QUEUE = 3
-EVENT = 4
-NOTE = 7
+
 
 names = []
 offset_sec = 0
 offset_nsec = 0
 
 prev_stamp = 0
-
-value = 0
-prev_value = 0
-
 
 def addnes (type, logfilename, logline, matches):
 
@@ -26,10 +20,6 @@ def addnes (type, logfilename, logline, matches):
    global names
    global offset_sec
    global offset_nsec
-
-   # brk
-   global value
-   global prev_value
 
    for match in matches:
       #sys.stderr.write('match:\'%s\'\n' % match)
@@ -126,49 +116,22 @@ def addnes (type, logfilename, logline, matches):
          print('OCC %d %d %d' %(type, (type * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
          print('DSC 0 0 %s' % logline.replace(" ", "_").replace("\t", "_"))
 
-
-
-         # brk
-         if re.search(' brk.*= 0x', logline):
-            #sys.stderr.write('brk logline: \'%s\'\n' % logline)
-            value = int(re.search(r'0x[0-9a-f]+', logline).group(0),16)
-            sys.stderr.write('brk %s\n' % value)
-
-            if (value >= prev_value):
-               print 'STA %d %d %d %d' %(QUEUE, QUEUE * 1000 + 0, (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec), value - prev_value)
-            else:
-               print 'STO %d %d %d %d' %(QUEUE, QUEUE * 1000 + 0, (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec), prev_value - value)
-            #sprintf(fullentry, "STO %d %d %d %d\n", QUEUE, QUEUE * 1000 + 0, sec * 1000000000, 100
-            prev_value = value
-
-
-
       else:
          sys.stderr.write('no timestamp found, skipping logline: \'%s\'\n' % logline)
 
 
 def main():
 
+   offset_sec = 0
+
    if len(sys.argv) >= 2:
 
-      i = 1;
-      type = SEMA;
-      if (sys.argv[1] == '-n'):
-         i = 2;
-         type = NOTE;
-      elif (sys.argv[1] == '-e'):
-         i = 2;
-         type = EVENT;
-      elif (sys.argv[1] == '-s'):
-         i = 2;
-         type = SEMA;
-
       matches = []
-      if len(sys.argv) == i + 1:
+      if len(sys.argv) == 2:
          matches = ['.+']
          totalmatch = '.+'
       else:
-         for arg in sys.argv[(i + 1):]:
+         for arg in sys.argv[2:]:
             matches.append(arg)
 
          totalmatch = ''
@@ -178,30 +141,46 @@ def main():
          totalmatch = totalmatch[:-1]
 
       #sys.stderr.write('totalmatch:\'%s\'\n' % totalmatch)
-      
+
       loglinematches = []
-
-      f = open(sys.argv[i])
-      for line in f:
-         m = re.match(totalmatch, line)
-         if m:
-            loglinematches.append(m.group())
-
-      f.close()
 
       print 'TIME 1000000000'
       print 'SPEED 1000000000'
 
-      for logline in loglinematches:
 
-         #sys.stderr.write('logline is \'%s\'\n' % logline)
-         addnes(type, sys.argv[i], logline, matches)
+      print('NAM %d %d %s' %(QUEUE, QUEUE * 1000, '[' + sys.argv[1] + ']' ))
 
-      print 'END %d UTC' % (offset_sec * 1000000000 + offset_nsec), datetime.utcfromtimestamp(offset_sec).strftime('%Y-%m-%d %H:%M:%S')
+      prev_value = 0
+
+      f = open(sys.argv[1])
+      for line in f:
+
+         words = line.split(',')
+
+         if re.match(r'\d+', words[0]):
+
+            #print words
+            sec = int(words[0]) / 1000
+
+            if offset_sec == 0:
+               offset_sec = sec
+
+            value = int(re.search(r'\d+', words[1]).group(0))
+
+            if (value >= prev_value):
+               print 'STA %d %d %d %d' %(QUEUE, QUEUE * 1000 + 0, (sec - offset_sec) * 1000000000, value - prev_value)
+            else:
+               print 'STO %d %d %d %d' %(QUEUE, QUEUE * 1000 + 0, (sec - offset_sec) * 1000000000, prev_value - value)
+            #sprintf(fullentry, "STO %d %d %d %d\n", QUEUE, QUEUE * 1000 + 0, sec * 1000000000, 100
+            prev_value = value
+
+      f.close()
+
+      print 'END %d UTC' % (offset_sec * 1000000000), datetime.utcfromtimestamp(offset_sec).strftime('%Y-%m-%d %H:%M:%S')
 
    else:
 
-      print("Usage: %s [-n] [-e] [-s] logfile [regexp1] [regexp2]..." % sys.argv[0])
+      print("Usage: %s csvfile [regexp1] [regexp2]..." % sys.argv[0])
 
 if __name__ == "__main__":
    main()
