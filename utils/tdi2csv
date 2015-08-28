@@ -32,7 +32,7 @@ def build(tdifilename):
 
    for line in f:
       if line.startswith('END'):
-         offset_nsec = int(line[4:])
+         offset_nsec = int(line.split()[1])
 
    f.seek(0)
 
