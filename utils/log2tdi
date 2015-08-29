@@ -10,6 +10,7 @@ EVENT = 4
 NOTE = 7
 
 names = []
+names_counts = []
 offset_sec = 0
 offset_nsec = 0
 
@@ -42,6 +43,9 @@ def addnes (type, logfilename, logline, matches):
       if name not in names:
          names.append(name)
          print('NAM %d %d %s' %(type, (type * 1000 + names.index(name)), '[' + logfilename + ']' + name.replace(' ', '_')))
+
+         names_counts.append(0)
+         names_counts[names.index(name)] = 0
 
       #attempt to detect multiple timestamp formats
 
@@ -123,16 +127,17 @@ def addnes (type, logfilename, logline, matches):
 
          prev_stamp = long(stamp)
 
-         print('OCC %d %d %d' %(type, (type * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
-         print('DSC 0 0 %s' % logline.replace(" ", "_").replace("\t", "_"))
+         names_counts[names.index(name)] += 1
 
+         print('OCC %d %d %d' %(type, (type * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
+         print('DSC 0 0 %s#%d,%s' % (name, names_counts[names.index(name)], logline.replace(" ", "_").replace("\t", "_")))
 
 
          # brk
          if re.search(' brk.*= 0x', logline):
             #sys.stderr.write('brk logline: \'%s\'\n' % logline)
             value = int(re.search(r'0x[0-9a-f]+', logline).group(0),16)
-            sys.stderr.write('brk %s\n' % value)
+            #sys.stderr.write('brk %s\n' % value)
 
             if (value >= prev_value):
                print 'STA %d %d %d %d' %(QUEUE, QUEUE * 1000 + 0, (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec), value - prev_value)
