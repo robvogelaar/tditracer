@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import os
+import subprocess
+
+QUEUE = 3
+
+def main():
+
+   if len(sys.argv) == 2:
+
+      f = open(sys.argv[1])
+
+      skippedfirst = False
+      queue_level = 0
+      prev_queue_level = 0
+      prev_delta = 0
+
+      for line in f:
+         print line,
+
+         if line.startswith('NAM') or line.startswith('STA') or line.startswith('STO'):
+
+            if line.split(' ')[2] == '3000':
+
+               words = line[:-1].split(' ')
+               #print words
+
+               if words[0] == 'NAM':
+                  print 'NAM 3 3100 %s_delta' % words[3]
+
+               elif words[0] == 'STA':
+                  queue_level += int(words[4])
+
+                  if not skippedfirst:
+                     skippedfirst = True
+                  else:
+                     if prev_delta:
+                        print 'STO 3 3100 %s %d' % (words[3], prev_delta)
+                     print 'STA 3 3100 %s %d' % (words[3], int(words[4]))
+                     prev_delta = int(words[4])
+
+               #elif words[0] == 'STO':
+               #   queue_level -= int(words[4])
+               #   print 'STO 3 3100 %s %d' % (words[3], 1)
+
+               prev_queue_level = queue_level
+               #break
+
+
+   else:
+
+      print("Usage: %s tdifile" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

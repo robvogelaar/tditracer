@@ -5,44 +5,43 @@ import re
 import os
 import subprocess
 
+QUEUE = 3
+EVENT = 4
+
 libs = []
 maps = []
 addresses = []
-tags = []
+ratags = []
 addresscounts = []
-results = []
+raresults = []
+ras = []
 
-def getlib(address, tag):
+def getlibandaddr2line(address, tag):
 
-   if not address in addresses:
-      addresses.append(address)
-      addresscounts.append(1)
-      tags.append(tag)
+   result = 'lib?|function?'
+   for map in maps:
+      maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
+      mapareas = maparea.split('-')
 
-      print tag
+      if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16) :
 
-      result = 'lib not found'
-      for map in maps:
-         maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
-         mapareas = maparea.split('-')
+         for lib in libs:
 
-         if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16) :
-            #results.append(address + ', ' + map)
+            #print 'map=', map
+            #print 'basename=', os.path.basename(map.split()[5])
 
-            for lib in libs:
-               if os.path.basename(map.split()[5]) in lib:
-                  
+            if os.path.basename(map.split()[5]) in lib:
+               if 'shared object' in subprocess.check_output('file ' + lib, shell = True):
+
                   cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
-                  result = subprocess.check_output(cmd, shell = True).replace('\n', ' ')
+                  #sys.stderr.write('cmd=%s\n' % cmd)
 
-            break
+                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', ''). split(': ')[1]
+                  return os.path.basename(map.split()[5]) + '|' + addr2line
+                  break
+         break
 
-      results.append(address + ', ' + os.path.basename(map.split()[5]) + ', ' + result)
-
-      #print 'result=', result
-
-   else:
-      addresscounts[addresses.index(address)] += 1
+   return result
 
 
 def sortby(x):
@@ -63,8 +62,12 @@ def main():
 
       f = open(sys.argv[2])
       for line in f:
-         maps.append(line)
+         if '.so' in line:
+            maps.append(line)
       f.close()
+
+      #for map in maps:
+      #   print map,
 
       f = open(sys.argv[1])
 
@@ -79,24 +82,86 @@ def main():
             if line.startswith('OCC'):
                if int(line.split()[3]) > int(sys.argv[4]) * 1000000000:
                   time = True
-
          else:
             if line.startswith('DSC'):
-               result = re.search(r'(f|m,[0-9]+|r,[0-9]+|c,[0-9]+),ra=[0-9a-f]+$', line)
-               if result:
-                  getlib((re.search(r'[0-9a-f]+$', line)).group(), result.group())
+               raresult = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
+               if raresult:
 
-      f.close()
+                  address = (raresult.group().split(',')[0])[3:]
+                  #size = raresult.group().split('sz=')[1]
+                  ratag = line.split(' ')[3][:-1]
+
+                  if not address in addresses:
+                     addresses.append(address)
+                     addresscounts.append(1)
+                     ratags.append(ratag)
+                     addr2line = getlibandaddr2line(address, ratag)
+                     raresults.append(address + '|' + addr2line)
+
+                  else:
+                     addresscounts[addresses.index(address)] += 1
+
+
+      #print results
 
       i = 0
-      for item in results:
-         results[i] = "%s, #%6d, %25s, %s" % (tags[i] , addresscounts[i], results[i].split(',')[1], results[i].split(',')[2])
+      for item in raresults:
+         lib = raresults[i].split('|')[1]
+         line = raresults[i].split('|')[2]
+         text = raresults[i].split('|')[0] + ',' + lib +',' + line.split('at ?')[0].replace(' ', '_')
+         if len(text) > 75:
+            text = text[:73] + '..'
+         ras.append(text)
+         raresults[i] = "%s, #%6d, %s, %s" % (ratags[i] , addresscounts[i], lib, line)
          i+= 1
 
-      results.sort(key = sortby)
+      raresults.sort(key = sortby)
 
-      for result in results:
-         print result
+      for raresult in raresults:
+         sys.stderr.write('%s\n' % raresult)
+
+
+      eventnams = []
+      queuenams = []
+      prev_malloc = []
+      f.seek(0)
+      for line in f:
+
+         if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
+            last_tstamp = line.split()[3]
+
+         if line.startswith('DSC'):
+            print line,
+
+            result = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
+            if result:
+
+               for ra in ras:
+                  if ra.split(',')[0] in result.group():
+
+                     #sys.stderr.write('%s\n' % ra)
+                     malloc = int((result.group().split(',')[1])[3:])
+
+                     if not ra in eventnams:
+                        print 'NAM %d %d %s' % (EVENT, EVENT * 10000 + len(eventnams), ra)
+                        eventnams.append(ra)
+
+                        print 'NAM %d %d %s' % (QUEUE, QUEUE * 11000 + len(queuenams), ra)
+                        queuenams.append(ra)
+
+                        prev_malloc.append(0)
+
+                     print 'OCC ' + str(EVENT) + ' %d %s' %((EVENT * 10000 + queuenams.index(ra), last_tstamp))
+                     print 'DSC 0 0 %d' % malloc
+
+                     if prev_malloc[queuenams.index(ra)]:
+                        print 'STO %d %d %s %d' % (QUEUE, QUEUE * 11000 + queuenams.index(ra), last_tstamp, prev_malloc[queuenams.index(ra)])
+                     print 'STA %d %d %s %d' % (QUEUE, QUEUE * 11000 + queuenams.index(ra), last_tstamp, malloc)
+                     prev_malloc[queuenams.index(ra)] = malloc
+
+         else:
+            print line,
+
 
    else:
 

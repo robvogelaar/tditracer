@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import os
+import subprocess
+
+QUEUE = 3
+
+def main():
+
+   if len(sys.argv) == 4:
+
+      f = open(sys.argv[1])
+
+      for line in f:
+         if line.startswith('END'):
+            endline = line
+
+      f.seek(0)
+      allow = False
+      nams = []
+      queuestas = []
+
+      for line in f:
+
+         if line.startswith('TIME') or line.startswith('SPEED'):
+            print line,
+
+         if line.startswith('NAM'):
+            print line,
+
+         if not allow:
+            if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
+               if int(line.split(' ')[3]) > int(sys.argv[2]) * 1000000000:
+                  allow = True
+
+         else:
+            # cut orphan STO's
+            if line.startswith('STA'):
+               print line,
+               if not line.split(' ')[2] in queuestas:
+                  queuestas.append(line.split(' ')[2])
+
+            elif line.startswith('STO'):
+               if line.split(' ')[2] in queuestas:
+                  print line,
+
+            else:
+               print line,
+
+
+            if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
+
+               if int(line.split(' ')[3]) > int(sys.argv[3]) * 1000000000:
+                  break
+
+      print endline,
+
+   else:
+
+      print("Usage: %s tdifile fromseconds toseconds" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
