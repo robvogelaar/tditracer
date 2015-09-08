@@ -678,7 +678,6 @@ extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
     return ret;
 }
 
-#if 1
 extern "C" int ioctl(int d, int request, ...) {
     static int (*__ioctl)(int d, int request, ...) = NULL;
 
@@ -706,7 +705,6 @@ extern "C" int ioctl(int d, int request, ...) {
 
     return ret;
 }
-#endif
 
 #if 0
 extern "C" void *memcpy(void *dest, const void *src, size_t n) {
@@ -822,18 +820,28 @@ extern "C" void *malloc(size_t size) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+malloc() %d", size);
+
+        if (size >= 1024) {
+            unsigned int ra = 0;
+            #ifdef __mips__
+            asm volatile("move %0, $ra" : "=r"(ra));
+            #endif
+            // tditrace_ex("@A+malloc() %d %p", size, ra);
+            tditrace_ex("m ra=%p,sz=%d", ra, size);
+        }
     }
 
     void *ret = __malloc(size);
 
     if (libcrecording) {
-        tditrace_ex("@A-malloc() =0x%x", ret);
+        // tditrace_ex("@A-malloc() =0x%x", ret);
     }
 
     return ret;
 }
+#endif
 
+#if 0
 extern "C" void *calloc(size_t nmemb, size_t size) {
     static void *(*__calloc)(size_t, size_t) = NULL;
 
@@ -845,18 +853,71 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+calloc() %d %d", nmemb, size);
+
+        if (size >= 1024) {
+            unsigned int ra = 0;
+            #ifdef __mips__
+            asm volatile("move %0, $ra" : "=r"(ra));
+            #endif
+            tditrace_ex("c ra=%p,sz=%d", ra, size);
+        }
+        //tditrace_ex("@A+calloc() %d %d", nmemb, size);
     }
 
     void *ret = __calloc(nmemb, size);
 
     if (libcrecording) {
-        tditrace_ex("@A-calloc() =%x", ret);
+        // tditrace_ex("@A-calloc() =%x", ret);
     }
 
     return ret;
 }
+#endif
 
+#if 1
+void *realloc(void *ptr, size_t size)
+{
+    static void *(*__realloc)(void *, size_t) = NULL;
+
+    if (__realloc == NULL) {
+        __realloc = (void *(*)(void *, size_t))dlsym(RTLD_NEXT, "realloc");
+        if (NULL == __realloc) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (libcrecording) {
+        if (0) { //size >= 1024) {
+            unsigned int ra = 0;
+            #ifdef __mips__
+            asm volatile("move %0, $ra" : "=r"(ra));
+            #endif
+            tditrace_ex("r ra=%p,sz=%d", ra, size);
+        }
+        // tditrace_ex("@A+realloc() %d %p", size, ra);
+    }
+
+    void *ret = __realloc(ptr, size);
+
+    if (libcrecording) {
+        // tditrace_ex("@A-realloc() =0x%x", ret);
+
+        if (1) { //size >= 1024) {
+            unsigned int ra = 0;
+            #ifdef __mips__
+            asm volatile("move %0, $ra" : "=r"(ra));
+            #endif
+            tditrace_ex("r =%x,ra=%p,sz=%d", ret, ra, size);
+        }
+
+
+    }
+
+    return ret;
+}
+#endif
+
+#if 0
 extern "C" void free(void *ptr) {
     static void (*__free)(void *) = NULL;
 
@@ -868,13 +929,19 @@ extern "C" void free(void *ptr) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+free() 0x%x", ptr);
+        unsigned int ra = 0;
+        #ifdef __mips__
+        asm volatile("move %0, $ra" : "=r"(ra));
+        #endif            
+        tditrace_ex("f ra=%p", ra);
+
+        //tditrace_ex("@A+free() 0x%x", ptr);
     }
 
     __free(ptr);
 
     if (libcrecording) {
-        tditrace_ex("@A-free()");
+        //tditrace_ex("@A-free()");
     }
 }
 #endif
@@ -907,6 +974,7 @@ extern "C" void *sbrk(intptr_t __delta) {
     return ret;
 }
 
+#if 0
 extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
                       int __fd, __off_t __offset) {
     static void *(*__mmap)(void *, size_t, int, int, int, __off_t) = NULL;
@@ -936,6 +1004,7 @@ extern "C" int munmap(void *__addr, size_t __len) {
     tditrace_ex("@A-munmap()");
     return ret;
 }
+#endif
 
 extern "C" void *pvalloc(size_t __size) {
     static void *(*__pvalloc)(size_t) = NULL;
@@ -1010,6 +1079,7 @@ extern "C" int posix_memalign(void **__memptr, size_t __alignment,
     return ret;
 }
 
+#if 0
 extern "C" int mprotect(void *__addr, size_t __len, int __prot) {
     static int (*__mprotect)(void *, size_t, int) = NULL;
     if (__mprotect == NULL) {
@@ -1023,6 +1093,7 @@ extern "C" int mprotect(void *__addr, size_t __len, int __prot) {
     tditrace_ex("@A-mprotect()");
     return ret;
 }
+#endif
 
 extern "C" int msync(void *__addr, size_t __len, int __flags) {
     static int (*__msync)(void *, size_t, int) = NULL;
@@ -1038,6 +1109,7 @@ extern "C" int msync(void *__addr, size_t __len, int __flags) {
     return ret;
 }
 
+#if 0
 extern "C" int madvise(void *__addr, size_t __len, int __advice) {
     static int (*__madvise)(void *, size_t, int) = NULL;
     if (__madvise == NULL) {
@@ -1051,3 +1123,4 @@ extern "C" int madvise(void *__addr, size_t __len, int __advice) {
     tditrace_ex("@A-madvise()");
     return ret;
 }
+#endif

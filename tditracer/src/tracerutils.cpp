@@ -5,6 +5,7 @@
 #include <dlfcn.h>
 #include <cxxabi.h>
 
+#if 0
 static const char *demangle(const char *s) {
     if (s) {
         if (strstr(s, "_ZN")) {
@@ -40,6 +41,7 @@ int pthreadid(pthread_t ptid) {
     memcpy(&threadId, &ptid, 4);
     return threadId;
 }
+#endif
 
 #if 0
 

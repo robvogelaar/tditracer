@@ -6,4 +6,5 @@ SUBDIRS = \
     tdi/src \
     tditest/src \
     tdidump/src \
+    tdistat/src \
     tditracer/src

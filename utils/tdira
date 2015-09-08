@@ -12,9 +12,21 @@ libs = []
 maps = []
 addresses = []
 ratags = []
+
 addresscounts = []
+addressminszs = []
+addressmaxszs = []
+
 raresults = []
 ras = []
+
+def parse_range(astr):
+    result = set()
+    for part in astr.split(','):
+        x = part.split('-')
+        result.update(range(int(x[0]), int(x[-1]) + 1))
+    return sorted(result)
+
 
 def getlibandaddr2line(address, tag):
 
@@ -26,9 +38,6 @@ def getlibandaddr2line(address, tag):
       if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16) :
 
          for lib in libs:
-
-            #print 'map=', map
-            #print 'basename=', os.path.basename(map.split()[5])
 
             if os.path.basename(map.split()[5]) in lib:
                if 'shared object' in subprocess.check_output('file ' + lib, shell = True):
@@ -43,76 +52,95 @@ def getlibandaddr2line(address, tag):
 
    return result
 
-
 def sortby(x):
-    try:
-        #return int(x.split(',')[1], 16)
-        return x.split(' ')[0],
-    except ValueError:
-        return float('inf')
+   return len(x.split()[0]), x.split()[0].lower(), int(x.split()[1][1:])
 
 def main():
 
    if len(sys.argv) >= 4:
 
+      #build libs
       for root, dirs, files in os.walk(sys.argv[3]):
          for file in files:
             if '.so' in file:
                libs.append(root + '/' + file)
 
+      #build maps
       f = open(sys.argv[2])
       for line in f:
          if '.so' in line:
             maps.append(line)
       f.close()
 
-      #for map in maps:
-      #   print map,
 
       f = open(sys.argv[1])
 
-      if len(sys.argv) == 5:
-         time = False
-      else:
-         time = True
+      if len(sys.argv) >= 5:
+         cyclerange = parse_range(sys.argv[6])
+
+      cycle = 0
+      allow = False
 
       for line in f:
 
-         if time == False:
-            if line.startswith('OCC'):
-               if int(line.split()[3]) > int(sys.argv[4]) * 1000000000:
-                  time = True
-         else:
-            if line.startswith('DSC'):
-               raresult = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
-               if raresult:
-
-                  address = (raresult.group().split(',')[0])[3:]
-                  #size = raresult.group().split('sz=')[1]
-                  ratag = line.split(' ')[3][:-1]
-
-                  if not address in addresses:
-                     addresses.append(address)
-                     addresscounts.append(1)
-                     ratags.append(ratag)
-                     addr2line = getlibandaddr2line(address, ratag)
-                     raresults.append(address + '|' + addr2line)
-
-                  else:
-                     addresscounts[addresses.index(address)] += 1
+         if line.startswith('DSC'):
+            if re.search(sys.argv[4], line):
+               cycle += 1
+               allow = True
+            elif re.search(sys.argv[5], line):
+               allow = False
 
 
-      #print results
+         if allow:
+
+            if cycle in cyclerange:
+
+               if line.startswith('DSC'):
+                  raresult = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
+                  if raresult:
+
+                     address = (raresult.group().split(',')[0])[3:]
+                     size = int((raresult.group().split(',')[1])[3:])
+                     ratag = line.split(' ')[3][:-1]
+
+                     if not address in addresses:
+                        addresses.append(address)
+                        addresscounts.append(1)
+                        addressminszs.append(size)
+                        addressmaxszs.append(size)
+
+                        ratags.append(ratag)
+                        addr2line = getlibandaddr2line(address, ratag)
+                        raresults.append(address + '|' + addr2line)
+
+                     else:
+                        addresscounts[addresses.index(address)] += 1
+
+                        if size > addressmaxszs[addresses.index(address)]:
+                           addressmaxszs[addresses.index(address)] = size
+
+                        if size < addressminszs[addresses.index(address)]:
+                           addressminszs[addresses.index(address)] = size
+
+
+
+
 
       i = 0
       for item in raresults:
          lib = raresults[i].split('|')[1]
          line = raresults[i].split('|')[2]
-         text = raresults[i].split('|')[0] + ',' + lib +',' + line.split('at ?')[0].replace(' ', '_')
-         if len(text) > 75:
-            text = text[:73] + '..'
+         text = raresults[i].split('|')[0] + ',' + lib.split('.so')[0] +':' + line.split('at ')[0].replace(' ', '_')
+         if len(text) > 102:
+            text = text[:100] + '..'
          ras.append(text)
-         raresults[i] = "%s, #%6d, %s, %s" % (ratags[i] , addresscounts[i], lib, line)
+
+         text = "%s #%-6d %7d..%-7d %s:%s" % ((ratags[i].split(',')[0]).ljust(44) , addresscounts[i], addressminszs[i], addressmaxszs[i],
+                        lib.split('.so')[0], line.split('at ')[0])
+         if len(text) > 162:
+            text = text[:160] + '..'
+
+         raresults[i] = text;
          i+= 1
 
       raresults.sort(key = sortby)
@@ -121,9 +149,13 @@ def main():
          sys.stderr.write('%s\n' % raresult)
 
 
+
+
+      #
       eventnams = []
       queuenams = []
       prev_malloc = []
+
       f.seek(0)
       for line in f:
 
@@ -131,9 +163,21 @@ def main():
             last_tstamp = line.split()[3]
 
          if line.startswith('DSC'):
-            print line,
 
             result = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
+            if result:
+               #prepend with ra data
+               for ra in ras:
+                  if ra.split(',')[0] in result.group():
+                     print 'DSC 0 0 %s:%s' %((ra.split(',')[1])[:-1], line.split(' ')[3]),
+                     break
+
+            else:
+               print line,
+
+
+
+            #build other data
             if result:
 
                for ra in ras:
@@ -158,14 +202,14 @@ def main():
                         print 'STO %d %d %s %d' % (QUEUE, QUEUE * 11000 + queuenams.index(ra), last_tstamp, prev_malloc[queuenams.index(ra)])
                      print 'STA %d %d %s %d' % (QUEUE, QUEUE * 11000 + queuenams.index(ra), last_tstamp, malloc)
                      prev_malloc[queuenams.index(ra)] = malloc
+                     break
 
          else:
             print line,
 
-
    else:
 
-      print("Usage: %s tdifile mapsfile pathtorootfs [from-seconds]" % sys.argv[0])
+      print("Usage: %s tdifile mapsfile pathtorootfs [cyclepattern-start cyclepattern-end cyclerange]" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

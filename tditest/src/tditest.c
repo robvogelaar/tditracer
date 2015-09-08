@@ -7,11 +7,35 @@
 extern void tditrace(const char *format, ...) __attribute__((weak));
 extern void tditrace_ex(const char *format, ...) __attribute__((weak));
 
+void bar(void) {
+    int a;
+    unsigned int x;
+    asm volatile ("move %0, $ra" : "=r" (x));
+    printf("bar, %p, %p, %p\n", __builtin_return_address(0), &a, x);
+ }
+
+void foo(void) {
+    int a;
+    printf("foo, %p, %p\n", __builtin_return_address(0), &a);
+    bar();
+    bar();
+
+}
+
+void bar2(void) {
+    int a;
+    printf("bar2, %p, %p\n", __builtin_return_address(0), &a); }
+
+void foo2(void) {
+    int a;
+    printf("foo2, %p, %p\n", __builtin_return_address(0), &a);
+    bar2();
+    bar2();
+}
+
+
 int main(int argc, char **argv) {
     int i;
-
-    struct timeval mytimeval;
-    struct timespec mytimespec;
 
 #if 1
 
@@ -23,13 +47,14 @@ int main(int argc, char **argv) {
     struct timespec mytime;
     mytime.tv_nsec = 0;
     mytime.tv_sec = 0;
-    printf("0 -> time and date: %s\n", ctime((const time_t*)&mytime));
-    printf("0 -> UTC time and date: %s\n", asctime(gmtime((const time_t*)&mytime)));
+    printf("0 -> time and date: %s\n", ctime((const time_t *)&mytime));
+    printf("0 -> UTC time and date: %s\n",
+           asctime(gmtime((const time_t *)&mytime)));
 
 #endif
 
-time_t mktime(struct tm *tm);
-
+    struct timeval mytimeval;
+    struct timespec mytimespec;
 
 #if 0
     for (i = 0; i < 150; i++) {
@@ -49,6 +74,9 @@ time_t mktime(struct tm *tm);
 
     printf("start\n");
 
+    foo();
+    foo2();
+
     if (tditrace)
         printf("tditrace\n");
     else
@@ -58,7 +86,7 @@ time_t mktime(struct tm *tm);
     else
         printf("no tditrace_ex\n");
 
-    for (i = 0; i < 25; i++) {
+    for (i = 0; i < 5; i++) {
 
         printf("%d\n", i);
 
@@ -76,8 +104,8 @@ time_t mktime(struct tm *tm);
         printf("HELLO %d %s %s\n", i, "yes", "no");
 
         printf("malloc(1 * 1024)\n");
-        
-        char*d = malloc(1 * 1024);
+
+        char *d = malloc(1 * 1024);
         d[0] = 0;
 
         // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
@@ -192,6 +220,16 @@ time_t mktime(struct tm *tm);
         // create "SEMAPHORES"-timeline, using the @S+ identifier
         if (tditrace)
             tditrace("@S+SEMA semaphore test");
+
+        usleep(10000);
+
+        if (tditrace)
+            tditrace("@A+Agent agent test");
+
+        usleep(40000);
+
+        if (tditrace)
+            tditrace("@A-Agent");
 
         usleep(50000);
     }

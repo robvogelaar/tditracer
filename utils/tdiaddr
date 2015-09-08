@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+
+import sys
+import re
+from itertools import izip_longest
+
+from collections import Counter
+
+import argparse
+
+def parse_range(astr):
+    result = set()
+    for part in astr.split(','):
+        x = part.split('-')
+        result.update(range(int(x[0]), int(x[-1]) + 1))
+    return sorted(result)
+
+
+def sortby(x):
+   return x.split(':')[0]
+
+def main():
+
+   if len(sys.argv) == 5:
+
+      cyclerange = parse_range(sys.argv[4])
+
+
+      addrshelper = []
+      addrs = []
+      cycle = 0
+      allow = False
+
+      master = []
+
+      f = open(sys.argv[1])
+
+      for line in f:
+
+         if line.startswith('DSC'):
+
+            if re.search(sys.argv[2], line):
+
+               if addrs:
+                  master.append(addrs)
+
+               addrshelper = []
+               addrs = []
+               cycle += 1
+
+               allow = True
+
+            elif re.search(sys.argv[3], line):
+               allow = False
+
+
+            if allow:
+
+               if cycle in cyclerange:
+                  addrresult = re.search(r',=[0-9a-f]+', line)
+
+
+                  if 'QImageData::create()' in line :
+                  #if not 'QImageData::create()' in line and not '~QImageData()' in line:
+                  #if 'libv3d' in line :
+                  #if 'ListData' in line :
+
+
+                     if addrresult:
+
+                        addr = int(addrresult.group()[2:], 16)
+
+                        if addr not in addrshelper:
+                           addrshelper.append(addr)
+                           addrs.append([])
+                           addrs[addrshelper.index(addr)].append(cycle)
+                           addrs[addrshelper.index(addr)].append(str('0x%08x') %addr)
+
+                        #addrs[addrshelper.index(addr)].append((line.split('::')[1])[:2])
+
+                        item = (line.split(' ')[3])
+                        #print 'item=', item
+
+                        #libQt5Core:QString::reallocData(unsigned_in:r,=b41930,ra=7411a664,sz=64
+                        #libQt5Gui:QImage::~QImage():QImageData::~QImageData(),=f26340,ra=7463e1b4,sz=0
+                        #libQt5Gui:QImage::QImage(in:QImageData::create(),=e46c40,ra=7463e748,sz=100,5x20@32
+
+
+                        if 'QImageData::create()' in item:
+                           result = str('c(%s)' %item.split(',')[4])
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        elif '~QImageData()' in item:
+                           result = '~()'
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        else:
+                           #result = str('r(%s)' %item.split('sz=')[1])
+                           #result = str('r(%s)' %item[0:20])
+                           #result = str('r(%s)' %item.replace(',','_'))
+                           result = str('r(%s)' %item.split('sz=')[1][:-1])
+                           addrs[addrshelper.index(addr)].append(result)
+                        
+
+
+
+      f.close()
+
+      #for addr in addrs:
+      #   print addr[0],
+      #   print addr[1],
+      #   print Counter(addr[1:]).items()
+
+
+      final = []
+      final_addronly = []
+
+      for item in master:
+         final.append([])
+         final_addronly.append([])
+
+         for a in item:
+            #res = str(a[0]) + ':' + str(a[1]) + ':' + repr(Counter(a[2:]).items()).replace(', ',':')
+            res = str(a[1]) + ':' + repr(Counter(a[2:]).items()).replace(', ',':')
+            res_addronly = str(a[1])
+            #print res
+            final[master.index(item)].append(res)
+            final_addronly[master.index(item)].append(res_addronly)
+
+         final[master.index(item)].sort(key = sortby)
+         final_addronly[master.index(item)].sort()
+
+      for row in izip_longest(*final):
+         print row
+
+
+      final_union = sorted(set().union(*final))
+      final_addronly_union = sorted(set().union(*final_addronly))
+      #for item in final_union:
+      #   print item
+
+
+
+      #new_lists = [[x if x in my_list else "MISSING" for x in final_addronly_union] for my_list in final_addronly]
+      #i = 0
+      #for row in izip_longest(*new_lists):
+      #   print i, row
+      #   i+= 1
+
+
+   else:
+      print("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

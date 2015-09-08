@@ -35,6 +35,7 @@ AC_CONFIG_FILES([
     tdi/src/Makefile
     tditest/src/Makefile
     tdidump/src/Makefile
+    tdistat/src/Makefile
     tditracer/src/Makefile
 ])
 

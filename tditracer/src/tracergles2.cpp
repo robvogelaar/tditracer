@@ -68,9 +68,9 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
         tditrace_ex("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d",
                     draw_counter, texturebind_counter);
 
-    if (eglrecording)
+    if (eglrecording && glesrecording)
         tditrace_ex("#gldraws~%d", 0);
-    if (eglrecording)
+    if (eglrecording && glesrecording)
         tditrace_ex("#gltexturebinds~%d", 0);
 
     glDrawElements_counter = 0;

@@ -32,7 +32,7 @@ def main():
 
          if not allow:
             if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
-               if int(line.split(' ')[3]) > int(sys.argv[2]) * 1000000000:
+               if int(line.split(' ')[3]) >= float(sys.argv[2]) * 1000000000:
                   allow = True
 
          else:
@@ -52,7 +52,7 @@ def main():
 
             if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
 
-               if int(line.split(' ')[3]) > int(sys.argv[3]) * 1000000000:
+               if int(line.split(' ')[3]) >= float(sys.argv[3]) * 1000000000:
                   break
 
       print endline,
