@@ -2,6 +2,7 @@
 
 import sys
 import re
+import time
 from datetime import datetime
 
 TASKS = 0
@@ -123,6 +124,7 @@ def build(tdifilename):
    global first_tstamp
    global ref_offset
 
+
    f = open(tdifilename)
 
    for line in f:
@@ -142,6 +144,9 @@ def build(tdifilename):
                offset = offset + (3600000000000 * hours)
 
    f.seek(0)
+   qvals = []
+   qnams = []
+   qtstamps = []
 
    for line in f:
 
@@ -149,6 +154,12 @@ def build(tdifilename):
 
          namwords = line.split()
          nams.append(tdifilename + ' ' + namwords[2] + ' ' + namwords[3])
+
+         if int(namwords[1]) == QUEUES:
+            if not namwords[3] in qnams:
+               qnams.append(namwords[3])
+               qvals.append(0)
+               qtstamps.append('')
 
       if line.startswith('OCC'):
 
@@ -204,6 +215,11 @@ def build(tdifilename):
 
             evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + stawords[0] + ' ' + thenam + ' ' + stawords[4])
 
+            qvals[qnams.index(thenam)] += int(stawords[4])
+            #sys.stderr.write('q+% 8d=% 8d\n' % (int(stawords[4]), qvals[qnams.index(thenam)]) )
+            qtstamps[qnams.index(thenam)] = str(offset + tstamp)
+
+
       if line.startswith('STO'):
 
          stowords = line.split()
@@ -233,6 +249,20 @@ def build(tdifilename):
                      thenam = namwords[2]
             
             evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + stowords[0] + ' ' + thenam + ' ' + stowords[4])
+
+            qvals[qnams.index(thenam)] -= int(stowords[4])
+            #sys.stderr.write('q-% 8d=% 8d\n' % (int(stowords[4]), qvals[qnams.index(thenam)]) )
+            qtstamps[qnams.index(thenam)] = str(offset + tstamp)
+
+   # set the queues back to 0 for merging
+   for q in qnams:
+      #sys.stderr.write('%d\n' % q)
+      sys.stderr.write('%d\n' % qvals[qnams.index(q)])
+      #sys.stderr.write('%s\n' % qnams[qnams.index(q)])
+      #sys.stderr.write('%s\n' % qtstamps[qnams.index(q)])
+      evts.append(qtstamps[qnams.index(q)] + ' 3 STO ' + qnams[qnams.index(q)] + ' ' + str(qvals[qnams.index(q)]))
+      #print evts[-1]
+      #'307521273736370 3 STO [qtbrowser][26409][0]mi.fordblks 11568']
 
    f.close()
 

@@ -47,10 +47,14 @@ def addnes (type, logfilename, logline, matches):
    if name:
       if name not in names:
          names.append(name)
-         print('NAM %d %d %s' %(type, (type * 1000 + names.index(name)), '[' + logfilename + ']' + name.replace(' ', '_')))
 
+         print('NAM %d %d %s' %(type, (type * 1000 + names.index(name)), '[' + logfilename + ']' + name.replace(' ', '_')))
          names_counts.append(0)
          names_counts[names.index(name)] = 0
+
+         if name == ' brk':
+            print('NAM %d %d %s' %(QUEUE, (QUEUE * 1000), '[' + logfilename + ']' + name.replace(' ', '_')))
+
 
       #attempt to detect multiple timestamp formats
 
@@ -151,6 +155,7 @@ def addnes (type, logfilename, logline, matches):
 
          # brk
          if re.search(' brk.*= 0x', logline):
+
             #sys.stderr.write('brk logline: \'%s\'\n' % logline)
             value = int(re.search(r'0x[0-9a-f]+', logline).group(0),16)
             #sys.stderr.write('brk %s\n' % value)

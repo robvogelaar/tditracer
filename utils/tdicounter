@@ -19,6 +19,7 @@ def main():
             if m:
                line = line[:m.start()] + '#' + str(counter) + line[m.start():]
                counter += 1
+               #sys.stderr.write ('%s\n' %line)
 
          print line,
 

@@ -57,14 +57,25 @@ def main():
             if allow:
 
                if cycle in cyclerange:
+
+                  #if '11fc620' in line:
+                  #   sys.stderr.write ('11fc620\n')
+
                   addrresult = re.search(r',=[0-9a-f]+', line)
 
+                  #if addrresult:
+                  #   test = int(addrresult.group()[2:], 16)
+                  #   if test == 0x11fc620:
+                  #      sys.stderr.write ('0x11fc620\n')
 
-                  if 'QImageData::create()' in line :
+
+
+                  #if 'QImageData::create()' in line :
                   #if not 'QImageData::create()' in line and not '~QImageData()' in line:
                   #if 'libv3d' in line :
                   #if 'ListData' in line :
-
+                  #if 'QImageData::create()' in line or '~QImageData()' in line or 'libv3d' in line:
+                  if 'QImageData::create()' in line or '~QImageData()' in line:
 
                      if addrresult:
 
@@ -130,22 +141,23 @@ def main():
          final[master.index(item)].sort(key = sortby)
          final_addronly[master.index(item)].sort()
 
-      for row in izip_longest(*final):
-         print row
 
+      if (0):
+         for row in izip_longest(*final):
+            print row
 
-      final_union = sorted(set().union(*final))
-      final_addronly_union = sorted(set().union(*final_addronly))
-      #for item in final_union:
-      #   print item
+      else:
+         final_union = sorted(set().union(*final))
+         final_addronly_union = sorted(set().union(*final_addronly))
+         #for item in final_union:
+         #   print item
+         new_lists = [[x if x in my_list else "----------" for x in final_addronly_union] for my_list in final_addronly]
+         i = 0
+         for row in izip_longest(*new_lists):
+            #print i, row
+            print row
+            i+= 1
 
-
-
-      #new_lists = [[x if x in my_list else "MISSING" for x in final_addronly_union] for my_list in final_addronly]
-      #i = 0
-      #for row in izip_longest(*new_lists):
-      #   print i, row
-      #   i+= 1
 
 
    else:
