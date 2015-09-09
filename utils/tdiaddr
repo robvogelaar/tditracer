@@ -25,6 +25,9 @@ def main():
 
       cyclerange = parse_range(sys.argv[4])
 
+      cycletostartcheckingfrom = cyclerange[0] + 1;
+      sys.stderr.write('cycletostartcheckingfrom=%d\n' % cycletostartcheckingfrom)
+
 
       addrshelper = []
       addrs = []
@@ -32,6 +35,8 @@ def main():
       allow = False
 
       master = []
+
+      addrs_from_cycle = []
 
       f = open(sys.argv[1])
 
@@ -54,6 +59,16 @@ def main():
                allow = False
 
 
+
+            if cycle >= cycletostartcheckingfrom:
+               if ',=' in line:
+                  it = int(line.split(',=')[1].split(',')[0], 16)
+                  #print it
+                  if it not in addrs_from_cycle:
+                     addrs_from_cycle.append(it)
+
+
+
             if allow:
 
                if cycle in cyclerange:
@@ -72,9 +87,12 @@ def main():
 
                   #if 'QImageData::create()' in line :
                   #if not 'QImageData::create()' in line and not '~QImageData()' in line:
+
                   #if 'libv3d' in line :
                   #if 'ListData' in line :
                   #if 'QImageData::create()' in line or '~QImageData()' in line or 'libv3d' in line:
+                  #if 'libjpeg:alloc_large' in line:
+
                   if 'QImageData::create()' in line or '~QImageData()' in line:
 
                      if addrresult:
@@ -101,8 +119,12 @@ def main():
                            result = str('c(%s)' %item.split(',')[4])
                            addrs[addrshelper.index(addr)].append(result)
 
-                        elif '~QImageData()' in item:
-                           result = '~()'
+                        elif '~QImageData()_nofree' in item:
+                           result = '~nofree()'
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        elif '~QImageData()_free' in item:
+                           result = '~free()'
                            addrs[addrshelper.index(addr)].append(result)
 
                         else:
@@ -155,13 +177,25 @@ def main():
          i = 0
          for row in izip_longest(*new_lists):
             #print i, row
-            print row
-            i+= 1
+            mylist = row
+            if mylist[0] == '----------':
+               print '----------',
+            else:
+               print mylist[0], final[0][i],
 
+               if int(mylist[0],16) not in addrs_from_cycle:
+
+                  if 'nofree' in final[0][i]:
+                     sys.stderr.write('%s ***\n' %(final[0][i]))
+
+                  print '****',
+
+               i+= 1
+            print ',', row
 
 
    else:
-      print("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange" % sys.argv[0])
+      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange cycletostartcheckingfrom\n" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

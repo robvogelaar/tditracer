@@ -257,7 +257,7 @@ def build(tdifilename):
    # set the queues back to 0 for merging
    for q in qnams:
       #sys.stderr.write('%d\n' % q)
-      sys.stderr.write('%d\n' % qvals[qnams.index(q)])
+      #sys.stderr.write('%d\n' % qvals[qnams.index(q)])
       #sys.stderr.write('%s\n' % qnams[qnams.index(q)])
       #sys.stderr.write('%s\n' % qtstamps[qnams.index(q)])
       evts.append(qtstamps[qnams.index(q)] + ' 3 STO ' + qnams[qnams.index(q)] + ' ' + str(qvals[qnams.index(q)]))

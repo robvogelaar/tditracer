@@ -869,7 +869,7 @@ void *delayed_init_thread(void *param) {
             time_t*)&st.st_ctim)), st.st_ctim);
             */
 
-            if (st.st_atim.tv_sec != gtrace_buffer_st.st_atim.tv_sec) {
+            if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
                 printf("tdi: init[%d][%s], started...\n", gpid,
                        gprocname);
 

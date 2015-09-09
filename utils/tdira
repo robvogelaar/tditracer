@@ -123,9 +123,6 @@ def main():
                            addressminszs[addresses.index(address)] = size
 
 
-
-
-
       i = 0
       for item in raresults:
          lib = raresults[i].split('|')[1]

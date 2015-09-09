@@ -808,7 +808,7 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
-#if 0
+#if 1
 extern "C" void *malloc(size_t size) {
     static void *(*__malloc)(size_t) = NULL;
 
@@ -819,23 +819,47 @@ extern "C" void *malloc(size_t size) {
         }
     }
 
-    if (libcrecording) {
+    //# if 0
+    //if (libcrecording) {
+    //    if (size >= 1024) {
+    //        unsigned int ra = 0;
+    //        #ifdef __mips__
+    //        asm volatile("move %0, $ra" : "=r"(ra));
+    //        #endif
+    //        // tditrace_ex("@A+malloc() %d %p", size, ra);
+    //        tditrace_ex("m ra=%p,sz=%d", ra, size);
+    //    }
+    //}
+    //#endif
 
-        if (size >= 1024) {
+
+    void *ret = __malloc(size);
+
+    if (libcrecording) {
+        if (size >= 128) {
             unsigned int ra = 0;
             #ifdef __mips__
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
             // tditrace_ex("@A+malloc() %d %p", size, ra);
-            tditrace_ex("m ra=%p,sz=%d", ra, size);
+
+            tditrace_ex("m =%x,ra=%p,sz=%d", ret, ra, size);
         }
     }
 
-    void *ret = __malloc(size);
 
+    #if 0
     if (libcrecording) {
         // tditrace_ex("@A-malloc() =0x%x", ret);
+        if (0) {//size >= 1024) {
+            unsigned int ra = 0;
+            #ifdef __mips__
+            asm volatile("move %0, $ra" : "=r"(ra));
+            #endif
+            tditrace_ex("m =%x,ra=%p,sz=%d", ret, ra, size);
+        }
     }
+    #endif
 
     return ret;
 }
