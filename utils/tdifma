@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+
+def main():
+
+   if len(sys.argv) == 7:
+
+
+      ms = []
+      f = open(sys.argv[1])
+
+      cycle = 0
+      allow = False
+      linenr = 0
+
+      for line in f:
+         linenr+= 1
+
+         if line.startswith('DSC'):
+
+            if re.search(sys.argv[2], line):
+               cycle += 1
+               allow = True
+
+            elif re.search(sys.argv[3], line):
+               allow = False
+
+
+            if allow:
+
+               if cycle >= int(sys.argv[4]):
+
+                  if 'm,=' in line:
+                     result = re.findall(r'=[0-9a-f]+', line)
+
+                     m = int(result[0][1:], 16)
+                     s = int(result[2][1:])
+                     #print m,s
+                     ms.append((m, m + s, cycle, linenr))
+
+      f.close()
+
+      arange = range(int(sys.argv[5],16), int(sys.argv[5],16) + int(sys.argv[6]))
+
+      for item in ms:
+
+         mrange = range(item[0], item[1])
+         overlaprange = range(max(mrange[0], arange[0]), min(mrange[-1], arange[-1])+1)
+         if overlaprange:
+            #print arange, item[2]
+            print hex(min(arange)),'..',hex(max(arange)), 'in:', hex(min(mrange)),'+', \
+                str(max(mrange) - min(mrange) + 1) + ' cycle:', str(item[2]), ' line:', str(item[3])
+            #for i in overlaprange:
+            #   print hex(i)
+
+
+   else:
+      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cycletostartcheckingfrom  hexaddress size\n" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

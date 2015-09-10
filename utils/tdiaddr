@@ -38,6 +38,8 @@ def main():
 
       addrs_from_cycle = []
 
+      ms = []
+
       f = open(sys.argv[1])
 
       for line in f:
@@ -59,14 +61,24 @@ def main():
                allow = False
 
 
-
             if cycle >= cycletostartcheckingfrom:
+
                if ',=' in line:
+
                   it = int(line.split(',=')[1].split(',')[0], 16)
                   #print it
                   if it not in addrs_from_cycle:
                      addrs_from_cycle.append(it)
 
+                  result = re.findall(r'=[0-9a-f]+', line)
+
+
+               if 'm,=' in line or 'r,=' in line:
+
+                  m = int(result[0][1:], 16)
+                  s = int(result[2][1:])
+                  #print m,s
+                  ms.append((m, m + s, cycle))
 
 
             if allow:
@@ -185,8 +197,25 @@ def main():
 
                if int(mylist[0],16) not in addrs_from_cycle:
 
-                  if 'nofree' in final[0][i]:
-                     sys.stderr.write('%s ***\n' %(final[0][i]))
+                  #if 'nofree' in final[0][i]:
+                  if (1):
+
+                     sys.stderr.write('%s ***' %(final[0][i]))
+
+                     #check in ranges
+                     arange = range(int(mylist[0],16), int(mylist[0], 16) + 1)
+
+                     for ms_item in ms:
+
+                        mrange = range(ms_item[0], ms_item[1])
+                        #sys.stderr.write('check %s..%s in %s..%s\n' %( hex(min(arange)), hex(max(arange)), hex(min(mrange)), hex(max(mrange))))
+                        overlaprange = range(max(mrange[0], arange[0]), min(mrange[-1], arange[-1]) + 1)
+                        if overlaprange:
+                           #sys.stderr.write('%s..%s\n' %(hex(min(arange)), hex(max(arange))))
+                           sys.stderr.write(' + ');
+                           break
+                     sys.stderr.write('\n');
+
 
                   print '****',
 
