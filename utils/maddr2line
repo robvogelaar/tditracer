@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import os
+import subprocess
+
+libs = []
+maps = []
+
+def getlibandaddr2line(address):
+
+   result = 'lib?|function?'
+   for map in maps:
+      maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
+      mapareas = maparea.split('-')
+
+      if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16) :
+
+         for lib in libs:
+
+            if os.path.basename(map.split()[5]) in lib:
+               if 'shared object' in subprocess.check_output('file ' + lib, shell = True):
+
+                  cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
+                  #sys.stderr.write('cmd=%s\n' % cmd)
+
+                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', ''). split(': ')[1]
+                  return os.path.basename(map.split()[5]) + '|' + addr2line
+                  break
+         break
+
+   return result
+
+def main():
+
+   if len(sys.argv) == 4:
+
+      #build maps
+      f = open(sys.argv[1])
+      for line in f:
+         if '.so' in line:
+            maps.append(line)
+      f.close()
+
+      #build libs
+      for root, dirs, files in os.walk(sys.argv[2]):
+         for file in files:
+            if '.so' in file:
+               libs.append(root + '/' + file)
+
+      print getlibandaddr2line(sys.argv[3])
+
+   else:
+
+      print("Usage: %s mapsfile pathtorootfs hexaddress" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
