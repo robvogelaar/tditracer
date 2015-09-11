@@ -77,19 +77,27 @@ def main():
 
       if len(sys.argv) >= 5:
          cyclerange = parse_range(sys.argv[6])
+      else:
+         cyclerange = parse_range('1')
+
 
       cycle = 0
       allow = False
 
       for line in f:
 
-         if line.startswith('DSC'):
-            if re.search(sys.argv[4], line):
-               cycle += 1
-               allow = True
-            elif re.search(sys.argv[5], line):
-               allow = False
+         if len(sys.argv) >= 5:
 
+            if line.startswith('DSC'):
+               if re.search(sys.argv[4], line):
+                  cycle += 1
+                  allow = True
+               elif re.search(sys.argv[5], line):
+                  allow = False
+
+         else:
+            allow = True
+            cycle = 1
 
          if allow:
 
@@ -128,14 +136,14 @@ def main():
          lib = raresults[i].split('|')[1]
          line = raresults[i].split('|')[2]
          text = raresults[i].split('|')[0] + ',' + lib.split('.so')[0] +':' + line.split('at ')[0].replace(' ', '_')
-         if len(text) > 102:
-            text = text[:100] + '..'
+         if len(text) > 152:
+            text = text[:150] + '..'
          ras.append(text)
 
          text = "%s #%-6d %7d..%-7d %s:%s" % ((ratags[i].split(',')[0]).ljust(44) , addresscounts[i], addressminszs[i], addressmaxszs[i],
                         lib.split('.so')[0], line.split('at ')[0])
-         if len(text) > 162:
-            text = text[:160] + '..'
+         if len(text) > 182:
+            text = text[:180] + '..'
 
          raresults[i] = text;
          i+= 1

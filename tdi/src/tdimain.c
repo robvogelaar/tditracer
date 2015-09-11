@@ -803,6 +803,97 @@ static void get_process_name_by_pid(const int pid, char *name) {
     }
 }
 
+char proc_self_maps[32 * 1024 + 1];
+
+static void dump_proc_self_maps(void) {
+    int fd;
+    int bytes;
+
+    fd = open("/proc/self/maps", O_RDONLY);
+    if (fd < 0)
+        return;
+
+    while (1) {
+        bytes = read(fd, proc_self_maps, sizeof(proc_self_maps) - 1);
+        if ((bytes == -1) && (errno == EINTR))
+            /* keep trying */;
+        else if (bytes > 0) {
+            proc_self_maps[bytes] = '\0';
+            // printf("bytes=%d[%s]\n", bytes, proc_self_maps);
+        } else
+            break;
+    }
+
+    close(fd);
+
+    char *line = strtok(proc_self_maps, "\n");
+    while (line) {
+        if (strlen(line) > 50) {
+            // printf("%d[%s]\n", strlen(line), line);
+            tditrace("MAPS %s", line);
+        }
+        line = strtok(NULL, "\n");
+    }
+}
+
+
+static int monitor;
+
+void *monitor_thread(void *param) {
+
+    static int seconds_counter = 0;
+    static int do_dump_proc_self_maps = 1;
+    while (1) {
+
+        usleep(1 * 1000000);
+
+        seconds_counter++;
+
+        if (do_dump_proc_self_maps) {
+            dump_proc_self_maps();
+            do_dump_proc_self_maps = 0;
+        }
+
+        struct mallinfo mi;
+
+        mi = mallinfo();
+
+        // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
+        // printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
+        // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+        // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
+        // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+        // printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
+        // printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
+        // printf("Total allocated space (uordblks):      %d\n", mi.uordblks);
+        // printf("Total free space (fordblks):           %d\n", mi.fordblks);
+        // printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+
+        tditrace("mi.arena~%d", mi.arena);
+        tditrace("mi.ordblks~%d", mi.ordblks);
+        tditrace("mi.smblks~%d", mi.smblks);
+        tditrace("mi.hblks~%d", mi.hblks);
+        tditrace("mi.hblkhd~%d", mi.hblkhd);
+        tditrace("mi.usmblks~%d", mi.usmblks);
+        tditrace("mi.fsmblks~%d", mi.fsmblks);
+        tditrace("mi.uordblks~%d", mi.uordblks);
+        tditrace("mi.fordblks~%d", mi.fordblks);
+        tditrace("mi.keepcost~%d", mi.keepcost);
+
+        struct stat st;
+        stat(gtracebufferfilename, &st);
+
+        if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
+            stat(gtracebufferfilename, &gtrace_buffer_st);
+
+            printf("tdi: init[%d][%s], rewinding...\n", gpid, gprocname);
+            tditrace_rewind();
+            do_dump_proc_self_maps = 1;
+        }
+    }
+
+    pthread_exit(NULL);
+}
 
 
 static int thedelay;
@@ -870,8 +961,7 @@ void *delayed_init_thread(void *param) {
             */
 
             if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-                printf("tdi: init[%d][%s], started...\n", gpid,
-                       gprocname);
+                printf("tdi: init[%d][%s], started...\n", gpid, gprocname);
 
                 stat(gtracebufferfilename, &gtrace_buffer_st);
                 break;
@@ -891,7 +981,6 @@ void *delayed_init_thread(void *param) {
             if (st.st_atim.tv_sec != gtrace_buffer_st.st_atim.tv_sec) {
             }
 
-
             delay--;
         }
     }
@@ -900,107 +989,11 @@ void *delayed_init_thread(void *param) {
     tditrace_inited = 1;
     simplefu_mutex_unlock(&myMutex);
 
-    pthread_exit(NULL);
-}
-
-
-char proc_self_maps[32*1024 + 1];
-
-static void dump_proc_self_maps (void)
-{
-    int fd;
-    int bytes;
-
-    fd = open ("/proc/self/maps", O_RDONLY);
-    if (fd < 0)
-       return;
-
-    while (1) {
-        bytes = read(fd, proc_self_maps, sizeof(proc_self_maps) - 1);
-        if ((bytes == -1) && (errno == EINTR))
-            /* keep trying */ ;
-        else if (bytes > 0) {
-            proc_self_maps[bytes] = '\0';
-            //printf("bytes=%d[%s]\n", bytes, proc_self_maps);
-        }
-        else
-           break;
-    }
-
-    close (fd);
-
-    char *line = strtok(proc_self_maps, "\n");
-    while (line) {
-        if (strlen(line) > 50) {
-            //printf("%d[%s]\n", strlen(line), line);
-            tditrace("MAPS %s", line);
-        }
-        line = strtok(NULL, "\n");
-    }
-
-}
-
-
-static int monitor;
-
-void *monitor_thread(void *param) {
-
-    static int seconds_counter = 0;
-    static int do_dump_proc_self_maps = 1;
-    while (1) {
-
-        usleep(1 * 1000000);
-
-        seconds_counter++;
-
-        if (do_dump_proc_self_maps) {
-            dump_proc_self_maps();
-            do_dump_proc_self_maps = 0;
-        }
-
-        struct mallinfo mi;
-
-        mi = mallinfo();
-
-        //printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
-        //printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
-        //printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-        //printf("# of mapped regions (hblks):           %d\n", mi.hblks);
-        //printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-        //printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
-        //printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
-        //printf("Total allocated space (uordblks):      %d\n", mi.uordblks);
-        //printf("Total free space (fordblks):           %d\n", mi.fordblks);
-        //printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
-
-        tditrace("mi.arena~%d", mi.arena);
-        tditrace("mi.ordblks~%d", mi.ordblks);
-        tditrace("mi.smblks~%d", mi.smblks);
-        tditrace("mi.hblks~%d", mi.hblks);
-        tditrace("mi.hblkhd~%d", mi.hblkhd);
-        tditrace("mi.usmblks~%d", mi.usmblks);
-        tditrace("mi.fsmblks~%d", mi.fsmblks);
-        tditrace("mi.uordblks~%d", mi.uordblks);
-        tditrace("mi.fordblks~%d", mi.fordblks);
-        tditrace("mi.keepcost~%d", mi.keepcost);
-
-
-        struct stat st;
-        stat(gtracebufferfilename, &st);
-
-        if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-            stat(gtracebufferfilename, &gtrace_buffer_st);
-
-            printf("tdi: init[%d][%s], rewinding...\n", gpid,
-                   gprocname);
-            tditrace_rewind();
-            do_dump_proc_self_maps = 1;
-        }
-    }
+    pthread_t monitor_thread_id;
+    pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
 
     pthread_exit(NULL);
 }
-
 
 
 int tditrace_init(void) {
@@ -1034,7 +1027,6 @@ int tditrace_init(void) {
     if (getenv("MALLINFO")) {
         do_mallinfo = atoi(getenv("REMOVE"));
     }
-
 
     /*
      * remove inactive tracefiles
@@ -1070,13 +1062,13 @@ int tditrace_init(void) {
 
                     if (stat(procpid, &sts) == -1) {
 
-                            unlink(fullname);
-                            printf("tdi: init[%d][%s], removed: \"%s\"\n", gpid,
-                                   gprocname, fullname);
+                        unlink(fullname);
+                        printf("tdi: init[%d][%s], removed: \"%s\"\n", gpid,
+                               gprocname, fullname);
                     } else {
 
-                            printf("tdi: init[%d][%s], not removed: \"%s\"\n", gpid,
-                                   gprocname, fullname);
+                        printf("tdi: init[%d][%s], not removed: \"%s\"\n", gpid,
+                               gprocname, fullname);
                     }
                 }
             }
@@ -1156,16 +1148,15 @@ int tditrace_init(void) {
                        &thedelay);
 
         // pthread_join(delayed_init_thread_id, NULL);
+    } else {
+
+        simplefu_mutex_lock(&myMutex);
+        tditrace_inited = 1;
+        simplefu_mutex_unlock(&myMutex);
+
+        pthread_t monitor_thread_id;
+        pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
     }
-    
-    simplefu_mutex_lock(&myMutex);
-    tditrace_inited = 1;
-    simplefu_mutex_unlock(&myMutex);
-
-    pthread_t monitor_thread_id;
-    pthread_create(&monitor_thread_id, NULL, monitor_thread,
-                   &monitor);
-
 }
 
 void tditrace_rewind() {
@@ -1176,8 +1167,8 @@ void tditrace_rewind() {
     tditrace_inited = 0;
     simplefu_mutex_unlock(&myMutex);
 
-
-    for (i = gtrace_buffer_rewind_ptr - gtrace_buffer ; i < TRACEBUFFERSIZE; i++) {
+    for (i = gtrace_buffer_rewind_ptr - gtrace_buffer; i < TRACEBUFFERSIZE;
+         i++) {
         gtrace_buffer[i] = 0;
     }
 
@@ -1258,8 +1249,9 @@ void tditrace_exit(int argc, char *argv[]) {
                         break;
                     }
 
-                    fprintf(stderr, "bufpct=%d\n", (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 / (TRACEBUFFERSIZE)));
-
+                    fprintf(stderr, "bufpct=%d\n",
+                            (int)(strlen(tracebuffers[buffers].saveptr) *
+                                  100.0 / (TRACEBUFFERSIZE)));
 
                     // token should hold "timeofday timestamp offset in nsecs"
                     tracebuffers[buffers].timeofday_offset = (_u64)atoll(
@@ -1336,7 +1328,9 @@ void tditrace_exit(int argc, char *argv[]) {
                             break;
                         }
 
-                        fprintf(stderr, "bufpct=%d\n", (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 / (TRACEBUFFERSIZE)));
+                        fprintf(stderr, "bufpct=%d\n",
+                                (int)(strlen(tracebuffers[buffers].saveptr) *
+                                      100.0 / (TRACEBUFFERSIZE)));
 
                         // token should hold "timeofday timestamp offset in
                         // nsecs"

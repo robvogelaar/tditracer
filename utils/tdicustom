@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+QUEUE = 3
+EVENT = 4
+
+def parse_range(astr):
+    result = set()
+    for part in astr.split(','):
+        x = part.split('-')
+        result.update(range(int(x[0]), int(x[-1]) + 1))
+    return sorted(result)
+
+def main():
+
+   if len(sys.argv) == 5:
+
+      f = open(sys.argv[1])
+
+      cyclerange = parse_range(sys.argv[4])
+
+
+      cycle = 0
+      allow = False
+
+
+      creates = 0
+      creates_as = []
+      creates_ss = []
+
+      frees = 0
+      frees_as = []
+
+      creates2 = 0
+      nofrees = 0
+
+
+      for line in f:
+
+         if line.startswith('DSC'):
+            if re.search(sys.argv[2], line):
+               cycle += 1
+               allow = True
+            elif re.search(sys.argv[3], line):
+               allow = False
+
+         if allow:
+            if cycle in cyclerange:
+
+               if line.startswith('DSC'):
+
+                  result = re.findall(r'=[0-9a-f]+', line)
+                  if result:
+                     _as = int(result[0][1:], 16)
+                     if _as < 0x30000000:
+
+                        if re.search('QImageData::create\(\)', line):
+                           creates+= 1
+                           creates_as.append(_as)
+                           creates_ss.append(int(result[2][1:]))
+
+                        if re.search('~QImageData\(\)_free', line):
+                           frees+= 1
+                           frees_as.append(int(result[0][1:], 16))
+
+                        if re.search('QImageData::create2\(\)', line):
+                           creates2+= 1
+
+                        if re.search('~QImageData\(\)_nofree', line):
+                           nofrees+= 1
+
+
+      print cyclerange,
+      print creates, '-', frees, ':', creates2, '-', nofrees
+      
+      #print set(creates_as).difference(set(frees_as))
+      #print set(frees_as).difference(set(creates_as))
+      print 'cnof:',
+      for i in creates_as:
+         if i not in frees_as:
+            print hex(i),',',
+      print
+
+      print 'fnoc:',
+      for i in frees_as:
+         if i not in creates_as:
+            print hex(i),',',
+      print
+
+
+      print hex(min(creates_as)), hex(max(creates_as))
+      print hex(min(frees_as)), hex(max(frees_as))
+
+
+
+   else:
+
+      print("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

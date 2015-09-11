@@ -15,8 +15,6 @@ def main():
 
          if line.startswith('NAM'):
 
-            #print sys.argv[2], line
-
             if re.findall(sys.argv[2], line):
                id = line.split()[2]
                if not id in ids:

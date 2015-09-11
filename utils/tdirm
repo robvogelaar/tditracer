@@ -3,8 +3,15 @@
 import sys
 import re
 
+TASKS = 0
+ISRS = 1
+SEMAS = 2
+QUEUES = 3
+EVENTS = 4
+NOTES = 7
+AGENTS = 8
 
-idstorm = []
+ids = []
 
 def main():
 
@@ -12,29 +19,26 @@ def main():
 
       f = open(sys.argv[1])
 
-         if line.startswith('NAM'):
-            if re.search(sys.argv[2], line):
-               id = (int)line.split()[2]
-               if not id in ids
-                  ids.append(id)
-
       for line in f:
 
          if line.startswith('NAM'):
-            if re.search(sys.argv[2], line):
-               id = (int)line.split()[2]
-               if not id in ids
+
+            rm = 'NOTES' in sys.argv[2] and int(line.split()[1]) == NOTES
+            rm = rm or 'TASKS' in sys.argv[2] and int(line.split()[1]) == TASKS
+
+            if re.search(sys.argv[2], line) or rm:
+               id = int(line.split()[2])
+               if not id in ids:
                   ids.append(id)
             else:
                print line,
 
          elif line.startswith('STA') or line.startswith('STO') or line.startswith('OCC'):
-            if not line.split()[2] in ids:
-            print line,
+            if not int(line.split()[2]) in ids:
+               print line,
 
          elif line.startswith('DSC'):
-            if re.search(sys.argv[2], line):
-            else:
+            if not re.search(sys.argv[2], line):
                print line,
 
          else:

@@ -832,15 +832,19 @@ extern "C" void *malloc(size_t size) {
     //}
     //#endif
 
+    unsigned int ra = 0;
+    #ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
+
 
     void *ret = __malloc(size);
 
     if (libcrecording) {
+
+        //if (1) {
         if (size >= 128) {
-            unsigned int ra = 0;
-            #ifdef __mips__
-            asm volatile("move %0, $ra" : "=r"(ra));
-            #endif
+
             // tditrace_ex("@A+malloc() %d %p", size, ra);
 
             tditrace_ex("m =%x,ra=%p,sz=%d", ret, ra, size);
@@ -899,7 +903,7 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
 #endif
 
 #if 1
-void *realloc(void *ptr, size_t size)
+extern "C" void *realloc(void *ptr, size_t size)
 {
     static void *(*__realloc)(void *, size_t) = NULL;
 

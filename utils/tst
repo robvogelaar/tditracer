@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+
+def get_longest(arr):
+    bestEnd = 0;
+    seqLengths = dict() #seqLengths[key] = length of the longest sequence ending on key-1, or 0 if not found
+    seqTuples = dict() #seqTuples[key] = the last tuple used in this longest sequence
+    for t in arr:
+        seqLength = seqLengths.get(t[0],0) + t[1]
+        tupleEnd = t[0] + t[1]
+        if (seqLength > seqLengths.get(tupleEnd,0)):
+            seqLengths[tupleEnd] = seqLength
+            seqTuples[tupleEnd] = t
+            if seqLength > seqLengths.get(bestEnd,0):
+                bestEnd = tupleEnd
+    longestSeq = []
+    while (bestEnd in seqTuples):
+        longestSeq.append(seqTuples[bestEnd])
+        bestEnd -= seqTuples[bestEnd][1]
+    longestSeq.reverse()
+    return longestSeq
+
+
+if __name__ == "__main__":
+    a = [(0,3),(1,4),(1,1),(1,8),(5,2),(5,5),(5,6),(10,2)]
+    print(get_longest(a))

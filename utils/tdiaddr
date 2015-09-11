@@ -3,9 +3,7 @@
 import sys
 import re
 from itertools import izip_longest
-
 from collections import Counter
-
 import argparse
 
 def parse_range(astr):
@@ -63,55 +61,48 @@ def main():
 
             if cycle >= cycletostartcheckingfrom:
 
-               if ',=' in line:
+               # build the list with all future malloc and realloc addresses
+               #if ',=' in line:
+               if 'm,=' in line or 'r,=' in line:
 
-                  it = int(line.split(',=')[1].split(',')[0], 16)
-                  #print it
-                  if it not in addrs_from_cycle:
-                     addrs_from_cycle.append(it)
+                  result = int(line.split(',=')[1].split(',')[0], 16)
+                  if result not in addrs_from_cycle:
+                     addrs_from_cycle.append(result)
+
+               # build the list with all future malloc and realloc ranges
+               if 'm,=' in line or 'r,=' in line:
 
                   result = re.findall(r'=[0-9a-f]+', line)
 
-
-               if 'm,=' in line or 'r,=' in line:
-
                   m = int(result[0][1:], 16)
                   s = int(result[2][1:])
-                  #print m,s
                   ms.append((m, m + s, cycle))
-
 
             if allow:
 
                if cycle in cyclerange:
 
-                  #if '11fc620' in line:
-                  #   sys.stderr.write ('11fc620\n')
-
-                  addrresult = re.search(r',=[0-9a-f]+', line)
-
-                  #if addrresult:
-                  #   test = int(addrresult.group()[2:], 16)
-                  #   if test == 0x11fc620:
-                  #      sys.stderr.write ('0x11fc620\n')
-
-
-
                   #if 'QImageData::create()' in line :
                   #if not 'QImageData::create()' in line and not '~QImageData()' in line:
-
                   #if 'libv3d' in line :
-                  #if 'ListData' in line :
                   #if 'QImageData::create()' in line or '~QImageData()' in line or 'libv3d' in line:
                   #if 'libjpeg:alloc_large' in line:
+                  #if 'ListData' in line :
 
-                  if 'QImageData::create()' in line or '~QImageData()' in line:
+                  #if 'QImageData::create()' in line or 'QImageData::create2()' in line or '~QImageData()' in line:
+                  #if 'QImageData::create2()' in line:
+                  #if 'QImageData::create()' in line:
+                  #if 'QImageData::create()' in line or 'm,=' in line or 'r,=' in line:
+                  if 'QImageData::create()' in line or '~QImageData()_free' in line:
+
+                     addrresult = re.search(r',=[0-9a-f]+', line)
 
                      if addrresult:
 
                         addr = int(addrresult.group()[2:], 16)
 
                         if addr not in addrshelper:
+
                            addrshelper.append(addr)
                            addrs.append([])
                            addrs[addrshelper.index(addr)].append(cycle)
@@ -131,23 +122,30 @@ def main():
                            result = str('c(%s)' %item.split(',')[4])
                            addrs[addrshelper.index(addr)].append(result)
 
-                        elif '~QImageData()_nofree' in item:
-                           result = '~nofree()'
-                           addrs[addrshelper.index(addr)].append(result)
-
                         elif '~QImageData()_free' in item:
                            result = '~free()'
                            addrs[addrshelper.index(addr)].append(result)
 
-                        else:
-                           #result = str('r(%s)' %item.split('sz=')[1])
-                           #result = str('r(%s)' %item[0:20])
-                           #result = str('r(%s)' %item.replace(',','_'))
+                        elif 'QImageData::create2()' in item:
+                           result = str('c2(%s)' %item.split(',')[4])
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        elif '~QImageData()_nofree' in item:
+                           result = '~nofree()'
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        elif 'm,=' in item:
+                           result = str('m(%s)' %item.split('sz=')[1][:-1])
+                           addrs[addrshelper.index(addr)].append(result)
+
+                        elif 'r,=' in item:
                            result = str('r(%s)' %item.split('sz=')[1][:-1])
                            addrs[addrshelper.index(addr)].append(result)
+
+                        else:
+                           result = str('?')
+                           addrs[addrshelper.index(addr)].append(result)
                         
-
-
 
       f.close()
 
@@ -176,6 +174,13 @@ def main():
          final_addronly[master.index(item)].sort()
 
 
+
+
+
+
+
+
+
       if (0):
          for row in izip_longest(*final):
             print row
@@ -187,39 +192,55 @@ def main():
          #   print item
          new_lists = [[x if x in my_list else "----------" for x in final_addronly_union] for my_list in final_addronly]
          i = 0
+         j = 0
          for row in izip_longest(*new_lists):
             #print i, row
             mylist = row
             if mylist[0] == '----------':
                print '----------',
             else:
+
+               future_addrs = False
+               future_ranges = False
+
+               if int(mylist[0], 16) in addrs_from_cycle:
+                  future_addrs = True
+               else:
+                  future_addrs = False
+
+               #if 'nofree' in final[0][i]:
+               if (1):
+                  #check in ranges
+                  for ms_item in ms:
+                     if int(mylist[0], 16) >= ms_item[0] and int(mylist[0], 16) < ms_item[1]:
+                        future_ranges = True
+                        break
+
+               #
                print mylist[0], final[0][i],
 
-               if int(mylist[0],16) not in addrs_from_cycle:
+               if future_addrs:
+                  print '***',
+               if future_ranges:
+                  print '+++',
 
-                  #if 'nofree' in final[0][i]:
-                  if (1):
+               #sys.stderr.write('%s' %(final[0][i]))
+               #if future_addrs:
+               #   sys.stderr.write('fa');
+               #else:
+               #   sys.stderr.write('nofa');
+               #if future_ranges:
+               #   sys.stderr.write('fr');
+               #else:
+               #   sys.stderr.write('nofr');
+               #sys.stderr.write('\n');
 
-                     sys.stderr.write('%s ***' %(final[0][i]))
+               if not future_ranges:
+                  sys.stderr.write('%4d %4d %s\n' %(i, j, final[0][i]))
+                  j+= 1
 
-                     #check in ranges
-                     arange = range(int(mylist[0],16), int(mylist[0], 16) + 1)
+            i+= 1
 
-                     for ms_item in ms:
-
-                        mrange = range(ms_item[0], ms_item[1])
-                        #sys.stderr.write('check %s..%s in %s..%s\n' %( hex(min(arange)), hex(max(arange)), hex(min(mrange)), hex(max(mrange))))
-                        overlaprange = range(max(mrange[0], arange[0]), min(mrange[-1], arange[-1]) + 1)
-                        if overlaprange:
-                           #sys.stderr.write('%s..%s\n' %(hex(min(arange)), hex(max(arange))))
-                           sys.stderr.write(' + ');
-                           break
-                     sys.stderr.write('\n');
-
-
-                  print '****',
-
-               i+= 1
             print ',', row
 
 
