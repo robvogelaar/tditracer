@@ -10,6 +10,7 @@ EVENT = 4
 
 libs = []
 maps = []
+maps2 = []
 addresses = []
 ratags = []
 
@@ -35,7 +36,7 @@ def getlibandaddr2line(address, tag):
       maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
       mapareas = maparea.split('-')
 
-      if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16) :
+      if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16):
 
          for lib in libs:
 
@@ -45,7 +46,8 @@ def getlibandaddr2line(address, tag):
                   cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
                   #sys.stderr.write('cmd=%s\n' % cmd)
 
-                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', ''). split(': ')[1]
+                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
+
                   return os.path.basename(map.split()[5]) + '|' + addr2line
                   break
          break
@@ -72,8 +74,21 @@ def main():
             maps.append(line)
       f.close()
 
-
       f = open(sys.argv[1])
+
+      #build maps2
+      #DSC 0 0 MAPS,741b1000-74213000,r-xp,00000000,00:10,56754894,,,/lib/libuClibc-0.9.32.1.so
+      for line in f:
+         if 'DSC 0 0 MAPS' in line:
+            l = line[13:].replace(',',' ')
+            if l not in maps2:
+               maps2.append(l)
+      #sys.stderr.write('maps2 done\n')
+      for i in maps2:
+         print i
+
+
+      f.seek(0)
 
       if len(sys.argv) >= 5:
          cyclerange = parse_range(sys.argv[6])
@@ -104,11 +119,13 @@ def main():
             if cycle in cyclerange:
 
                if line.startswith('DSC'):
-                  raresult = re.search(r'ra=[0-9a-f]+,sz=[0-9]+', line)
+                  #raresult = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  raresult = re.search(r',=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
                   if raresult:
 
-                     address = (raresult.group().split(',')[0])[3:]
-                     size = int((raresult.group().split(',')[1])[3:])
+                     malloc = (raresult.group().split(',')[1])[1:]
+                     address = (raresult.group().split(',')[2])[3:]
+                     size = int((raresult.group().split(',')[3])[3:])
                      ratag = line.split(' ')[3][:-1]
 
                      if not address in addresses:

@@ -1,0 +1,214 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import itertools
+from itertools import izip_longest
+from itertools import imap
+from collections import Counter
+import argparse
+import time
+
+def parse_range(astr):
+    result = set()
+    for part in astr.split(','):
+        x = part.split('-')
+        result.update(range(int(x[0]), int(x[-1]) + 1))
+    return sorted(result)
+
+#def sortby(x):
+#   return x.split()[0], int(x.split()[1])
+
+def sortby(x):
+   return int(x.split()[1])
+
+
+def sortby1(x):
+    try:
+        return int(x.split(' ', 1)[0])
+    except ValueError:
+        return float('inf')
+
+
+def lists_overlap(a, b):
+  sb = set(b)
+  return any(itertools.imap(sb.__contains__, a))
+
+cyclesdata = []
+cycledata = []
+
+def main():
+
+   global cyclesdata
+   global cycledata
+
+
+   if len(sys.argv) == 5:
+
+      cyclesrange = parse_range(sys.argv[4])
+
+      cyclenr = 0
+      allow = False
+
+      f = open(sys.argv[1])
+
+      sys.stderr.write('collecting data for cycles')
+
+      for line in f:
+
+         if line.startswith('DSC'):
+            if re.search(sys.argv[2], line):
+
+               if cycledata:
+                  cyclesdata.append(cycledata)
+
+               cycledata = []
+               cyclenr += 1
+
+               allow = True
+
+               if cyclenr in cyclesrange:
+                  sys.stderr.write('+')
+                  sys.stderr.flush()
+               else:
+                  sys.stderr.write('-')
+                  sys.stderr.flush()
+
+
+            elif re.search(sys.argv[3], line):
+
+               allow = False
+
+
+         if allow:
+
+            if cyclenr in cyclesrange:
+
+
+               if line.startswith('DSC'):
+
+                  #result = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  #result = re.search(r'r,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  result = re.search(r'm,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+
+                  if result:
+
+                     malloc = int((result.group().split(',')[1])[1:], 16)
+                     #address = int((result.group().split(',')[2])[3:], 16)
+                     size = int((result.group().split(',')[3])[3:])
+                     tag = line.split(' ')[3][:-1].split(',=')[0]
+
+                     if malloc < 0x30000000:
+
+                        cycledata.append((malloc, tag, size))
+                        
+      sys.stderr.write('\n')
+
+      f.close()
+
+      cycleranges = []
+      cyclesets = []
+
+      sys.stderr.write('build ranges for cycles')
+
+      i = 1
+      for cycle in cyclesdata:
+
+         sys.stderr.write('.')
+         sys.stderr.flush()
+
+         i+= 1
+         cycle = list(set(cycle))
+         cycle.sort()
+         cyclerange = []
+         for item in cycle:
+            itemlist = list(item)
+            cyclerange.extend(range(itemlist[0], itemlist[0] + itemlist[2]))
+
+         cyclesets.append(set(cyclerange))
+
+
+      sys.stderr.write('\n')
+
+      """
+      for row in izip_longest(*cyclesdata):
+         print row
+      """
+
+      """
+      sys.stderr.write('here1\n')
+      cyclesdata_union = sorted(set().union(*cyclesdata))
+      sys.stderr.write('here2\n')
+      new_lists = [[x if x in my_list else "----------" for x in cyclesdata_union] for my_list in cyclesdata]
+      sys.stderr.write('here3\n')
+
+      for row in izip_longest(*new_lists):
+         for item in row:
+            print str(item).replace(',',''),
+            print ',',
+         print
+      """
+
+
+      leakchecklists = []
+
+      for cycletocheckfrom in range(0, max(cyclesrange) - min(cyclesrange)):
+
+         cycle = list(set(cyclesdata[cycletocheckfrom]))
+         cycle.sort()
+         i = 0
+
+         leaksize = 0
+
+         leakchecklist_full = []
+         leakchecklist_leaksonly = []
+
+         for item in cycle:
+
+            itemlist = list(item)
+            r = range(itemlist[0], itemlist[0] + itemlist[2])
+            rs = set(r)
+
+            leakstr = ''
+            uses = 0
+            for cycleset in cyclesets[cycletocheckfrom:]:
+
+               if bool(rs & cycleset):
+                  uses+= 1
+                  leakstr+= '+'
+               else:
+                  leakstr+= '-'
+
+            if uses == 1:
+               leaksize+= itemlist[2]
+               leakstr+= '!'
+               leakchecklist_leaksonly.append(str('%s %d %s') %(itemlist[1], itemlist[2], hex(itemlist[0])))
+               sys.stderr.write(str('%4d %-60s %s\n' %(i, str(item), leakstr)))
+
+            leakchecklist_full.append(str('%s %d %s %s') %(itemlist[1], itemlist[2], hex(itemlist[0]), leakstr))
+    
+            i+= 1
+
+
+         #for j in leakchecklist_full:
+         #   print j
+
+
+         leakchecklist_leaksonly.sort(key = sortby, reverse=True)
+
+         #for j in leakchecklist_leaksonly:
+         #   print j
+
+         leakchecklists.append(leakchecklist_leaksonly)
+
+
+
+   for row in izip_longest(*leakchecklists):
+      print row
+
+
+   else:
+      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange\n" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

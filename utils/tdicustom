@@ -2,6 +2,7 @@
 
 import sys
 import re
+from collections import Counter
 
 QUEUE = 3
 EVENT = 4
@@ -22,10 +23,6 @@ def main():
       cyclerange = parse_range(sys.argv[4])
 
 
-      cycle = 0
-      allow = False
-
-
       creates = 0
       creates_as = []
       creates_ss = []
@@ -36,6 +33,8 @@ def main():
       creates2 = 0
       nofrees = 0
 
+      cycle = 0
+      allow = False
 
       for line in f:
 
@@ -54,9 +53,10 @@ def main():
                   result = re.findall(r'=[0-9a-f]+', line)
                   if result:
                      _as = int(result[0][1:], 16)
-                     if _as < 0x30000000:
+                     if (1): #_as < 0x30000000:
 
                         if re.search('QImageData::create\(\)', line):
+                           #sys.stderr.write('%s\n' %line)
                            creates+= 1
                            creates_as.append(_as)
                            creates_ss.append(int(result[2][1:]))
@@ -73,8 +73,17 @@ def main():
 
 
       print cyclerange,
-      print creates, '-', frees, ':', creates2, '-', nofrees
-      
+      print '#creates = ', creates, min(creates_ss), '..', max(creates_ss)
+
+      a = dict(Counter(creates_ss))
+      a = a.items()
+      a.sort()
+
+      for b in a:
+         print b
+      print '#frees = ' , frees
+
+      """
       #print set(creates_as).difference(set(frees_as))
       #print set(frees_as).difference(set(creates_as))
       print 'cnof:',
@@ -88,11 +97,10 @@ def main():
          if i not in creates_as:
             print hex(i),',',
       print
+      """
 
-
-      print hex(min(creates_as)), hex(max(creates_as))
-      print hex(min(frees_as)), hex(max(frees_as))
-
+      #print hex(min(creates_as)), hex(max(creates_as))
+      #print hex(min(frees_as)), hex(max(frees_as))
 
 
    else:
