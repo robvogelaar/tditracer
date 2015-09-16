@@ -84,7 +84,6 @@ def main():
 
             if cyclenr in cyclesrange:
 
-
                if line.startswith('DSC'):
 
                   #result = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
@@ -183,7 +182,8 @@ def main():
                leaksize+= itemlist[2]
                leakstr+= '!'
                leakchecklist_leaksonly.append(str('%s %d %s') %(itemlist[1], itemlist[2], hex(itemlist[0])))
-               sys.stderr.write(str('%4d %-60s %s\n' %(i, str(item), leakstr)))
+
+            sys.stderr.write(str('%4d 0x%08x %-40s %6d %s\n' %(i, itemlist[0], itemlist[1], itemlist[2], leakstr)))
 
             leakchecklist_full.append(str('%s %d %s %s') %(itemlist[1], itemlist[2], hex(itemlist[0]), leakstr))
     
@@ -203,8 +203,8 @@ def main():
 
 
 
-   for row in izip_longest(*leakchecklists):
-      print row
+      for row in izip_longest(*leakchecklists):
+         print row
 
 
    else:

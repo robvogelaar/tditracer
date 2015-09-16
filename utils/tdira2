@@ -5,27 +5,15 @@ import re
 import os
 import subprocess
 import time
-
-QUEUE = 3
-EVENT = 4
+import datetime
 
 libs = []
 maps = []
-maps2 = []
-
-addresses = []
-addr2lines = []
-
-
-def parse_range(astr):
-    result = set()
-    for part in astr.split(','):
-        x = part.split('-')
-        result.update(range(int(x[0]), int(x[-1]) + 1))
-    return sorted(result)
-
 
 def getlibandaddr2line(address):
+
+   global libs
+   global maps
 
    result = 'lib?|function?'
    for map in maps:
@@ -34,24 +22,25 @@ def getlibandaddr2line(address):
 
       if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16):
 
+         #sys.stderr.write('%s\n' % address)
+         #sys.stderr.write('%d\n' % len(libs))
+
          for lib in libs:
 
+            #sys.stderr.write('lib=%s\n' % lib)
+
             if os.path.basename(map.split()[5]) in lib:
-               if 'shared object' in subprocess.check_output('file ' + lib, shell = True):
+               cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
+               #sys.stderr.write('cmd=%s\n' % cmd)
 
-                  cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
-                  #sys.stderr.write('cmd=%s\n' % cmd)
+               addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
 
-                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
+               thelib = os.path.basename(map.split()[5])
+               thefullfunc = addr2line.split(' at ')[0].replace(' ', '-')
+               thefuncname = thefullfunc.split('(')[0]
 
-                  thelib = os.path.basename(map.split()[5])
-                  thefullfunc = addr2line.split(' at ')[0].replace(' ', '-')
-                  thefuncname = thefullfunc.split('(')[0]
-
-                  #sys.stderr.write('thefuncname=%s\n' % thefuncname)
-
-                  result = thefuncname
-                  break
+               result = thefuncname
+               break
          break
 
    return result
@@ -61,15 +50,16 @@ def sortby(x):
 
 def main():
 
-   if len(sys.argv) >= 4:
+   global libs
+   global maps
 
-      #build libs
-      for root, dirs, files in os.walk(sys.argv[3]):
-         for file in files:
-            if '.so' in file:
-               libs.append(root + '/' + file)
-      sys.stderr.write('libs done\n')
+   addresses = []
+   addr2lines = []
 
+
+   if len(sys.argv) == 3:
+
+      """
       #build maps
       #74955000-7495c000 rw-p 00151000 00:10 56755590   /usr/lib/libQt5Network.so.5.3.2
       f = open(sys.argv[2])
@@ -80,22 +70,68 @@ def main():
       sys.stderr.write('maps done\n')
       #for m in maps:
       #   sys.stderr.write('maps=[%s]\n' %m)
+      """
 
       f = open(sys.argv[1])
-
-      #build maps2
+      #build maps
       #DSC 0 0 MAPS,741b1000-74213000,r-xp,00000000,00:10,56754894,,,/lib/libuClibc-0.9.32.1.so
+      sys.stderr.write('building maps')
       for line in f:
          if 'DSC 0 0 MAPS' in line:
-            if line[13:].replace(',',' ') not in maps:
-               maps2.append(line[13:].replace(',',' '))
-      sys.stderr.write('maps2 done\n')
+            l = line[13:].replace(',',' ')
+            if l not in maps:
+               maps.append(l)
+               sys.stderr.write('.')
+               sys.stderr.flush()
 
-      #for m in maps2:
-      #   sys.stderr.write('maps2=[%s]\n' %m)
+      f.close()
+      sys.stderr.write('\n')
+      #for m in maps:
+      #   sys.stderr.write('maps=[%s]\n' %m)
 
 
-      f.seek(0)
+      """
+      libs = []
+      #build libs
+      sys.stderr.write('building libs')
+      ts = datetime.datetime.now()
+      for root, dirs, files in os.walk(sys.argv[3]):
+         for file in files:
+            if '.so' in file:
+               libs.append(root + '/' + file)
+               sys.stderr.write('.')
+               sys.stderr.flush()
+      tf = datetime.datetime.now()
+      sys.stderr.write('libs done in %s\n' % str(tf - ts))
+      for l in libs:
+         sys.stderr.write('%s\n' %l)
+      """
+
+      #build libs
+      libs = []
+      sys.stderr.write('building libs')
+      #ts = datetime.datetime.now()
+      for root, dirs, files in os.walk(sys.argv[2]):
+         for file in files:
+            #sys.stderr.write('check %s\n' % file)
+
+            if '/' + file + '\\n' in str(maps):
+               if 'MIPS' in subprocess.check_output('file ' + root + '/' + file, shell = True):
+               #if os.access(fpath, os.X_OK)
+               #if os.path.isfile(root + '/' + file):
+                  if not root + '/' + file in libs:
+                     libs.append(root + '/' + file)
+                     sys.stderr.write('.')
+                     sys.stderr.flush()
+      #tf = datetime.datetime.now()
+      #sys.stderr.write('libs done in %s\n' % str(tf - ts))
+      sys.stderr.write('\n')
+      for l in libs:
+         sys.stderr.write('%s\n' %l)
+
+      f = open(sys.argv[1])
+      sys.stderr.write('labeling return addresses...')
+
       for line in f:
 
          if line.startswith('DSC'):
@@ -110,17 +146,23 @@ def main():
                   addr2lines.append(addr2line)
 
                theaddr2line = addr2lines[addresses.index(address)]
-
                #sys.stderr.write('%s\n' %theaddr2line)
 
+               #DSC 0 0 QImageData::~QImageData()_free,=b17b78,ra=752ba544,sz=0
                line = line[0:8] + theaddr2line + ':' + line[8:]
+
+               #index = line.find(address) + len(address)
+               #line = line[:index] + '{' + theaddr2line + '}' + line[index:]
 
 
          print line,
 
+      f.close()
+      sys.stderr.write('\n')
+
    else:
 
-      print("Usage: %s tdifile mapsfile pathtorootfs" % sys.argv[0])
+      sys.stderr.write("Usage: %s tdifile pathtorootfs\n" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

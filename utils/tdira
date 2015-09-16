@@ -32,7 +32,7 @@ def parse_range(astr):
 def getlibandaddr2line(address, tag):
 
    result = 'lib?|function?'
-   for map in maps:
+   for map in maps2:
       maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
       mapareas = maparea.split('-')
 
@@ -66,13 +66,18 @@ def main():
          for file in files:
             if '.so' in file:
                libs.append(root + '/' + file)
+      sys.stderr.write('libs done\n')
 
       #build maps
+      #74955000-7495c000 rw-p 00151000 00:10 56755590   /usr/lib/libQt5Network.so.5.3.2
       f = open(sys.argv[2])
       for line in f:
          if '.so' in line:
             maps.append(line)
       f.close()
+      sys.stderr.write('maps done\n')
+      #for m in maps:
+      #   sys.stderr.write('maps=[%s]\n' %m)
 
       f = open(sys.argv[1])
 
@@ -84,9 +89,6 @@ def main():
             if l not in maps2:
                maps2.append(l)
       #sys.stderr.write('maps2 done\n')
-      for i in maps2:
-         print i
-
 
       f.seek(0)
 

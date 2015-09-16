@@ -177,10 +177,6 @@ def main():
 
 
 
-
-
-
-
       if (0):
          for row in izip_longest(*final):
             print row

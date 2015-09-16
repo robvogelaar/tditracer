@@ -803,7 +803,7 @@ static void get_process_name_by_pid(const int pid, char *name) {
     }
 }
 
-char proc_self_maps[32 * 1024 + 1];
+char proc_self_maps[16 * 1024 + 1];
 
 static void dump_proc_self_maps(void) {
     int fd;
@@ -819,23 +819,28 @@ static void dump_proc_self_maps(void) {
             /* keep trying */;
         else if (bytes > 0) {
             proc_self_maps[bytes] = '\0';
-            // printf("bytes=%d[%s]\n", bytes, proc_self_maps);
+            //printf("bytes=%d[%s]\n", bytes, proc_self_maps);
+
+            char *saveptr;
+            char *line = strtok_r(proc_self_maps, "\n", &saveptr);
+
+            while (line) {
+                if (strlen(line) > 50) {
+                    //printf("+%d[%s]\n", strlen(line), line);
+                    tditrace("MAPS %s", line);
+                }
+                line = strtok_r(NULL, "\n", &saveptr);
+            }
+
         } else
             break;
     }
 
     close(fd);
 
-    char *line = strtok(proc_self_maps, "\n");
-    while (line) {
-        if (strlen(line) > 50) {
-            // printf("%d[%s]\n", strlen(line), line);
-            tditrace("MAPS %s", line);
-        }
-        line = strtok(NULL, "\n");
-    }
 }
 
+static int do_mallinfo = 0;
 
 static int monitor;
 
@@ -854,31 +859,33 @@ void *monitor_thread(void *param) {
             do_dump_proc_self_maps = 0;
         }
 
-        struct mallinfo mi;
+        if (do_mallinfo) {
+            struct mallinfo mi;
 
-        mi = mallinfo();
+            mi = mallinfo();
 
-        // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
-        // printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
-        // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-        // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
-        // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-        // printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
-        // printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
-        // printf("Total allocated space (uordblks):      %d\n", mi.uordblks);
-        // printf("Total free space (fordblks):           %d\n", mi.fordblks);
-        // printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+            // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
+            // printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
+            // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+            // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
+            // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+            // printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
+            // printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
+            // printf("Total allocated space (uordblks):      %d\n", mi.uordblks);
+            // printf("Total free space (fordblks):           %d\n", mi.fordblks);
+            // printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
 
-        tditrace("mi.arena~%d", mi.arena);
-        tditrace("mi.ordblks~%d", mi.ordblks);
-        tditrace("mi.smblks~%d", mi.smblks);
-        tditrace("mi.hblks~%d", mi.hblks);
-        tditrace("mi.hblkhd~%d", mi.hblkhd);
-        tditrace("mi.usmblks~%d", mi.usmblks);
-        tditrace("mi.fsmblks~%d", mi.fsmblks);
-        tditrace("mi.uordblks~%d", mi.uordblks);
-        tditrace("mi.fordblks~%d", mi.fordblks);
-        tditrace("mi.keepcost~%d", mi.keepcost);
+            tditrace("mi.arena~%d", mi.arena);
+            tditrace("mi.ordblks~%d", mi.ordblks);
+            tditrace("mi.smblks~%d", mi.smblks);
+            tditrace("mi.hblks~%d", mi.hblks);
+            tditrace("mi.hblkhd~%d", mi.hblkhd);
+            tditrace("mi.usmblks~%d", mi.usmblks);
+            tditrace("mi.fsmblks~%d", mi.fsmblks);
+            tditrace("mi.uordblks~%d", mi.uordblks);
+            tditrace("mi.fordblks~%d", mi.fordblks);
+            tditrace("mi.keepcost~%d", mi.keepcost);
+        }
 
         struct stat st;
         stat(gtracebufferfilename, &st);
@@ -1023,9 +1030,9 @@ int tditrace_init(void) {
         printf("tdi: init[%d][%s]\n", gpid, gprocname);
     }
 
-    static int do_mallinfo = 0;
+    do_mallinfo = 0;
     if (getenv("MALLINFO")) {
-        do_mallinfo = atoi(getenv("REMOVE"));
+        do_mallinfo = (atoi(getenv("MALLINFO")) >= 1);
     }
 
     /*

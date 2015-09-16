@@ -104,6 +104,17 @@ typedef float GLclampf;
 #define GL_DEPTH_ATTACHMENT 0x8D00
 #define GL_STENCIL_ATTACHMENT 0x8D20
 
+#define GL_DELETE_STATUS 0x8B80
+#define GL_LINK_STATUS 0x8B82
+#define GL_VALIDATE_STATUS 0x8B83
+#define GL_ATTACHED_SHADERS 0x8B85
+#define GL_ACTIVE_UNIFORMS 0x8B86
+#define GL_ACTIVE_UNIFORM_MAX_LENGTH 0x8B87
+#define GL_ACTIVE_ATTRIBUTES 0x8B89
+#define GL_ACTIVE_ATTRIBUTE_MAX_LENGTH 0x8B8A
+#define GL_SHADING_LANGUAGE_VERSION 0x8B8C
+#define GL_CURRENT_PROGRAM 0x8B8D
+
 #define CLEARSTRING(mask)                                                      \
     (mask == GL_DEPTH_BUFFER_BIT                                               \
          ? "GL_DEPTH_BUFFER_BIT"                                               \
@@ -293,9 +304,11 @@ extern "C" {
 #endif
 
 GLenum glGetError(void);
-
+void glGetProgramiv(GLuint program, GLenum pname, GLint *params);
+void glGetIntegerv(GLenum pname, GLint *data);
+GLboolean glIsProgram(GLuint program);
 #ifdef __cplusplus
 }
 #endif
 
-#define GL_NO_ERROR        0
+#define GL_NO_ERROR 0

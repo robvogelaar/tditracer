@@ -545,7 +545,33 @@ extern "C" GLvoid glAttachShader(GLuint program, GLuint shader) {
     }
 
     __glAttachShader(program, shader);
+    tditrace_ex("@E+glAttachShader() %u %u", shader, program);
 }
+
+extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
+    static void (*__glDetachShader)(GLuint, GLuint) = NULL;
+
+    if (__glDetachShader == NULL) {
+        __glDetachShader =
+            (void (*)(GLuint, GLuint))dlsym(RTLD_NEXT, "glDetachShader");
+        if (NULL == __glDetachShader) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (glesrecording)
+        tditrace_ex("glDetachShader() %u %u", program, shader);
+
+    #if 0
+    if (shaderrecording) {
+        shadercapture_referenceprogram(shader, program);
+    }
+    #endif
+
+    __glDetachShader(program, shader);
+    tditrace_ex("@E+glDetachShader() %u %u", shader, program);
+}
+
 
 #if 0
 extern "C" GLvoid glEnable(GLenum cap)
@@ -821,4 +847,127 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer) {
 
     boundrenderbuffer = renderbuffer;
     framebufferrenderbuffer[boundframebuffer & 0x3ff] = renderbuffer;
+}
+
+
+extern "C" GLuint glCreateProgram(void) {
+    static GLuint (*__glCreateProgram)(void) = NULL;
+
+    if (__glCreateProgram == NULL) {
+        __glCreateProgram = (GLuint (*)(void))dlsym(RTLD_NEXT, "glCreateProgram");
+        if (NULL == __glCreateProgram) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    GLuint program = __glCreateProgram();
+    tditrace_ex("@E+glCreateProgram() %u", program);
+
+    return program;
+}
+
+
+extern "C" void glLinkProgram(GLuint program) {
+    static void (*__glLinkProgram)(GLuint) = NULL;
+
+    if (__glLinkProgram == NULL) {
+        __glLinkProgram = (void (*)(GLuint))dlsym(RTLD_NEXT, "glLinkProgram");
+        if (NULL == __glLinkProgram) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    tditrace_ex("@I+glLinkProgram() %d", program);
+    __glLinkProgram(program);
+    tditrace_ex("@I-glLinkProgram() %d", program);
+
+}
+
+extern "C" void glDeleteProgram(GLuint program) {
+    static void (*__glDeleteProgram)(GLuint) = NULL;
+
+    if (__glDeleteProgram == NULL) {
+        __glDeleteProgram = (void (*)(GLuint))dlsym(RTLD_NEXT, "glDeleteProgram");
+        if (NULL == __glDeleteProgram) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    __glDeleteProgram(program);
+    tditrace_ex("@E+glDeleteProgram() %d", program);
+
+
+
+    GLint params = 0;
+    GLint curprog = 0;
+
+    glGetIntegerv(GL_CURRENT_PROGRAM, &curprog);
+    tditrace_ex("@E+glDeleteProgram() %d GL_CURRENT_PROGRAM=%d", program, curprog);
+    
+    if (glIsProgram(program)) {
+        glGetProgramiv(program, GL_DELETE_STATUS, &params); 
+        tditrace_ex("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
+
+        glGetProgramiv(program, GL_ATTACHED_SHADERS, &params); 
+        tditrace_ex("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
+
+        if (program == curprog) {
+
+            glUseProgram(0);
+
+            __glDeleteProgram(program);
+
+            if (glIsProgram(program)) {
+                tditrace_ex("@E+glDeleteProgram() %d is_not_deleted", program);
+
+                glGetProgramiv(program, GL_DELETE_STATUS, &params); 
+                tditrace_ex("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
+
+                glGetProgramiv(program, GL_ATTACHED_SHADERS, &params); 
+                tditrace_ex("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
+
+            } else {
+                tditrace_ex("@E+glDeleteProgram() %d is_deleted", program);
+            }
+        }
+
+    } else {
+        tditrace_ex("@E+glDeleteProgram() %d is_deleted", program);
+    }
+
+    GLenum err = GL_NO_ERROR;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        tditrace_ex("@E+GLERROR 0x%x", err);
+    }
+
+}
+
+extern "C" GLuint glCreateShader(GLenum shaderType){
+    static GLuint (*__glCreateShader)(GLenum) = NULL;
+
+    if (__glCreateShader == NULL) {
+        __glCreateShader = (GLuint (*)(GLenum))dlsym(RTLD_NEXT, "glCreateShader");
+        if (NULL == __glCreateShader) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    GLuint shader = __glCreateShader(shaderType);
+    tditrace_ex("@E+glCreateShader() %u", shader);
+
+    return shader;
+}
+
+extern "C" void glDeleteShader(GLuint shader) {
+    static void (*__glDeleteShader)(GLuint) = NULL;
+
+    if (__glDeleteShader == NULL) {
+        __glDeleteShader = (void (*)(GLuint))dlsym(RTLD_NEXT, "glDeleteShader");
+        if (NULL == __glDeleteShader) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    __glDeleteShader(shader);
+    tditrace_ex("@E+glDeleteShader() %u", shader);
 }

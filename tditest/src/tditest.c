@@ -7,55 +7,7 @@
 extern void tditrace(const char *format, ...) __attribute__((weak));
 extern void tditrace_ex(const char *format, ...) __attribute__((weak));
 
-void bar(void) {
-    int a;
-    unsigned int x;
-    asm volatile ("move %0, $ra" : "=r" (x));
-    printf("bar, %p, %p, %p\n", __builtin_return_address(0), &a, x);
- }
-
-void foo(void) {
-    int a;
-    printf("foo, %p, %p\n", __builtin_return_address(0), &a);
-    bar();
-    bar();
-
-}
-
-void bar2(void) {
-    int a;
-    printf("bar2, %p, %p\n", __builtin_return_address(0), &a); }
-
-void foo2(void) {
-    int a;
-    printf("foo2, %p, %p\n", __builtin_return_address(0), &a);
-    bar2();
-    bar2();
-}
-
-
-int main(int argc, char **argv) {
-    int i;
-
-#if 1
-
-    time_t t;
-    t = time(NULL);
-    printf("Local time and date: %s\n", asctime(localtime(&t)));
-    printf("UTC time and date: %s\n", asctime(gmtime(&t)));
-
-    struct timespec mytime;
-    mytime.tv_nsec = 0;
-    mytime.tv_sec = 0;
-    printf("0 -> time and date: %s\n", ctime((const time_t *)&mytime));
-    printf("0 -> UTC time and date: %s\n",
-           asctime(gmtime((const time_t *)&mytime)));
-
-#endif
-
-    struct timeval mytimeval;
-    struct timespec mytimespec;
-
+void run_1(void) {
 #if 0
     for (i = 0; i < 150; i++) {
         gettimeofday(&mytimeval, 0);
@@ -63,6 +15,7 @@ int main(int argc, char **argv) {
         usleep(10000);
     }
 #endif
+}
 
 #if 0
     for (i = 0; i < 150; i++) {
@@ -72,10 +25,29 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    printf("start\n");
+void run_2(void) {
 
-    foo();
-    foo2();
+int i;
+struct timeval mytimeval;
+struct timespec mytimespec;
+
+printf("start\n");
+
+#if 1
+
+time_t t;
+t = time(NULL);
+printf("Local time and date: %s\n", asctime(localtime(&t)));
+printf("UTC time and date: %s\n", asctime(gmtime(&t)));
+
+struct timespec mytime;
+mytime.tv_nsec = 0;
+mytime.tv_sec = 0;
+printf("0 -> time and date: %s\n", ctime((const time_t *)&mytime));
+printf("0 -> UTC time and date: %s\n",
+       asctime(gmtime((const time_t *)&mytime)));
+
+#endif
 
     if (tditrace)
         printf("tditrace\n");
@@ -240,5 +212,45 @@ int main(int argc, char **argv) {
 
     printf("stop\n");
 
+}
+
+void foo(char* p, int i) {
+
+    int b;
+
+    unsigned int ra = 0;
+    unsigned int sp = 0;
+
+    #ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+    asm volatile("move %0, $sp" : "=r"(sp));
+    #endif
+
+    printf("foo, return address : %p, ra : %p, sp : %p\n", __builtin_return_address(0), ra, sp);
+
+    printf("%d\n", i);
+
+
+    if (i < 3) {
+        foo(p, ++i);
+    } else {
+        b = (int)realloc(p, i * 5 * 1024);
+        printf("b=0x%08x (0x%08x)\n", b, &b);
+    }
+
+}
+
+
+int main(int argc, char **argv) {
+
+    sleep(3);
+
+    char *p = malloc(1 * 1024);
+
+    foo(p, 0);
+
+    sleep(3);
+
+    printf("stop\n");
     return 0;
 }

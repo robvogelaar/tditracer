@@ -842,12 +842,12 @@ extern "C" void *malloc(size_t size) {
 
     if (libcrecording) {
 
-        //if (1) {
+        //if (0) {
         if (size >= 128) {
 
             // tditrace_ex("@A+malloc() %d %p", size, ra);
 
-            tditrace_ex("m =%x,ra=%p,sz=%d", ret, ra, size);
+            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
         }
     }
 
@@ -914,12 +914,25 @@ extern "C" void *realloc(void *ptr, size_t size)
         }
     }
 
+#if 0
+    if (NULL == glsl) {
+        glsl = dlsym(RTLD_NEXT, "glsl_set_line_capture_vertex");
+        if (glsl == NULL) {
+            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "glsl_set_line_capture_vertex");
+            fprintf(stderr, "glsl = 0x%x [0x%x]\n", glsl, &glsl);
+        } else {
+            fprintf(stderr, "got glsl!!!!!!!!! = 0x%x [0x%x]\n", glsl, &glsl);
+        }
+    }
+#endif
+
     if (libcrecording) {
         if (0) { //size >= 1024) {
             unsigned int ra = 0;
             #ifdef __mips__
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
+
             tditrace_ex("r ra=%p,sz=%d", ra, size);
         }
         // tditrace_ex("@A+realloc() %d %p", size, ra);
@@ -935,10 +948,9 @@ extern "C" void *realloc(void *ptr, size_t size)
             #ifdef __mips__
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
-            tditrace_ex("r =%x,ra=%p,sz=%d", ret, ra, size);
+
+            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
         }
-
-
     }
 
     return ret;

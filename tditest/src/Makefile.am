@@ -8,4 +8,4 @@ tditest_LDADD = \
 tditest_SOURCES = \
     tditest.c
 
-tditest_CFLAGS = -fPIC -g
+tditest_CFLAGS = -fPIC -g2 -O0
