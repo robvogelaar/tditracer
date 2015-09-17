@@ -50,6 +50,8 @@ def main():
       cyclenr = 0
       allow = False
 
+      order = 1
+
       f = open(sys.argv[1])
 
       sys.stderr.write('collecting data for cycles')
@@ -86,9 +88,9 @@ def main():
 
                if line.startswith('DSC'):
 
-                  #result = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  result = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
                   #result = re.search(r'r,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
-                  result = re.search(r'm,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  #result = re.search(r'm,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
 
                   if result:
 
@@ -99,7 +101,8 @@ def main():
 
                      if malloc < 0x30000000:
 
-                        cycledata.append((malloc, tag, size))
+                        cycledata.append((malloc, tag, size, order))
+                        order+= 1
                         
       sys.stderr.write('\n')
 
@@ -183,7 +186,7 @@ def main():
                leakstr+= '!'
                leakchecklist_leaksonly.append(str('%s %d %s') %(itemlist[1], itemlist[2], hex(itemlist[0])))
 
-            sys.stderr.write(str('%4d 0x%08x %-40s %6d %s\n' %(i, itemlist[0], itemlist[1], itemlist[2], leakstr)))
+            sys.stderr.write(str('%4d 0x%08x %-60s %6d %s\n' %(i, itemlist[0], itemlist[1], itemlist[2], leakstr)))
 
             leakchecklist_full.append(str('%s %d %s %s') %(itemlist[1], itemlist[2], hex(itemlist[0]), leakstr))
     

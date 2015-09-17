@@ -36,7 +36,7 @@ def main():
       f.close()
 
    else:
-      print("Usage: %s tdifile pattern" % sys.argv[0])
+      sys.stderr.write("Usage: %s tdifile pattern\n" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

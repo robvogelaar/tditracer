@@ -4,6 +4,8 @@ import sys
 import re
 import time
 from datetime import datetime
+import os
+import fnmatch
 
 TASKS = 0
 ISRS = 1
@@ -278,7 +280,16 @@ def main():
 
    if len(sys.argv) >= 2:
 
-      for tdifilename in sys.argv[1:]:
+      #build filelist
+      filelist = []
+      for filespec in sys.argv[1:]:
+         for afile in os.listdir('.'):
+            if fnmatch.fnmatch(afile, filespec):
+               if afile not in filelist:
+                  filelist.append(afile)
+
+
+      for tdifilename in filelist:
          build(tdifilename)
 
       evts.sort(key = sortby)
