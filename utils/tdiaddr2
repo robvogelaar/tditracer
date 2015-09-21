@@ -186,12 +186,14 @@ def main():
 
       leakchecklists = []
 
-      if len(sys.argv) == 6:
+      if len(sys.argv) >= 6:
          nrcyclestocheck = int(sys.argv[5])
       else:
          nrcyclestocheck = max(cyclesrange) - min(cyclesrange) + 1
 
       for cycletocheckfrom in range(0, nrcyclestocheck):
+
+         nrfuturecycleschecked = 0
 
          sys.stderr.write('checking cycle %d\n' % (cycletocheckfrom + 1))
 
@@ -211,7 +213,6 @@ def main():
          start = cycletocheckfrom
          stop = max(cyclesrange) - min(cyclesrange) + 1
          length = stop - start
-         #sys.stderr.write('start=%d, stop=%d, length=%d, grouprange=%d,%d\n' % (start, stop, length, 0, length / 4 + 1))
 
          for group in range(0, length / 4 + 1):
 
@@ -220,6 +221,12 @@ def main():
                count = length - group * 4
 
             cyclesets = buildcyclerangesets(start + group * 4, start + group * 4 + count)
+
+            sys.stderr.write('checking against cycle(s)')
+            for c in range(start + group * 4, start + group * 4 + count):
+               sys.stderr.write(' %d' % int(c + 1))
+            sys.stderr.write('\n')
+
 
             i = 0
             for item in cycle:
@@ -241,37 +248,47 @@ def main():
 
                i+= 1
 
+            nrfuturecycleschecked+= count
+
+            if len(sys.argv) == 7:
+               if nrfuturecycleschecked >= int(sys.argv[6]):
+                  sys.stderr.write('stop due to nrfuturecycleschecked = %d >= %s\n' %(nrfuturecycleschecked, sys.argv[6]))
+                  break
+
 
          k = 0
          for t in tempstrings:
             if tempuses[k] == 1:
                tempstrings[k]+= '!'
                leakchecklist_leaksonly.append(tempstrings[k])
-               sys.stderr.write('%s\n' % tempstrings[k])
+               #sys.stderr.write('%s\n' % tempstrings[k])
 
             k+= 1
 
-         sys.stderr.write('sorted -----------------------------------------------------------\n')
-
          leakchecklist_leaksonly.sort(key = sortby, reverse=True)
-         for r in leakchecklist_leaksonly:
-            sys.stderr.write('%s\n' % str(r))
+         #sys.stderr.write('sorted -----------------------------------------------------------\n')
+         #for r in leakchecklist_leaksonly:
+         #   sys.stderr.write('%s\n' % str(r))
 
-
-         sys.stderr.write('minimized -----------------------------------------------------------\n')
 
          addrs = []
+         total = 0
+
          for r in leakchecklist_leaksonly:
             if not r.split()[0] in addrs:
                leakchecklist_leaksonly_minimized.append(str('%s %s' %(r.split()[4], r.split()[1])))
                addrs.append(r.split()[0])
+               total += int(r.split()[1])
 
          leakchecklist_leaksonly_minimized.sort(key = sortby1, reverse=True)
-         total = 0
+
+         #sys.stderr.write('minimized -----------------------------------------------------------\n')
+
          for r in leakchecklist_leaksonly_minimized:
             sys.stderr.write('%s\n' % str(r))
-            total += int(r.split()[1])
          sys.stderr.write('total = %d Bytes\n' % total)
+
+         leakchecklist_leaksonly_minimized.insert(0, 'total = %d Bytes' %total)
          leakchecklist_leaksonly_minimized.append('total = %d Bytes' %total)
 
 
@@ -283,7 +300,7 @@ def main():
 
 
    else:
-      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange [nrcyclestocheck]\n" % sys.argv[0])
+      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange [nrcyclestocheck] [maxnrfuturecyclestocheckagainst]\n" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

@@ -808,6 +808,8 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
+extern "C" void closelog (void);
+
 #if 1
 extern "C" void *malloc(size_t size) {
     static void *(*__malloc)(size_t) = NULL;
@@ -832,6 +834,23 @@ extern "C" void *malloc(size_t size) {
     //}
     //#endif
 
+    #if 0
+    //static void *(*__malloc)(size_t) = NULL;
+    //static void* (*operator new)(unsigned int i) = NULL;
+    static void* __new = NULL;
+
+    if (__new == NULL) {
+        __new = (void *)dlsym(RTLD_NEXT, "_Znwj");
+        if (NULL == __new) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+        else {
+            fprintf(stderr, "Got operator new : %p\n", __new);
+        }
+    }
+    #endif
+
+
     unsigned int ra = 0;
     #ifdef __mips__
     asm volatile("move %0, $ra" : "=r"(ra));
@@ -843,11 +862,30 @@ extern "C" void *malloc(size_t size) {
     if (libcrecording) {
 
         //if (0) {
+        //if (1) {
         if (size >= 128) {
 
             // tditrace_ex("@A+malloc() %d %p", size, ra);
 
-            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+
+            // tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+
+            if (size == 1312) {
+                tditrace_ex("m1312 =%x,ra=%x,sz=%d", ret, ra, size);
+            }
+
+
+            #if 0
+            if ((ra >= __new - 256) && (ra <= __new + 256)) {
+                tditrace_ex("newm =%x,ra=%x,sz=%d", ret, ra, size);
+
+                if (size > 1024) {
+                    tditrace_ex("new1024m =%x,ra=%x,sz=%d", ret, ra, size);
+                    closelog();
+                }
+            }
+            #endif
+
         }
     }
 
@@ -1162,5 +1200,51 @@ extern "C" int madvise(void *__addr, size_t __len, int __advice) {
     int ret = __madvise(__addr, __len, __advice);
     tditrace_ex("@A-madvise()");
     return ret;
+}
+#endif
+
+
+
+
+
+#if 0
+
+#include <new>
+#include <stdexcept>
+
+// Regular scalar new
+void* operator new(std::size_t n) throw(std::bad_alloc)
+{
+    using namespace std;
+
+    for (;;) {
+        void* allocated_memory = ::operator new(n, nothrow);
+        if (allocated_memory != 0) return allocated_memory;
+
+        // Store the global new handler
+        new_handler global_handler = set_new_handler(0);
+        set_new_handler(global_handler);
+
+        if (global_handler) {
+            global_handler();
+        } else {
+            throw bad_alloc();
+        }
+    }
+}
+
+#endif
+
+//_Znwj
+
+#if 0
+void* operator new(unsigned int i){
+
+    //printf('hello\n');
+
+    //usleep(1*1000*1000);
+
+    return malloc(i);
+
 }
 #endif

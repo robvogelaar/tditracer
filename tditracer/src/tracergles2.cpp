@@ -877,9 +877,9 @@ extern "C" void glLinkProgram(GLuint program) {
         }
     }
 
-    tditrace_ex("@I+glLinkProgram() %d", program);
+    //tditrace_ex("@I+glLinkProgram() %d", program);
     __glLinkProgram(program);
-    tditrace_ex("@I-glLinkProgram() %d", program);
+    //tditrace_ex("@I-glLinkProgram() %d", program);
 
 }
 

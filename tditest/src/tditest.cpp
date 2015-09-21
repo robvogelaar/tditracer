@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <time.h>
+#include <sys/time.h>
 
-extern void tditrace(const char *format, ...) __attribute__((weak));
-extern void tditrace_ex(const char *format, ...) __attribute__((weak));
+extern "C" void tditrace(const char *format, ...) __attribute__((weak));
+extern "C" void tditrace_ex(const char *format, ...) __attribute__((weak));
 
 void run_1(void) {
 #if 0
@@ -77,7 +77,7 @@ printf("0 -> UTC time and date: %s\n",
 
         printf("malloc(1 * 1024)\n");
 
-        char *d = malloc(1 * 1024);
+        char *d = (char*)malloc(1 * 1024);
         d[0] = 0;
 
         // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
@@ -240,7 +240,7 @@ void foo(char* p, int i) {
 
 }
 
-
+#if 0
 int main(int argc, char **argv) {
 
     sleep(3);
@@ -252,5 +252,33 @@ int main(int argc, char **argv) {
     sleep(3);
 
     printf("stop\n");
+    return 0;
+}
+#endif
+
+int main(int argc, char **argv) {
+
+    usleep(2*1000*1000);
+
+    if (tditrace)
+        tditrace("START");
+
+
+    int i;
+    for (i = 0; i < 10; i++) {
+
+        int *p1 = new int(5);
+        int *p2 = new int [1312 / 4];
+        int *p3 = (int*)malloc(5 * sizeof(int));
+    
+        printf("p1=%d(%x)\n", *p1, p1);
+        printf("p2=%d(%x)\n", *p2, p2);
+        printf("p3=%d(%x)\n", *p3, p3);
+    }
+
+
+    if (tditrace)
+        tditrace("STOP");
+
     return 0;
 }

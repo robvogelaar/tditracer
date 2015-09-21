@@ -126,8 +126,10 @@ def build(tdifilename):
    global first_tstamp
    global ref_offset
 
+   sys.stderr.write('%s\n' % tdifilename)
 
    f = open(tdifilename)
+
 
    for line in f:
       if line.startswith('END'):
@@ -145,24 +147,19 @@ def build(tdifilename):
             else:
                offset = offset + (3600000000000 * hours)
 
+
+
    f.seek(0)
    qvals = []
    qnams = []
    qtstamps = []
 
+
+   localnams = []
+
    for line in f:
 
-      if line.startswith('NAM'):
-
-         namwords = line.split()
-         nams.append(tdifilename + ' ' + namwords[2] + ' ' + namwords[3])
-
-         if int(namwords[1]) == QUEUES:
-            if not namwords[3] in qnams:
-               qnams.append(namwords[3])
-               qvals.append(0)
-               qtstamps.append('')
-
+      #####
       if line.startswith('OCC'):
 
          occwords = line.split()
@@ -173,18 +170,17 @@ def build(tdifilename):
 
          dscwords = f.next().split()
 
-         for nam in nams:
+         for nam in localnams:
             namwords = nam.split()
 
             if namwords[0] == tdifilename:
-
                if occwords[2] == namwords[1]:
-
                   thenam = namwords[2]
 
          evts.append(str(offset + tstamp) + ' ' + occwords[1] + ' ' + 'OCC' + ' ' +  thenam + ' ' + dscwords[3])
 
-      if line.startswith('STA'):
+      #####
+      elif line.startswith('STA'):
 
          stawords = line.split()
          tstamp = int(stawords[3])
@@ -196,20 +192,18 @@ def build(tdifilename):
 
             dscwords = f.next().split()
 
-            for nam in nams:
+            for nam in localnams:
                namwords = nam.split()
 
                if namwords[0] == tdifilename:
-
                   if stawords[2] == namwords[1]:
-
                      thenam = namwords[2]
 
             evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + 'STA' + ' ' + thenam + ' ' + dscwords[3])
 
-         if int(stawords[1]) == QUEUES: # ~ STA / STO
+         elif int(stawords[1]) == QUEUES: # ~ STA / STO
 
-            for nam in nams:
+            for nam in localnams:
                namwords = nam.split()
                if namwords[0] == tdifilename:
                   if stawords[2] == namwords[1]:
@@ -218,11 +212,11 @@ def build(tdifilename):
             evts.append(str(offset + tstamp) + ' ' + stawords[1] + ' ' + stawords[0] + ' ' + thenam + ' ' + stawords[4])
 
             qvals[qnams.index(thenam)] += int(stawords[4])
-            #sys.stderr.write('q+% 8d=% 8d\n' % (int(stawords[4]), qvals[qnams.index(thenam)]) )
             qtstamps[qnams.index(thenam)] = str(offset + tstamp)
 
 
-      if line.startswith('STO'):
+      #####
+      elif line.startswith('STO'):
 
          stowords = line.split()
          tstamp = int(stowords[3])
@@ -234,7 +228,7 @@ def build(tdifilename):
 
             dscwords = f.next().split()
 
-            for nam in nams:
+            for nam in localnams:
                namwords = nam.split()
                if namwords[0] == tdifilename:
                   if stowords[2] == namwords[1]:
@@ -242,9 +236,9 @@ def build(tdifilename):
 
             evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + 'STO' + ' ' + thenam + ' ' + dscwords[3])
 
-         if int(stowords[1]) == QUEUES: # ~ STA / STO
+         elif int(stowords[1]) == QUEUES: # ~ STA / STO
 
-            for nam in nams:
+            for nam in localnams:
                namwords = nam.split()
                if namwords[0] == tdifilename:
                   if stowords[2] == namwords[1]:
@@ -253,8 +247,23 @@ def build(tdifilename):
             evts.append(str(offset + tstamp) + ' ' + stowords[1] + ' ' + stowords[0] + ' ' + thenam + ' ' + stowords[4])
 
             qvals[qnams.index(thenam)] -= int(stowords[4])
-            #sys.stderr.write('q-% 8d=% 8d\n' % (int(stowords[4]), qvals[qnams.index(thenam)]) )
             qtstamps[qnams.index(thenam)] = str(offset + tstamp)
+
+      #####
+      elif line.startswith('NAM'):
+
+         namwords = line.split()
+
+         localnams.append(tdifilename + ' ' + namwords[2] + ' ' + namwords[3])
+
+         nams.append(tdifilename + ' ' + namwords[2] + ' ' + namwords[3])
+
+         if int(namwords[1]) == QUEUES:
+            if not namwords[3] in qnams:
+               qnams.append(namwords[3])
+               qvals.append(0)
+               qtstamps.append('')
+
 
    # set the queues back to 0 for merging
    for q in qnams:
@@ -266,6 +275,7 @@ def build(tdifilename):
       #print evts[-1]
       #'307521273736370 3 STO [qtbrowser][26409][0]mi.fordblks 11568']
 
+
    f.close()
 
 def sortby(x):
@@ -273,6 +283,12 @@ def sortby(x):
         return int(x.split(' ', 1)[0])
     except ValueError:
         return float('inf')
+
+
+def natural_sort(l): 
+    convert = lambda text: int(text) if text.isdigit() else text.lower() 
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+    return sorted(l, key = alphanum_key)
 
 def main():
    global first_tstamp
@@ -288,6 +304,7 @@ def main():
                if afile not in filelist:
                   filelist.append(afile)
 
+      filelist = natural_sort(filelist)
 
       for tdifilename in filelist:
          build(tdifilename)

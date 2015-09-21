@@ -6,6 +6,6 @@ tditest_LDADD = \
     ../../tdi/src/libtdi.la
 
 tditest_SOURCES = \
-    tditest.c
+    tditest.cpp
 
-tditest_CFLAGS = -fPIC -g2 -O0
+tditest_CXXFLAGS = -fPIC -g2 -O0

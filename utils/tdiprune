@@ -19,6 +19,8 @@ def main():
                id = line.split()[2]
                if not id in ids:
                   ids.append(id)
+                  sys.stderr.write('keeping : %s\n' % line[:-1])
+
                print line,
 
          elif line.startswith('STA') or line.startswith('STO') or line.startswith('OCC'):
