@@ -987,7 +987,7 @@ extern "C" void *realloc(void *ptr, size_t size)
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
 
-            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            //tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
         }
     }
 
