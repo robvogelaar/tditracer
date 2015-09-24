@@ -876,15 +876,15 @@ void *monitor_thread(void *param) {
             // printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
 
             tditrace("mi.arena~%d", mi.arena);
-            tditrace("mi.ordblks~%d", mi.ordblks);
-            tditrace("mi.smblks~%d", mi.smblks);
-            tditrace("mi.hblks~%d", mi.hblks);
-            tditrace("mi.hblkhd~%d", mi.hblkhd);
-            tditrace("mi.usmblks~%d", mi.usmblks);
-            tditrace("mi.fsmblks~%d", mi.fsmblks);
-            tditrace("mi.uordblks~%d", mi.uordblks);
-            tditrace("mi.fordblks~%d", mi.fordblks);
-            tditrace("mi.keepcost~%d", mi.keepcost);
+            //tditrace("mi.ordblks~%d", mi.ordblks);
+            //tditrace("mi.smblks~%d", mi.smblks);
+            //tditrace("mi.hblks~%d", mi.hblks);
+            //tditrace("mi.hblkhd~%d", mi.hblkhd);
+            //tditrace("mi.usmblks~%d", mi.usmblks);
+            //tditrace("mi.fsmblks~%d", mi.fsmblks);
+            //tditrace("mi.uordblks~%d", mi.uordblks);
+            //tditrace("mi.fordblks~%d", mi.fordblks);
+            //tditrace("mi.keepcost~%d", mi.keepcost);
         }
 
         struct stat st;

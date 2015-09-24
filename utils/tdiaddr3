@@ -43,7 +43,7 @@ def main():
 
    cycledata = []
 
-   if len(sys.argv) >= 5:
+   if len(sys.argv) >= 6:
 
       cyclesrange = parse_range(sys.argv[4])
 
@@ -59,9 +59,13 @@ def main():
       for line in f:
 
          if line.startswith('DSC'):
+
             if re.search(sys.argv[2], line):
 
                if cycledata:
+
+                  sys.stderr.write('[%d]' %int(cyclenr))
+                  sys.stderr.flush()
 
                   addrs = []
                   largests = []
@@ -76,23 +80,15 @@ def main():
                         if s > largests[addrs.index(a)]:
                            largests[addrs.index(a)] = s
 
-                  #for p in addrs:
-                  #   print hex(p), largests[addrs.index(p)]
-
                   i = 0;
                   for c in cycledata:
                      b = largests[addrs.index(list(c)[0])]
                      cycledata[i] = cycledata[i] + (b,)
                      i+= 1
 
-
                   cyclesdata.append(cycledata)
-
                   cyclesresultstrings.append([''] * len(cycledata))
                   cyclesuses.append([0] * len(cycledata))
-
-                  #sys.stderr.write('%s\n' % str(cyclesresultstrings))
-                  #sys.stderr.write('%s\n' % str(cyclesuses))
 
 
                cycledata = []
@@ -102,10 +98,7 @@ def main():
 
                allow = True
 
-               if cyclenr in cyclesrange:
-                  sys.stderr.write('+')
-                  sys.stderr.flush()
-               else:
+               if cyclenr not in cyclesrange:
                   if cyclenr > max(cyclesrange):
                      break
                   else:
@@ -134,13 +127,14 @@ def main():
                      #address = int((result.group().split(',')[2])[3:], 16)
                      size = int((result.group().split(',')[3])[3:])
                      tag = line.split(' ')[3][:-1].split(',=')[0]
+                     tag = tag.replace(',', ';')
 
                      if malloc < 0x30000000:
 
                         cycledata.append((malloc, tag, size, order))
                         order+= 1
 
-      sys.stderr.write('\n')
+      sys.stderr.write(' (%d cycles)\n' %len(cyclesdata))
 
       f.close()
 
@@ -168,11 +162,13 @@ def main():
 
       leakchecklists = []
 
-      if len(sys.argv) >= 6:
-         nrcyclestocheck = int(sys.argv[5])
-      else:
-         nrcyclestocheck = max(cyclesrange) - min(cyclesrange) + 1
 
+      nrcyclestocheck = max(cyclesrange) - min(cyclesrange) + 1
+
+      if nrcyclestocheck > len(cyclesdata):
+         nrcyclestocheck = len(cyclesdata)
+
+      sys.stderr.write('checking %d cycle(s)\n' %nrcyclestocheck)
 
       nrchecks = 1
       ts = datetime.datetime.now()
@@ -195,64 +191,68 @@ def main():
    
          for cycletocheck in range(0, nrcyclestocheck):
 
-            if cycletocheckagainst >= cycletocheck:
+            if cycletocheckagainst > cycletocheck:
 
-               skip = False
                tf = datetime.datetime.now()
-               sys.stderr.write('(%s)#%5d checking %d-%d' % (str(tf-ts), nrchecks, cycletocheck + 1, cycletocheckagainst + 1))
+
+               if len(sys.argv) >= 6:
+                  if (cycletocheck + 1) > int(sys.argv[5]):
+                     continue
+
                if len(sys.argv) == 7:
                   if (cycletocheckagainst - cycletocheck) >= int(sys.argv[6]):
-                     sys.stderr.write(' skip (max = %d)\n' % int(sys.argv[6]))
-                     skip = True
+                     continue;
+
+               sys.stderr.write('(%s)#%-5d checking %d-%d\n' % (str(tf-ts), nrchecks, cycletocheck + 1, cycletocheckagainst + 1))
+               cycleresultstrings = cyclesresultstrings[cycletocheck]
+               cycleuses = cyclesuses[cycletocheck]
+
+               cycledata = list(set(cyclesdata[cycletocheck]))
+               cycledata.sort()
+
+               # do the check
+               i = 0
+               for item in cycledata:
+                  itemlist = list(item)
+
+                  if not cycleresultstrings[i]:
+                     cycleresultstrings[i] = str('0x%08x %6d %6d %6d %s=x') %(itemlist[0], itemlist[2], itemlist[4], itemlist[3], itemlist[1])
+
+                  rs = set(range(itemlist[0], itemlist[0] + itemlist[2]))
+                  if bool(rs & cycleset):
+                     cycleresultstrings[i]+= '+'
+                     cycleuses[i]+= 1
                   else:
-                     sys.stderr.write('\n');
+                     cycleresultstrings[i]+= '-'
 
-               if not skip:
-                  cycleresultstrings = cyclesresultstrings[cycletocheck]
-                  cycleuses = cyclesuses[cycletocheck]
+                  i+= 1
 
-                  cycledata = list(set(cyclesdata[cycletocheck]))
-                  cycledata.sort()
-
-                  # do the check
-                  i = 0
-                  for item in cycledata:
-                     itemlist = list(item)
-
-                     if not cycleresultstrings[i]:
-                        cycleresultstrings[i] = str('0x%08x %6d %6d %6d %-60s') %(itemlist[0], itemlist[2], itemlist[4], itemlist[3], itemlist[1])
-
-                     rs = set(range(itemlist[0], itemlist[0] + itemlist[2]))
-                     if bool(rs & cycleset):
-                        cycleresultstrings[i] += '+'
-                        cycleuses[i] += 1
-                     else:
-                        cycleresultstrings[i] += '-'
-
-                     i+= 1
-
-                  cyclesresultstrings[cycletocheck] = cycleresultstrings
-                  cyclesuses[cycletocheck] = cycleuses
-                  nrchecks+= 1
+               cyclesresultstrings[cycletocheck] = cycleresultstrings
+               cyclesuses[cycletocheck] = cycleuses
+               nrchecks+= 1
 
    
       #process results
 
-      for cycletocheck in range(0, nrcyclestocheck):
+      if len(sys.argv) >= 6:
+         cyclestocheck = int(sys.argv[5]) - 1
+      else:
+         cyclestocheck = nrcyclestocheck - 1
+
+      for cycletocheck in range(0, cyclestocheck):
 
          leakchecklist_full = []
          leakchecklist_leaksonly = []
          leakchecklist_leaksonly_minimized = []
-
 
          cycleresultstrings = cyclesresultstrings[cycletocheck]
          cycleuses = cyclesuses[cycletocheck]
 
          k = 0
          for t in cycleresultstrings:
-            if cycleuses[k] == 1:
+            if cycleuses[k] == 0:
                cycleresultstrings[k]+= '!'
-               leakchecklist_leaksonly.append(cycleresultstrings[k])
+               leakchecklist_leaksonly.append(cycleresultstrings[k].split('x=')[0])
                #sys.stderr.write('%s\n' % cycleresultstrings[k])
             k+= 1
 
@@ -271,7 +271,7 @@ def main():
 
          for r in leakchecklist_leaksonly:
             if not r.split()[0] in addrs:
-               leakchecklist_leaksonly_minimized.append(str('%s %s' %(r.split()[4], r.split()[1])))
+               leakchecklist_leaksonly_minimized.append(str('%s %s' %((r.split()[4]).split('=x')[0], r.split()[1])))
                addrs.append(r.split()[0])
                total += int(r.split()[1])
 
@@ -279,12 +279,11 @@ def main():
 
          #sys.stderr.write('minimized -----------------------------------------------------------\n')
 
-         #for r in leakchecklist_leaksonly_minimized:
-         #   sys.stderr.write('%s\n' % str(r))
-         sys.stderr.write('total = %d Bytes\n' % total)
+         for r in leakchecklist_leaksonly_minimized:
+            sys.stderr.write('cycle(%3d)[%s]\n' % (cycletocheck + 1, str(r)))
+         sys.stderr.write('cycle(%3d)total = %d Bytes\n' % (cycletocheck + 1, total))
 
          leakchecklist_leaksonly_minimized.insert(0, 'total = %d Bytes' %total)
-         leakchecklist_leaksonly_minimized.append('total = %d Bytes' %total)
 
 
          leakchecklists.append(leakchecklist_leaksonly_minimized)
@@ -294,7 +293,7 @@ def main():
 
 
    else:
-      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange [nrcyclestocheck] [maxnrfuturecyclestocheckagainst]\n" % sys.argv[0])
+      sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange [maxnrcyclestocheck] [maxnrfuturecyclestocheckagainst]\n" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

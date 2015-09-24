@@ -36,10 +36,13 @@ def getlibandaddr2line(address):
                addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
 
                thelib = os.path.basename(map.split()[5])
-               thefullfunc = addr2line.split(' at ')[0].replace(' ', '-')
+               thefullfunc = addr2line.split(' at ')[0]
+               thefullfunc = thefullfunc.replace(', ', ',')
+               thefullfunc = thefullfunc.replace(' ', '-')
                thefuncname = thefullfunc.split('(')[0]
 
-               result = thefuncname
+               #result = thefuncname
+               result = thefullfunc
                break
          break
 
@@ -59,19 +62,6 @@ def main():
 
    if len(sys.argv) == 3:
 
-      """
-      #build maps
-      #74955000-7495c000 rw-p 00151000 00:10 56755590   /usr/lib/libQt5Network.so.5.3.2
-      f = open(sys.argv[2])
-      for line in f:
-         if '.so' in line:
-            maps.append(line)
-      f.close()
-      sys.stderr.write('maps done\n')
-      #for m in maps:
-      #   sys.stderr.write('maps=[%s]\n' %m)
-      """
-
       f = open(sys.argv[1])
       #build maps
       #DSC 0 0 MAPS,741b1000-74213000,r-xp,00000000,00:10,56754894,,,/lib/libuClibc-0.9.32.1.so
@@ -85,27 +75,9 @@ def main():
       #for m in maps:
       #   sys.stderr.write('maps=[%s]\n' %m)
 
-
-      """
-      libs = []
       #build libs
+      libs = []
       sys.stderr.write('building libs')
-      ts = datetime.datetime.now()
-      for root, dirs, files in os.walk(sys.argv[3]):
-         for file in files:
-            if '.so' in file:
-               libs.append(root + '/' + file)
-               sys.stderr.write('.')
-               sys.stderr.flush()
-      tf = datetime.datetime.now()
-      sys.stderr.write('libs done in %s\n' % str(tf - ts))
-      for l in libs:
-         sys.stderr.write('%s\n' %l)
-      """
-
-      #build libs
-      libs = []
-      sys.stderr.write('building libs...')
       sys.stderr.flush()
       #ts = datetime.datetime.now()
       for root, dirs, files in os.walk(sys.argv[2]):
@@ -122,9 +94,10 @@ def main():
                      sys.stderr.flush()
       #tf = datetime.datetime.now()
       #sys.stderr.write('libs done in %s\n' % str(tf - ts))
+
       sys.stderr.write('\n')
-      #for l in libs:
-      #   sys.stderr.write('%s\n' %l)
+      for l in libs:
+         sys.stderr.write('%s\n' %l)
 
       f = open(sys.argv[1])
       sys.stderr.write('labeling return addresses...')
@@ -141,6 +114,9 @@ def main():
                if not address in addresses:
                   addresses.append(address)
                   addr2line = getlibandaddr2line(address)
+
+                  #sys.stderr.write('%s\n' % addr2line)
+
                   addr2lines.append(addr2line)
 
                theaddr2line = addr2lines[addresses.index(address)]

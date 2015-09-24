@@ -545,7 +545,7 @@ extern "C" GLvoid glAttachShader(GLuint program, GLuint shader) {
     }
 
     __glAttachShader(program, shader);
-    tditrace_ex("@E+glAttachShader() %u %u", shader, program);
+    //tditrace_ex("@E+glAttachShader() %u %u", shader, program);
 }
 
 extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
@@ -569,7 +569,7 @@ extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
     #endif
 
     __glDetachShader(program, shader);
-    tditrace_ex("@E+glDetachShader() %u %u", shader, program);
+    //tditrace_ex("@E+glDetachShader() %u %u", shader, program);
 }
 
 
@@ -850,6 +850,7 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer) {
 }
 
 
+#if 0
 extern "C" GLuint glCreateProgram(void) {
     static GLuint (*__glCreateProgram)(void) = NULL;
 
@@ -971,3 +972,4 @@ extern "C" void glDeleteShader(GLuint shader) {
     __glDeleteShader(shader);
     tditrace_ex("@E+glDeleteShader() %u", shader);
 }
+#endif

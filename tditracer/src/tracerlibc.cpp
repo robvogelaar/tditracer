@@ -868,11 +868,11 @@ extern "C" void *malloc(size_t size) {
             // tditrace_ex("@A+malloc() %d %p", size, ra);
 
 
-            // tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
 
-            if (size == 1312) {
-                tditrace_ex("m1312 =%x,ra=%x,sz=%d", ret, ra, size);
-            }
+            // if (size == 1312) {
+            //     tditrace_ex("m1312 =%x,ra=%x,sz=%d", ret, ra, size);
+            //}
 
 
             #if 0
@@ -987,7 +987,7 @@ extern "C" void *realloc(void *ptr, size_t size)
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
 
-            //tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
         }
     }
 

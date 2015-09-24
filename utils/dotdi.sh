@@ -14,3 +14,22 @@ for i in `find . -regex '\.\/[0-9]+ra.tdi' | sort -V` ; do echo $i && /home/rev/
 /home/rev/git/tditracer/utils/tdiprune combined1-499.tdi 'MAPS|VK|arena|Font|1312|]m$|]r$' > combined1-499prune.tdi
 
 /home/rev/git/tditracer/utils/tdiprune combined1-499.tdi 'MAPS|VK|arena|Font|1312' > combined1-499-prune.tdi
+
+/home/rev/git/tditracer/utils/tdiprune combined1-499.tdi '|VK|arena|' > combined1-499-prune.tdi
+
+
+for i in `find . -regex '\.\/[0-9]+.tdi' | sort -V` ; do echo $i && /home/rev/git/tditracer/utils/tdiprune $i 'VK|add_|prune' > ${i%%.tdi}pr.tdi ; done
+
+
+
+
+################
+/home/rev/git/tditracer/tdimerge 1.tdi 2.tdi 3.tdi 4.tdi 5.tdi 6.tdi 7.tdi  > combined1-7.tdi
+/home/rev/git/tditracer/utils/tdiprune combined1-7.tdi 'MAPS|VK|arena|]m$|]r$' > combined1-7pr.tdi
+/home/rev/git/tditracer/utils/tdiprune combined1-7.tdi 'VK|arena' > combined1-7prVKarena.tdi
+
+
+################
+/home/rev/git/tditracer/tdimerge *.tdi  > combined1-12.tdi
+/home/rev/git/tditracer/utils/tdiprune combined1-12.tdi 'MAPS|VK|arena|]m$|]r$' > combined1-12pr.tdi
+/home/rev/git/tditracer/utils/tdiprune combined1-12.tdi 'VK|arena' > combined1-12prVKarena.tdi
