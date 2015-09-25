@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/time.h>
 
 extern "C" void tditrace(const char *format, ...) __attribute__((weak));
@@ -214,6 +215,7 @@ printf("0 -> UTC time and date: %s\n",
 
 }
 
+#if 0
 void foo(char* p, int i) {
 
     int b;
@@ -239,6 +241,7 @@ void foo(char* p, int i) {
     }
 
 }
+#endif
 
 #if 0
 int main(int argc, char **argv) {
