@@ -1141,11 +1141,11 @@ int tditrace_init(void) {
         if (dp != NULL) {
             while (ep = readdir(dp)) {
 
-                if (strncmp(ep->d_name, ".tditracebuffer:", 16) == 0) {
+                if (strncmp(ep->d_name, "tditracebuffer-", 16) == 0) {
 
                     char procpid[128];
                     sprintf(procpid, (char *)"/proc/%d",
-                            atoi(strrchr(ep->d_name, ':') + 1));
+                            atoi(strrchr(ep->d_name, '-') + 1));
 
                     char fullname[128];
                     sprintf(fullname, "/tmp/%s", ep->d_name);
@@ -1173,7 +1173,7 @@ int tditrace_init(void) {
         }
     }
 
-    sprintf(gtracebufferfilename, (char *)"/tmp/.tditracebuffer:%s:%d",
+    sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer-%s-%d",
             gprocname, gpid);
 
     FILE *file;
@@ -1293,7 +1293,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
         while (--tracebufferid) {
 
-            if (strstr(argv[tracebufferid], ".tditracebuffer:") != 0) {
+            if (strstr(argv[tracebufferid], "tditracebuffer-") != 0) {
 
                 FILE *file;
 
@@ -1303,14 +1303,14 @@ void tditrace_exit(int argc, char *argv[]) {
                 if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                     NULL) {
 
-                    /* /tmp/.tditracebuffer-xxx-xxx */
+                    /* /tmp/tditracebuffer-xxx-xxx */
 
                     fprintf(stderr, "Found \"%s\"\n",
                             tracebuffers[buffers].filename);
 
                     strncpy(tracebuffers[buffers].procname,
                             (const char *)&tracebuffers[buffers].filename[21],
-                            strchr(&tracebuffers[buffers].filename[21], ':') -
+                            strchr(&tracebuffers[buffers].filename[21], '-') -
                                 &tracebuffers[buffers].filename[21]);
 
                     tracebuffers[buffers].pid = atoi(
@@ -1371,7 +1371,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
             while (ep = readdir(dp)) {
 
-                if (strncmp(ep->d_name, ".tditracebuffer:", 16) == 0) {
+                if (strncmp(ep->d_name, "tditracebuffer-", 16) == 0) {
 
                     FILE *file;
 
@@ -1381,7 +1381,7 @@ void tditrace_exit(int argc, char *argv[]) {
                     if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                         NULL) {
 
-                        /* /tmp/.tditracebuffer-xxx-xxx */
+                        /* /tmp/tditracebuffer-xxx-xxx */
 
                         fprintf(stderr, "Found \"%s\"\n",
                                 tracebuffers[buffers].filename);
@@ -1389,7 +1389,7 @@ void tditrace_exit(int argc, char *argv[]) {
                         strncpy(
                             tracebuffers[buffers].procname,
                             (const char *)&tracebuffers[buffers].filename[21],
-                            strchr(&tracebuffers[buffers].filename[21], ':') -
+                            strchr(&tracebuffers[buffers].filename[21], '-') -
                                 &tracebuffers[buffers].filename[21]);
 
                         tracebuffers[buffers].pid = atoi(
@@ -1449,7 +1449,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     if (buffers == 0) {
 
-        fprintf(stderr, "Not found: \"/tmp/.tditracebuffer:*:*\"\n");
+        fprintf(stderr, "Not found: \"/tmp/tditracebuffer-*-*\"\n");
         return;
     }
 
