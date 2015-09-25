@@ -164,7 +164,7 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
     sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
     int procpidtidlen = strlen(text_in1);
 
-    // fprintf(stderr, "addentry:[%s]\n", text_in);
+    //fprintf(stderr, "addentry:[%s]\n", text_in);
 
     if ((strncmp(text_in, "@T+", 3) == 0) ||
         (strncmp(text_in, "@T-", 3) == 0) ||
@@ -939,7 +939,7 @@ void *monitor_thread(void *param) {
                                 offloadfilename);
                     }
 
-                    ftruncate(fileno(offload_file), TRACEBUFFERSIZE);
+                    (void)ftruncate(fileno(offload_file), TRACEBUFFERSIZE);
 
                     offload_buffer =
                         (char *)mmap(0, TRACEBUFFERSIZE, PROT_WRITE, MAP_SHARED,
@@ -1304,20 +1304,19 @@ void tditrace_exit(int argc, char *argv[]) {
                 if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                     NULL) {
 
-                    /* tditracebuffer-xxx-xxx */
+                    /* tditracebuffer@xxx@xxx */
 
                     fprintf(stderr, "Found \"%s\"\n",
                             tracebuffers[buffers].filename);
 
-                    strncpy(tracebuffers[buffers].procname,
-                            (const char *)&tracebuffers[buffers].filename[21],
-                            strchr(&tracebuffers[buffers].filename[21], '-') -
-                                &tracebuffers[buffers].filename[21]);
+                    char* s1 = strchr(tracebuffers[buffers].filename, '@');
+                    char* s2 = strchr(s1 + 1, '@');
 
-                    tracebuffers[buffers].pid = atoi(
-                        &tracebuffers[buffers]
-                             .filename[22 +
-                                       strlen(tracebuffers[buffers].procname)]);
+                    strncpy(tracebuffers[buffers].procname, s1 + 1, s2 - s1);
+                    tracebuffers[buffers].procname[(s2 - s1) - 1] = 0;
+                    tracebuffers[buffers].pid = atoi(s2 + 1);
+
+                    //fprintf(stderr, "[%s] [%d]\n", tracebuffers[buffers].procname, tracebuffers[buffers].pid);
 
                     struct stat st;
                     stat(tracebuffers[buffers].filename, &st);
@@ -1387,15 +1386,12 @@ void tditrace_exit(int argc, char *argv[]) {
                         fprintf(stderr, "Found \"%s\"\n",
                                 tracebuffers[buffers].filename);
 
-                        strncpy(
-                            tracebuffers[buffers].procname,
-                            (const char *)&tracebuffers[buffers].filename[21],
-                            strchr(&tracebuffers[buffers].filename[21], '@') -
-                                &tracebuffers[buffers].filename[21]);
+                        char* s1 = strchr(tracebuffers[buffers].filename, '@');
+                        char* s2 = strchr(s1 + 1, '@');
 
-                        tracebuffers[buffers].pid = atoi(
-                            &tracebuffers[buffers].filename
-                                 [22 + strlen(tracebuffers[buffers].procname)]);
+                        strncpy(tracebuffers[buffers].procname, s1 + 1, s2 - s1);
+                        tracebuffers[buffers].procname[(s2 - s1) - 1] = 0;
+                        tracebuffers[buffers].pid = atoi(s2 + 1);
 
                         struct stat st;
                         stat(tracebuffers[buffers].filename, &st);
@@ -1450,7 +1446,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     if (buffers == 0) {
 
-        fprintf(stderr, "Not found: \"/tmp/tditracebuffer-*-*\"\n");
+        fprintf(stderr, "Not found: \"/tmp/tditracebuffer@*@*\"\n");
         return;
     }
 
