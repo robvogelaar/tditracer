@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
         while (ep = readdir(dp)) {
 
-            if (strncmp(ep->d_name, ".tditracebuffer:", 16) == 0) {
+            if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
 
                 FILE *file;
                 char filename[128];

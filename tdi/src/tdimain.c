@@ -855,16 +855,15 @@ void *monitor_thread(void *param) {
 
     static int seconds_counter = 0;
     static int do_dump_proc_self_maps = 1;
+
+    stat(gtracebufferfilename, &gtrace_buffer_st);
+    usleep(1 * 1000 * 1000);
+    dump_proc_self_maps();
+
+    fprintf(stderr, "tdi: [%s][%d], monitoring...\n", gprocname, gpid);
     while (1) {
 
-        usleep(1 * 1000 * 1000);
-
         seconds_counter++;
-
-        if (do_dump_proc_self_maps) {
-            dump_proc_self_maps();
-            do_dump_proc_self_maps = 0;
-        }
 
         if (do_mallinfo) {
             struct mallinfo mi;
@@ -906,7 +905,7 @@ void *monitor_thread(void *param) {
         if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
             stat(gtracebufferfilename, &gtrace_buffer_st);
 
-            printf("tdi: [%d][%s], rewinding...\n", gpid, gprocname);
+            printf("tdi: [%s][%d], rewinding...\n", gprocname, gpid);
             tditrace_rewind();
             do_dump_proc_self_maps = 1;
         }
@@ -932,7 +931,7 @@ void *monitor_thread(void *param) {
 
                     offload_counter++;
 
-                    sprintf(offloadfilename, (char *)"%s/tdi-%s-%d-%03d",
+                    sprintf(offloadfilename, (char *)"%s/tditracebuffer@%s@%d@%04d",
                             offload_location, gprocname, gpid, offload_counter);
 
                     if ((offload_file = fopen(offloadfilename, "w+")) == 0) {
@@ -965,7 +964,7 @@ void *monitor_thread(void *param) {
 
                 if (check) {
                     offload_over50 = 0;
-                    fprintf(stderr, "tdi: [%d][%s], at over 100%%...\n", gpid,
+                    fprintf(stderr, "tdi: [%d][%s], at 100%%...\n", gpid,
                             gprocname);
                     // fill remaining 50..100% data to existing file and close
                     // file
@@ -982,6 +981,9 @@ void *monitor_thread(void *param) {
                 }
             }
         }
+
+    usleep(1 * 1000 * 1000);
+
     }
 
     pthread_exit(NULL);
@@ -994,7 +996,7 @@ void *delayed_init_thread(void *param) {
     int *pdelay = (int *)param;
     int delay = *pdelay;
 
-    printf("tdi: init[%d][%s], delay is %d\n", gpid, gprocname, delay);
+    printf("tdi: init[%s][%d], delay is %d\n", gprocname, gpid, delay);
 
     if (delay == -1) {
 
@@ -1012,19 +1014,19 @@ void *delayed_init_thread(void *param) {
 
             if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
                 printf(
-                    "tdi: init[%d][%s], delay until timeofday is set, \"%s\", "
+                    "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
                     "timeofday is set\n",
-                    gpid, gprocname, time_string);
+                    gprocname, gpid, time_string);
                 break;
             }
 
             ptm = localtime(&tv.tv_sec);
             strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S",
                      ptm);
-            printf("tdi: init[%d][%s], delay until timeofday is set, \"%s\", "
+            printf("tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
                    "timeofday "
                    "is not set\n",
-                   gpid, gprocname, time_string);
+                   gprocname, gpid, time_string);
 
             usleep(1 * 1000000);
         }
@@ -1036,7 +1038,7 @@ void *delayed_init_thread(void *param) {
          */
 
         while (1) {
-            printf("tdi: init[%d][%s], paused...\n", gpid, gprocname);
+            printf("tdi: init[%s][%d], paused...\n", gprocname, gpid);
             usleep(1 * 1000000);
 
             struct stat st;
@@ -1052,7 +1054,7 @@ void *delayed_init_thread(void *param) {
             */
 
             if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-                printf("tdi: init[%d][%s], started...\n", gpid, gprocname);
+                printf("tdi: init[%s][%d], started...\n", gprocname, gpid);
 
                 stat(gtracebufferfilename, &gtrace_buffer_st);
                 break;
@@ -1062,8 +1064,7 @@ void *delayed_init_thread(void *param) {
     } else {
 
         while (delay > 0) {
-            printf("tdi: init[%d][%s], delay %d second(s)...\n", gpid,
-                   gprocname, delay);
+            printf("tdi: init[%s][%d], delay %d second(s)...\n", gprocname, gpid, delay);
             usleep(1 * 1000000);
 
             struct stat st;
@@ -1098,19 +1099,19 @@ int tditrace_init(void) {
     get_process_name_by_pid(gpid, gprocname);
 
     if (strcmp(gprocname, "mkdir") == 0) {
-        printf("tdi: init[%d][%s], procname is \"mkdir\" ; not tracing\n", gpid,
-               gprocname);
+        printf("tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n", gprocname,
+               gpid);
         return;
     } else if (strcmp(gprocname, "sh") == 0) {
-        printf("tdi: init[%d][%s], procname is \"sh\" ; not tracing\n", gpid,
-               gprocname);
+        printf("tdi: init[%s][%d], procname is \"sh\" ; not tracing\n", gprocname,
+               gpid);
         return;
     } else if (strcmp(gprocname, "strace") == 0) {
-        printf("tdi: init[%d][%s], procname is \"strace\" ; not tracing\n",
-               gpid, gprocname);
+        printf("tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
+               gprocname, gpid);
         return;
     } else {
-        printf("tdi: init[%d][%s]\n", gpid, gprocname);
+        printf("tdi: init[%s][%d]\n", gprocname, gpid);
     }
 
     do_mallinfo = 0;
@@ -1141,11 +1142,11 @@ int tditrace_init(void) {
         if (dp != NULL) {
             while (ep = readdir(dp)) {
 
-                if (strncmp(ep->d_name, "tditracebuffer-", 16) == 0) {
+                if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
 
                     char procpid[128];
                     sprintf(procpid, (char *)"/proc/%d",
-                            atoi(strrchr(ep->d_name, '-') + 1));
+                            atoi(strrchr(ep->d_name, '@') + 1));
 
                     char fullname[128];
                     sprintf(fullname, "/tmp/%s", ep->d_name);
@@ -1159,12 +1160,12 @@ int tditrace_init(void) {
                     if (stat(procpid, &sts) == -1) {
 
                         unlink(fullname);
-                        printf("tdi: init[%d][%s], removed: \"%s\"\n", gpid,
-                               gprocname, fullname);
+                        printf("tdi: init[%s][%d], removed: \"%s\"\n", gprocname,
+                               gpid, fullname);
                     } else {
 
-                        printf("tdi: init[%d][%s], not removed: \"%s\"\n", gpid,
-                               gprocname, fullname);
+                        printf("tdi: init[%s][%d], not removed: \"%s\"\n", gprocname,
+                               gpid, fullname);
                     }
                 }
             }
@@ -1173,7 +1174,7 @@ int tditrace_init(void) {
         }
     }
 
-    sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer-%s-%d",
+    sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer@%s@%d",
             gprocname, gpid);
 
     FILE *file;
@@ -1193,7 +1194,7 @@ int tditrace_init(void) {
         gtrace_buffer[i] = 0;
     }
 
-    printf("tdi: init[%d][%s], allocated: \"%s\" (16MB)\n", gpid, gprocname,
+    printf("tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname, gpid,
            gtracebufferfilename);
 
     trace_buffer_ptr = gtrace_buffer;
@@ -1216,9 +1217,9 @@ int tditrace_init(void) {
 
     gtrace_buffer_rewind_ptr = trace_buffer_ptr;
 
-    printf("tdi: init[%d][%s], timeofday_timestamp:%lld, "
+    printf("tdi: init[%s][%d], timeofday_timestamp:%lld, "
            "monotonic_timestamp:%lld\n",
-           gpid, gprocname, timeofday_timestamp, monotonic_timestamp);
+           gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
 
     reported_full = 0;
 
@@ -1293,7 +1294,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
         while (--tracebufferid) {
 
-            if (strstr(argv[tracebufferid], "tditracebuffer-") != 0) {
+            if (strstr(argv[tracebufferid], "tditracebuffer@") != 0) {
 
                 FILE *file;
 
@@ -1303,7 +1304,7 @@ void tditrace_exit(int argc, char *argv[]) {
                 if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                     NULL) {
 
-                    /* /tmp/tditracebuffer-xxx-xxx */
+                    /* tditracebuffer-xxx-xxx */
 
                     fprintf(stderr, "Found \"%s\"\n",
                             tracebuffers[buffers].filename);
@@ -1371,7 +1372,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
             while (ep = readdir(dp)) {
 
-                if (strncmp(ep->d_name, "tditracebuffer-", 16) == 0) {
+                if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
 
                     FILE *file;
 
@@ -1381,7 +1382,7 @@ void tditrace_exit(int argc, char *argv[]) {
                     if ((file = fopen(tracebuffers[buffers].filename, "r")) !=
                         NULL) {
 
-                        /* /tmp/tditracebuffer-xxx-xxx */
+                        /* /tmp/tditracebuffer@xxx@xxx */
 
                         fprintf(stderr, "Found \"%s\"\n",
                                 tracebuffers[buffers].filename);
@@ -1389,7 +1390,7 @@ void tditrace_exit(int argc, char *argv[]) {
                         strncpy(
                             tracebuffers[buffers].procname,
                             (const char *)&tracebuffers[buffers].filename[21],
-                            strchr(&tracebuffers[buffers].filename[21], '-') -
+                            strchr(&tracebuffers[buffers].filename[21], '@') -
                                 &tracebuffers[buffers].filename[21]);
 
                         tracebuffers[buffers].pid = atoi(
@@ -1416,9 +1417,9 @@ void tditrace_exit(int argc, char *argv[]) {
                                     strtok_r(tracebuffers[buffers].ptr, search,
                                              &tracebuffers[buffers].saveptr),
                                     14) != 0) {
-                            fprintf(stderr, "tdi: init[%d][%s], invalid "
+                            fprintf(stderr, "tdi: init[%s][%d], invalid "
                                             "tracebuffer, skipping\n",
-                                    gpid, gprocname);
+                                    gprocname, gpid);
                             break;
                         }
 

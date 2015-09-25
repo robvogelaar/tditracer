@@ -33,3 +33,8 @@ for i in `find . -regex '\.\/[0-9]+.tdi' | sort -V` ; do echo $i && /home/rev/gi
 /home/rev/git/tditracer/tdimerge *.tdi  > combined1-12.tdi
 /home/rev/git/tditracer/utils/tdiprune combined1-12.tdi 'MAPS|VK|arena|]m$|]r$' > combined1-12pr.tdi
 /home/rev/git/tditracer/utils/tdiprune combined1-12.tdi 'VK|arena' > combined1-12prVKarena.tdi
+
+for i in `find . -regex 'tdi' | sort -V` ; do echo $i && /home/rev/git/tditracer/utils/tdira2 $i  libs > ${i%%.tdi}ra.tdi ; done
+
+
+for i in `find . -name 'tditracebuffer*' | sort -V` ; do echo $i && tdidump $i > ${i%%.tdi}.tdi ; done

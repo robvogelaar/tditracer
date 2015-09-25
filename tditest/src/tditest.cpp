@@ -59,7 +59,7 @@ printf("0 -> UTC time and date: %s\n",
     else
         printf("no tditrace_ex\n");
 
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 25; i++) {
 
         printf("%d\n", i);
 

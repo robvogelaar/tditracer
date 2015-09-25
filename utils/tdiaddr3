@@ -235,11 +235,14 @@ def main():
       #process results
 
       if len(sys.argv) >= 6:
-         cyclestocheck = int(sys.argv[5]) - 1
+         cyclestocheck = int(sys.argv[5])
       else:
-         cyclestocheck = nrcyclestocheck - 1
+         cyclestocheck = nrcyclestocheck
 
-      for cycletocheck in range(0, cyclestocheck):
+      if cyclestocheck > len(cyclesdata):
+         cyclestocheck = len(cyclesdata)
+
+      for cycletocheck in range(0, cyclestocheck - 1):
 
          leakchecklist_full = []
          leakchecklist_leaksonly = []

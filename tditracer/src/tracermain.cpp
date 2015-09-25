@@ -13,8 +13,6 @@
 #include "tracermain.h"
 #include "tracerutils.h"
 
-extern int trace_counter;
-
 extern "C" {
 #include "shadercapture.h"
 #include "texturecapture.h"
@@ -36,7 +34,7 @@ static void tditracer_constructor() {
 }
 
 static void tditracer_destructor() {
-    printf("tditracer: exit[%d], #traces = %d\n", getpid(), trace_counter);
+    fprintf(stderr, "tditracer: exit[%d]\n", getpid());
 }
 
 int framestorecord;
