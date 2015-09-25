@@ -256,6 +256,7 @@ int main(int argc, char **argv) {
 }
 #endif
 
+#if 0
 int main(int argc, char **argv) {
 
     usleep(2*1000*1000);
@@ -281,4 +282,10 @@ int main(int argc, char **argv) {
         tditrace("STOP");
 
     return 0;
+}
+#endif
+
+int main(int argc, char **argv) {
+
+    run_2();
 }

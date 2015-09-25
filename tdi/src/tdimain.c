@@ -13,8 +13,12 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <linux/futex.h>
+#include <errno.h>
 
 #include <dirent.h>
+
+void tditrace(const char *format, ...);
+void tditrace_ex(const char *format, ...);
 
 pid_t gpid;
 char gprocname[128];
@@ -89,7 +93,6 @@ static char *gtrace_buffer;
 static char *trace_buffer_ptr;
 static char *gtrace_buffer_rewind_ptr;
 
-int trace_counter;
 static int tditrace_inited;
 static int reported_full;
 static int report_tid;
@@ -819,14 +822,14 @@ static void dump_proc_self_maps(void) {
             /* keep trying */;
         else if (bytes > 0) {
             proc_self_maps[bytes] = '\0';
-            //printf("bytes=%d[%s]\n", bytes, proc_self_maps);
+            // printf("bytes=%d[%s]\n", bytes, proc_self_maps);
 
             char *saveptr;
             char *line = strtok_r(proc_self_maps, "\n", &saveptr);
 
             while (line) {
                 if (strlen(line) > 50) {
-                    //printf("+%d[%s]\n", strlen(line), line);
+                    // printf("+%d[%s]\n", strlen(line), line);
                     tditrace("MAPS %s", line);
                 }
                 line = strtok_r(NULL, "\n", &saveptr);
@@ -837,12 +840,16 @@ static void dump_proc_self_maps(void) {
     }
 
     close(fd);
-
 }
 
 static int do_mallinfo = 0;
 
 static int monitor;
+
+static int do_offload = 0;
+static char offload_location[256] = {0};
+static int offload_counter = 0;
+static int offload_over50 = 0;
 
 void *monitor_thread(void *param) {
 
@@ -850,7 +857,7 @@ void *monitor_thread(void *param) {
     static int do_dump_proc_self_maps = 1;
     while (1) {
 
-        usleep(1 * 1000000);
+        usleep(1 * 1000 * 1000);
 
         seconds_counter++;
 
@@ -865,26 +872,32 @@ void *monitor_thread(void *param) {
             mi = mallinfo();
 
             // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
-            // printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
+            // printf("# of free chunks (ordblks):            %d\n",
+            // mi.ordblks);
             // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
             // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
             // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-            // printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
-            // printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
-            // printf("Total allocated space (uordblks):      %d\n", mi.uordblks);
-            // printf("Total free space (fordblks):           %d\n", mi.fordblks);
-            // printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+            // printf("Max. total allocated space (usmblks):  %d\n",
+            // mi.usmblks);
+            // printf("Free bytes held in fastbins (fsmblks): %d\n",
+            // mi.fsmblks);
+            // printf("Total allocated space (uordblks):      %d\n",
+            // mi.uordblks);
+            // printf("Total free space (fordblks):           %d\n",
+            // mi.fordblks);
+            // printf("Topmost releasable block (keepcost):   %d\n",
+            // mi.keepcost);
 
             tditrace("mi.arena~%d", mi.arena);
-            //tditrace("mi.ordblks~%d", mi.ordblks);
-            //tditrace("mi.smblks~%d", mi.smblks);
-            //tditrace("mi.hblks~%d", mi.hblks);
-            //tditrace("mi.hblkhd~%d", mi.hblkhd);
-            //tditrace("mi.usmblks~%d", mi.usmblks);
-            //tditrace("mi.fsmblks~%d", mi.fsmblks);
-            //tditrace("mi.uordblks~%d", mi.uordblks);
-            //tditrace("mi.fordblks~%d", mi.fordblks);
-            //tditrace("mi.keepcost~%d", mi.keepcost);
+            // tditrace("mi.ordblks~%d", mi.ordblks);
+            // tditrace("mi.smblks~%d", mi.smblks);
+            // tditrace("mi.hblks~%d", mi.hblks);
+            // tditrace("mi.hblkhd~%d", mi.hblkhd);
+            // tditrace("mi.usmblks~%d", mi.usmblks);
+            // tditrace("mi.fsmblks~%d", mi.fsmblks);
+            // tditrace("mi.uordblks~%d", mi.uordblks);
+            // tditrace("mi.fordblks~%d", mi.fordblks);
+            // tditrace("mi.keepcost~%d", mi.keepcost);
         }
 
         struct stat st;
@@ -893,15 +906,86 @@ void *monitor_thread(void *param) {
         if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
             stat(gtracebufferfilename, &gtrace_buffer_st);
 
-            printf("tdi: init[%d][%s], rewinding...\n", gpid, gprocname);
+            printf("tdi: [%d][%s], rewinding...\n", gpid, gprocname);
             tditrace_rewind();
             do_dump_proc_self_maps = 1;
+        }
+
+        if (do_offload) {
+
+            static char offloadfilename[256];
+            static char *offload_buffer;
+            static FILE *offload_file;
+
+            if (!offload_over50) {
+
+                simplefu_mutex_lock(&myMutex);
+                int check = ((trace_buffer_ptr - gtrace_buffer) >
+                             (TRACEBUFFERSIZE / 2));
+                simplefu_mutex_unlock(&myMutex);
+
+                if (check) {
+                    offload_over50 = 1;
+                    fprintf(stderr, "tdi: [%d][%s], at 50%%...\n", gpid,
+                            gprocname);
+                    // create a new file and fill with 0..50% data
+
+                    offload_counter++;
+
+                    sprintf(offloadfilename, (char *)"%s/tdi-%s-%d-%03d",
+                            offload_location, gprocname, gpid, offload_counter);
+
+                    if ((offload_file = fopen(offloadfilename, "w+")) == 0) {
+                        fprintf(stderr, "Error creating file \"%s\"",
+                                offloadfilename);
+                    }
+
+                    ftruncate(fileno(offload_file), TRACEBUFFERSIZE);
+
+                    offload_buffer =
+                        (char *)mmap(0, TRACEBUFFERSIZE, PROT_WRITE, MAP_SHARED,
+                                     fileno(offload_file), 0);
+
+                    fprintf(stderr,
+                            "tdi: [%d][%s], created offloadfile: \"%s\" \n",
+                            gpid, gprocname, offloadfilename);
+
+                    memcpy(offload_buffer, gtrace_buffer, TRACEBUFFERSIZE / 2);
+
+                    fprintf(stderr, "tdi: [%d][%s], copied 0..50%% to "
+                                    "offloadfile: \"%s\" \n",
+                            gpid, gprocname, offloadfilename);
+                }
+
+            } else {
+                simplefu_mutex_lock(&myMutex);
+                int check = ((trace_buffer_ptr - gtrace_buffer) <
+                             (TRACEBUFFERSIZE / 2));
+                simplefu_mutex_unlock(&myMutex);
+
+                if (check) {
+                    offload_over50 = 0;
+                    fprintf(stderr, "tdi: [%d][%s], at over 100%%...\n", gpid,
+                            gprocname);
+                    // fill remaining 50..100% data to existing file and close
+                    // file
+
+                    memcpy(offload_buffer + TRACEBUFFERSIZE / 2,
+                           gtrace_buffer + TRACEBUFFERSIZE / 2,
+                           TRACEBUFFERSIZE / 2);
+                    munmap(offload_buffer, TRACEBUFFERSIZE);
+                    fclose(offload_file);
+
+                    fprintf(stderr, "tdi: [%d][%s], copied 50..100%% to "
+                                    "offloadfile: \"%s\" \n",
+                            gpid, gprocname, offloadfilename);
+                }
+            }
         }
     }
 
     pthread_exit(NULL);
 }
-
 
 static int thedelay;
 
@@ -1002,7 +1086,6 @@ void *delayed_init_thread(void *param) {
     pthread_exit(NULL);
 }
 
-
 int tditrace_init(void) {
     struct timeval mytime;
     int i;
@@ -1033,6 +1116,12 @@ int tditrace_init(void) {
     do_mallinfo = 0;
     if (getenv("MALLINFO")) {
         do_mallinfo = (atoi(getenv("MALLINFO")) >= 1);
+    }
+
+    do_offload = 0;
+    if (getenv("OFFLOAD")) {
+        do_offload = 1;
+        strcpy(offload_location, getenv("OFFLOAD"));
     }
 
     /*
@@ -1108,7 +1197,6 @@ int tditrace_init(void) {
            gtracebufferfilename);
 
     trace_buffer_ptr = gtrace_buffer;
-    trace_counter = 0;
 
     // write one time start text
     trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
@@ -1180,7 +1268,6 @@ void tditrace_rewind() {
     }
 
     trace_buffer_ptr = gtrace_buffer_rewind_ptr;
-    trace_counter = 0;
 
     reported_full = 0;
 
@@ -1467,19 +1554,8 @@ void tditrace(const char *format, ...) {
 
     simplefu_mutex_lock(&myMutex);
 
-    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 500)) {
-        if (!reported_full) {
-            printf("tdi: full[%d][%s]\n", gpid, gprocname);
-            reported_full = 1;
-        }
-        simplefu_mutex_unlock(&myMutex);
-        return;
-    }
-
     // Add the string to the tracebuffer, and add timestamp
     // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
-
-    trace_counter++;
 
     *trace_buffer_ptr++ = 0x0c;
 
@@ -1622,6 +1698,21 @@ void tditrace(const char *format, ...) {
     }
 
     va_end(args);
+
+    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 1024)) {
+
+        if (do_offload) {
+            // clear unused and rewind to rewind ptr
+            int i;
+            for (i = trace_buffer_ptr - gtrace_buffer; i < TRACEBUFFERSIZE; i++) {
+                gtrace_buffer[i] = 0;
+            }
+            trace_buffer_ptr = gtrace_buffer_rewind_ptr;
+        } else {
+            fprintf(stderr, "tdi: full[%d][%s]\n", gpid, gprocname);
+            tditrace_inited = 0;
+        }
+    }
 
     simplefu_mutex_unlock(&myMutex);
 }
@@ -1633,24 +1724,17 @@ void tditrace_ex(const char *format, ...) {
         return;
     }
 
+    if (!report_tditrace) {
+        return;
+    }
+
     struct timespec mytime;
     clock_gettime(CLOCK_MONOTONIC, &mytime);
 
     simplefu_mutex_lock(&myMutex);
 
-    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 500)) {
-        if (!reported_full) {
-            printf("tdi: full[%d][%s]\n", gpid, gprocname);
-            reported_full = 1;
-        }
-        simplefu_mutex_unlock(&myMutex);
-        return;
-    }
-
     // Add the string to the tracebuffer, and add timestamp
     // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
-
-    trace_counter++;
 
     *trace_buffer_ptr++ = 0x0c;
 
@@ -1793,6 +1877,21 @@ void tditrace_ex(const char *format, ...) {
     }
 
     va_end(args);
+
+    if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 1024)) {
+
+        if (do_offload) {
+            // clear unused area and rewind to rewind ptr
+            int i;
+            for (i = trace_buffer_ptr - gtrace_buffer; i < TRACEBUFFERSIZE; i++) {
+                gtrace_buffer[i] = 0;
+            }
+            trace_buffer_ptr = gtrace_buffer_rewind_ptr;
+        } else {
+            fprintf(stderr, "tdi: full[%d][%s]\n", gpid, gprocname);
+            tditrace_inited = 0;
+        }
+    }
 
     simplefu_mutex_unlock(&myMutex);
 }
