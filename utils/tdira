@@ -84,7 +84,8 @@ def main():
       #build maps2
       #DSC 0 0 MAPS,741b1000-74213000,r-xp,00000000,00:10,56754894,,,/lib/libuClibc-0.9.32.1.so
       for line in f:
-         if 'DSC 0 0 MAPS' in line:
+         result = re.match(r'DSC 0 0 MAPS,[0-9a-f]{8}', line)
+         if result:
             l = line[13:].replace(',',' ')
             if l not in maps2:
                maps2.append(l)

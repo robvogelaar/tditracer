@@ -263,7 +263,7 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
                 "@I+glDrawElements() "
                 "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawElements_counter, MODESTRING(mode),
-                TYPESTRING(mode), count, boundtexture, currentprogram,
+                TYPESTRING(type), count, boundtexture, currentprogram,
                 boundframebuffer, framebuffertexture[boundframebuffer & 0x3ff],
                 framebufferrenderbuffer[boundframebuffer & 0x3ff],
                 renderbufferwidth
@@ -383,7 +383,6 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
     while ((err = glGetError()) != GL_NO_ERROR) {
         tditrace_ex("@S+GLERROR 0x%x", err);
     }
-
 }
 
 extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
@@ -545,7 +544,7 @@ extern "C" GLvoid glAttachShader(GLuint program, GLuint shader) {
     }
 
     __glAttachShader(program, shader);
-    //tditrace_ex("@E+glAttachShader() %u %u", shader, program);
+    // tditrace_ex("@E+glAttachShader() %u %u", shader, program);
 }
 
 extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
@@ -562,16 +561,15 @@ extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
     if (glesrecording)
         tditrace_ex("glDetachShader() %u %u", program, shader);
 
-    #if 0
+#if 0
     if (shaderrecording) {
         shadercapture_referenceprogram(shader, program);
     }
-    #endif
+#endif
 
     __glDetachShader(program, shader);
-    //tditrace_ex("@E+glDetachShader() %u %u", shader, program);
+    // tditrace_ex("@E+glDetachShader() %u %u", shader, program);
 }
-
 
 #if 0
 extern "C" GLvoid glEnable(GLenum cap)
@@ -848,7 +846,6 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer) {
     boundrenderbuffer = renderbuffer;
     framebufferrenderbuffer[boundframebuffer & 0x3ff] = renderbuffer;
 }
-
 
 #if 0
 extern "C" GLuint glCreateProgram(void) {

@@ -259,25 +259,26 @@ int main(int argc, char **argv) {
 }
 #endif
 
-#if 0
+#if 1
 int main(int argc, char **argv) {
+
+    if (tditrace)
+        tditrace("START");
 
     usleep(2*1000*1000);
 
     if (tditrace)
-        tditrace("START");
+        tditrace("CHECK");
 
 
     int i;
     for (i = 0; i < 10; i++) {
 
-        int *p1 = new int(5);
-        int *p2 = new int [1312 / 4];
-        int *p3 = (int*)malloc(5 * sizeof(int));
+        //int *p1 = (int*)malloc(5 * sizeof(int));
+        //int *p1 = new int(5);
+        int *p1 = new int [420];
     
         printf("p1=%d(%x)\n", *p1, p1);
-        printf("p2=%d(%x)\n", *p2, p2);
-        printf("p3=%d(%x)\n", *p3, p3);
     }
 
 
@@ -288,7 +289,9 @@ int main(int argc, char **argv) {
 }
 #endif
 
+#if 0
 int main(int argc, char **argv) {
 
     run_2();
 }
+#endif

@@ -851,6 +851,72 @@ extern "C" void *malloc(size_t size) {
     #endif
 
 
+    #if 0
+    static void* v3ddriver_base = NULL;
+    static int v3ddriver_size = 0x110000;
+    static void* ___ftext = NULL;
+
+
+    if (NULL == v3ddriver_base) {
+        Dl_info dli;
+        if (dladdr(dlsym(RTLD_NEXT, "glEnable"), &dli)) {
+            fprintf(stderr, "dladdr, dli_fname[%s], dli_fbase[%x], dli_sname[%s], dli_saddr[%x]\n",
+                dli.dli_fname, dli.dli_fbase, dli.dli_sname, dli.dli_saddr);
+
+            //const char *dli_fname;  /* Pathname of shared object that
+            //void       *dli_fbase;  /* Address at which shared object
+            //const char *dli_sname;  /* Name of nearest symbol with address
+            //void       *dli_saddr;  /* Exact address of symbol named
+            v3ddriver_base = dli.dli_fbase;
+
+            if (dlopen("/usr/lib/libv3ddriver.so", RTLD_NOW | RTLD_NOLOAD)) {
+                fprintf(stderr, "/usr/lib/libv3ddriver.so - is resident\n");
+                ___ftext = dlsym(dlopen("/usr/lib/libv3ddriver.so", RTLD_NOW | RTLD_NOLOAD), "_ftext");
+                fprintf(stderr, "___ftext=%x\n", ___ftext);
+            } else {
+                fprintf(stderr, "/usr/lib/libv3ddriver.so - not resident\n");
+                v3ddriver_base = NULL;
+            }
+
+
+        } else {
+            fprintf(stderr, "dladdr, failed\n");
+        }
+    }
+    #endif
+
+    #if 0
+    if (NULL == ___ftext) {
+        ___ftext = dlsym(RTLD_NEXT, "_ftext");
+        if (___ftext == NULL) {
+            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "_ftext");
+        } else {
+            fprintf(stderr, "got ___ftext = 0x%x\n", ___ftext);
+
+            Dl_info dli;
+            if (dladdr(___ftext, &dli)) {
+                fprintf(stderr, "dladdr, dli_fname[%s], dli_fbase[%x], dli_sname[%s], dli_saddr[%x]\n",
+                    dli.dli_fname, dli.dli_fbase, dli.dli_sname, dli.dli_saddr);
+
+                //const char *dli_fname;  /* Pathname of shared object that
+                //void       *dli_fbase;  /* Address at which shared object
+                //const char *dli_sname;  /* Name of nearest symbol with address
+                //void       *dli_saddr;  /* Exact address of symbol named
+
+                if (strstr(dli.dli_fname, "v3ddriver") == NULL) {
+                    ___ftext = NULL;
+                }
+
+            } else {
+                fprintf(stderr, "dladdr, failed\n");
+            }
+        }
+    }
+    #endif
+
+
+
+
     unsigned int ra = 0;
     #ifdef __mips__
     asm volatile("move %0, $ra" : "=r"(ra));
@@ -868,7 +934,32 @@ extern "C" void *malloc(size_t size) {
             // tditrace_ex("@A+malloc() %d %p", size, ra);
 
 
-            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+
+            //temporary
+            //tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+
+            if (size == 420)
+                tditrace_ex("420m =%x,ra=%x,sz=%d", ret, ra, size);
+
+
+            #if 0
+            if (v3ddriver_base) {
+                if ((ra >= v3ddriver_base) && (ra <= v3ddriver_base + 0x110000)) {
+                    tditrace_ex("v3dm =%x,ra=%x,sz=%d", ret, ra, size);
+                }
+            }
+            #endif
+
+            #if 0
+            if (___ftext) {
+                if ((ra == ___ftext + 0x3534) && (size >= 1024)) {
+                    closelog();
+                    tditrace_ex("v3dftext1024m =%x,ra=%x,sz=%d", ret, ra, size);
+                    fprintf(stderr, "v3dftextm %d\n", size);
+                }
+            }
+            #endif
+
 
             // if (size == 1312) {
             //     tditrace_ex("m1312 =%x,ra=%x,sz=%d", ret, ra, size);
@@ -964,18 +1055,6 @@ extern "C" void *realloc(void *ptr, size_t size)
     }
 #endif
 
-    if (libcrecording) {
-        if (0) { //size >= 1024) {
-            unsigned int ra = 0;
-            #ifdef __mips__
-            asm volatile("move %0, $ra" : "=r"(ra));
-            #endif
-
-            tditrace_ex("r ra=%p,sz=%d", ra, size);
-        }
-        // tditrace_ex("@A+realloc() %d %p", size, ra);
-    }
-
     void *ret = __realloc(ptr, size);
 
     if (libcrecording) {
@@ -987,7 +1066,14 @@ extern "C" void *realloc(void *ptr, size_t size)
             asm volatile("move %0, $ra" : "=r"(ra));
             #endif
 
-            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            //temporary
+            if (size == 8)
+                tditrace_ex("8r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            else if (size == 16)
+                tditrace_ex("16r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            else
+                tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+
         }
     }
 
@@ -1237,14 +1323,28 @@ void* operator new(std::size_t n) throw(std::bad_alloc)
 
 //_Znwj
 
-#if 0
+#if 1
 void* operator new(unsigned int i){
 
-    //printf('hello\n');
+    unsigned int ra = 0;
+    #ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
 
-    //usleep(1*1000*1000);
+    void* ret = malloc(i);
 
-    return malloc(i);
+    //tditrace_ex("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
 
+    if (i == 420) {
+        tditrace_ex("420operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    }
+    if (i == 168) {
+        tditrace_ex("168operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    }
+    if (i == 156) {
+        tditrace_ex("156operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    }
+
+    return ret;
 }
 #endif

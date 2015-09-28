@@ -812,9 +812,14 @@ static void dump_proc_self_maps(void) {
     int fd;
     int bytes;
 
+    tditrace("MAPS begin");
+
+
     fd = open("/proc/self/maps", O_RDONLY);
-    if (fd < 0)
+    if (fd < 0) {
+        tditrace("MAPS end");
         return;
+    }
 
     while (1) {
         bytes = read(fd, proc_self_maps, sizeof(proc_self_maps) - 1);
@@ -840,6 +845,8 @@ static void dump_proc_self_maps(void) {
     }
 
     close(fd);
+
+    tditrace("MAPS end");
 }
 
 static int do_mallinfo = 0;
@@ -1108,6 +1115,10 @@ int tditrace_init(void) {
         return;
     } else if (strcmp(gprocname, "strace") == 0) {
         printf("tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
+               gprocname, gpid);
+        return;
+    } else if (strcmp(gprocname, "gdbserver") == 0) {
+        printf("tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
                gprocname, gpid);
         return;
     } else {
