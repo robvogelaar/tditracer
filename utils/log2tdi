@@ -99,7 +99,7 @@ def addnes (type, logfilename, logline, matches):
 
                else:
                   # 1434754719      168720
-                  tstamp = re.findall("\d{8,}[ \t]d+", logline)
+                  tstamp = re.findall("\d{8,}[ ]+\d+", logline)
                   if tstamp:
                      if tstamp[0]:
                         pat = re.compile("\s*")

@@ -921,7 +921,7 @@ extern "C" void *malloc(size_t size) {
 
     void *ret = __malloc(size);
 
-    if (libcrecording && libcmalloc) {
+    if (libcmalloc) {
 
         if (size >= libcmalloc) {
 
@@ -983,7 +983,7 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
 
     void *ret = __calloc(nmemb, size);
 
-    if (libcrecording && libccalloc) {
+    if (libccalloc) {
 
         if ((nmemb * size) >= libccalloc) {
             tditrace_ex("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
@@ -1014,7 +1014,7 @@ extern "C" void *realloc(void *ptr, size_t size)
 
     void *ret = __realloc(ptr, size);
 
-    if (libcrecording && libcrealloc) {
+    if (libcrealloc) {
 
         if (size >= libcrealloc){
 

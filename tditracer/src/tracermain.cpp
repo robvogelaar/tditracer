@@ -262,7 +262,7 @@ static void init(void) {
         if (getenv("GLDRAW")) {
             gldrawrecording = (atoi(getenv("GLDRAW")) >= 1);
         } else {
-            gldrawrecording = true;
+            gldrawrecording = false;
         }
 
         if (getenv("TR")) {
