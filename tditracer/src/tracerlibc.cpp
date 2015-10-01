@@ -808,7 +808,6 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
-extern "C" void closelog (void);
 
 #if 1
 extern "C" void *malloc(size_t size) {
@@ -821,18 +820,19 @@ extern "C" void *malloc(size_t size) {
         }
     }
 
-    //# if 0
-    //if (libcrecording) {
-    //    if (size >= 1024) {
-    //        unsigned int ra = 0;
-    //        #ifdef __mips__
-    //        asm volatile("move %0, $ra" : "=r"(ra));
-    //        #endif
-    //        // tditrace_ex("@A+malloc() %d %p", size, ra);
-    //        tditrace_ex("m ra=%p,sz=%d", ra, size);
-    //    }
-    //}
-    //#endif
+
+
+    #if 0
+    if (NULL == glsl) {
+        glsl = dlsym(RTLD_NEXT, "glsl_set_line_capture_vertex");
+        if (glsl == NULL) {
+            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "glsl_set_line_capture_vertex");
+            fprintf(stderr, "glsl = 0x%x [0x%x]\n", glsl, &glsl);
+        } else {
+            fprintf(stderr, "got glsl!!!!!!!!! = 0x%x [0x%x]\n", glsl, &glsl);
+        }
+    }
+    #endif
 
     #if 0
     //static void *(*__malloc)(size_t) = NULL;
@@ -855,7 +855,6 @@ extern "C" void *malloc(size_t size) {
     static void* v3ddriver_base = NULL;
     static int v3ddriver_size = 0x110000;
     static void* ___ftext = NULL;
-
 
     if (NULL == v3ddriver_base) {
         Dl_info dli;
@@ -915,32 +914,23 @@ extern "C" void *malloc(size_t size) {
     #endif
 
 
-
-
     unsigned int ra = 0;
     #ifdef __mips__
     asm volatile("move %0, $ra" : "=r"(ra));
     #endif
 
-
     void *ret = __malloc(size);
 
-    if (libcrecording) {
+    if (libcrecording && libcmalloc) {
 
-        //if (0) {
-        //if (1) {
-        if (size >= 128) {
+        if (size >= libcmalloc) {
 
-            // tditrace_ex("@A+malloc() %d %p", size, ra);
+            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
 
-
-
-            //temporary
-            //tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
-
+            #if 0
             if (size == 420)
                 tditrace_ex("420m =%x,ra=%x,sz=%d", ret, ra, size);
-
+            #endif
 
             #if 0
             if (v3ddriver_base) {
@@ -949,7 +939,6 @@ extern "C" void *malloc(size_t size) {
                 }
             }
             #endif
-
             #if 0
             if (___ftext) {
                 if ((ra == ___ftext + 0x3534) && (size >= 1024)) {
@@ -959,13 +948,6 @@ extern "C" void *malloc(size_t size) {
                 }
             }
             #endif
-
-
-            // if (size == 1312) {
-            //     tditrace_ex("m1312 =%x,ra=%x,sz=%d", ret, ra, size);
-            //}
-
-
             #if 0
             if ((ra >= __new - 256) && (ra <= __new + 256)) {
                 tditrace_ex("newm =%x,ra=%x,sz=%d", ret, ra, size);
@@ -976,29 +958,14 @@ extern "C" void *malloc(size_t size) {
                 }
             }
             #endif
-
         }
     }
-
-
-    #if 0
-    if (libcrecording) {
-        // tditrace_ex("@A-malloc() =0x%x", ret);
-        if (0) {//size >= 1024) {
-            unsigned int ra = 0;
-            #ifdef __mips__
-            asm volatile("move %0, $ra" : "=r"(ra));
-            #endif
-            tditrace_ex("m =%x,ra=%p,sz=%d", ret, ra, size);
-        }
-    }
-    #endif
 
     return ret;
 }
 #endif
 
-#if 0
+#if 1
 extern "C" void *calloc(size_t nmemb, size_t size) {
     static void *(*__calloc)(size_t, size_t) = NULL;
 
@@ -1009,22 +976,19 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
         }
     }
 
-    if (libcrecording) {
-
-        if (size >= 1024) {
-            unsigned int ra = 0;
-            #ifdef __mips__
-            asm volatile("move %0, $ra" : "=r"(ra));
-            #endif
-            tditrace_ex("c ra=%p,sz=%d", ra, size);
-        }
-        //tditrace_ex("@A+calloc() %d %d", nmemb, size);
-    }
+    unsigned int ra = 0;
+    #ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
 
     void *ret = __calloc(nmemb, size);
 
-    if (libcrecording) {
-        // tditrace_ex("@A-calloc() =%x", ret);
+    if (libcrecording && libccalloc) {
+
+        if ((nmemb * size) >= libccalloc) {
+            tditrace_ex("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
+
+        }
     }
 
     return ret;
@@ -1043,36 +1007,23 @@ extern "C" void *realloc(void *ptr, size_t size)
         }
     }
 
-#if 0
-    if (NULL == glsl) {
-        glsl = dlsym(RTLD_NEXT, "glsl_set_line_capture_vertex");
-        if (glsl == NULL) {
-            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "glsl_set_line_capture_vertex");
-            fprintf(stderr, "glsl = 0x%x [0x%x]\n", glsl, &glsl);
-        } else {
-            fprintf(stderr, "got glsl!!!!!!!!! = 0x%x [0x%x]\n", glsl, &glsl);
-        }
-    }
-#endif
+    unsigned int ra = 0;
+    #ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
 
     void *ret = __realloc(ptr, size);
 
-    if (libcrecording) {
-        // tditrace_ex("@A-realloc() =0x%x", ret);
+    if (libcrecording && libcrealloc) {
 
-        if (1) { //size >= 1024) {
-            unsigned int ra = 0;
-            #ifdef __mips__
-            asm volatile("move %0, $ra" : "=r"(ra));
-            #endif
+        if (size >= libcrealloc){
 
-            //temporary
-            if (size == 8)
-                tditrace_ex("8r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-            else if (size == 16)
-                tditrace_ex("16r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-            else
-                tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+
+            //if (size == 8)
+            //    tditrace_ex("8r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            //if (size == 16)
+            //    tditrace_ex("16r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
 
         }
     }
@@ -1322,8 +1273,7 @@ void* operator new(std::size_t n) throw(std::bad_alloc)
 #endif
 
 //_Znwj
-
-#if 1
+#if 0
 void* operator new(unsigned int i){
 
     unsigned int ra = 0;

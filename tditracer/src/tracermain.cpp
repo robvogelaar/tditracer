@@ -25,8 +25,6 @@ static void dump(void);
 static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();
 
-extern char *__progname;
-
 static void tditracer_constructor() {
     tditrace_init();
 
@@ -61,6 +59,10 @@ bool libcrecvmmsgrecording;
 bool libcselectrecording;
 bool libcpollrecording;
 bool libcioctlrecording;
+
+unsigned int libcmalloc;
+unsigned int libccalloc;
+unsigned int libcrealloc;
 
 bool pthreadrecording;
 bool eglrecording;
@@ -136,9 +138,7 @@ static void signalhandler(int sig, siginfo_t *si, void *context) {
     case SIGQUIT:
 
         printf("tditracer: received SIGQUIT, rewinding tracebuffer\n");
-
         tditrace_rewind();
-
         break;
     }
 }
@@ -200,7 +200,10 @@ static void init(void) {
             libcrecvmmsgrecording = true;
             libcselectrecording = true;
             libcpollrecording = true;
-            libcioctlrecording = true;
+            libcioctlrecording = false;
+            libcmalloc = 0;
+            libccalloc = 0;
+            libcrealloc = 0;
 
         } else {
             libcrecording = false;
@@ -226,6 +229,17 @@ static void init(void) {
         if (env = getenv("LIBCIOCTL")) {
             libcioctlrecording = (atoi(env) >= 1);
         }
+
+        if (env = getenv("LIBCMALLOC")) {
+            libcmalloc = atoi(env);
+        }
+        if (env = getenv("LIBCCALLOC")) {
+            libccalloc = atoi(env);
+        }
+        if (env = getenv("LIBCREALLOC")) {
+            libcrealloc = atoi(env);
+        }
+
 
         if (getenv("PTHREAD")) {
             pthreadrecording = (atoi(getenv("PTHREAD")) >= 1);
