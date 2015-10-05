@@ -987,7 +987,6 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
 
         if ((nmemb * size) >= libccalloc) {
             tditrace_ex("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
-
         }
     }
 
@@ -1017,14 +1016,7 @@ extern "C" void *realloc(void *ptr, size_t size)
     if (libcrealloc) {
 
         if (size >= libcrealloc){
-
             tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-
-            //if (size == 8)
-            //    tditrace_ex("8r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-            //if (size == 16)
-            //    tditrace_ex("16r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-
         }
     }
 
@@ -1283,17 +1275,7 @@ void* operator new(unsigned int i){
 
     void* ret = malloc(i);
 
-    //tditrace_ex("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-
-    if (i == 420) {
-        tditrace_ex("420operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    }
-    if (i == 168) {
-        tditrace_ex("168operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    }
-    if (i == 156) {
-        tditrace_ex("156operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    }
+    tditrace_ex("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
 
     return ret;
 }

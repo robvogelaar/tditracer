@@ -32,3 +32,6 @@ for i in `find . -regex 'tdi' | sort -V` ; do echo $i && /home/rev/git/tditracer
 for i in `find . -name 'tditracebuffer*' | sort -V` ; do echo $i && tdidump $i > ${i%%.tdi}.tdi ; done
 /home/rev/git/tditracer/utils/tdimerge *.tdi  > combined1-18.tdi
 /home/rev/git/tditracer/utils/tdiprune combined1-18.tdi 'arena' > combined1-18-prarena.tdi
+
+
+/home/rev/git/tditracer/utils/tdiprune combined1-45.tdi 'OK|arena' > combined1-45-prOKarena.tdi

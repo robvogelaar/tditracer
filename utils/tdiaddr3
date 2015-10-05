@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pypy
 
 import sys
 import re
@@ -138,30 +138,7 @@ def main():
 
       f.close()
 
-
-
-
-      """
-      for row in izip_longest(*cyclesdata):
-         print row
-      """
-
-      """
-      sys.stderr.write('here1\n')
-      cyclesdata_union = sorted(set().union(*cyclesdata))
-      sys.stderr.write('here2\n')
-      new_lists = [[x if x in my_list else "----------" for x in cyclesdata_union] for my_list in cyclesdata]
-      sys.stderr.write('here3\n')
-
-      for row in izip_longest(*new_lists):
-         for item in row:
-            print str(item).replace(',',''),
-            print ',',
-         print
-      """
-
       leakchecklists = []
-
 
       nrcyclestocheck = max(cyclesrange) - min(cyclesrange) + 1
 
@@ -175,20 +152,13 @@ def main():
 
       for cycletocheckagainst in range(0, nrcyclestocheck):
 
-         #sys.stderr.write('checking against cycle %d\n' % (cycletocheckagainst + 1))
-         #build cyclerange
-         #sys.stderr.write('build range for cycle %d\n' %(cycletocheckagainst + 1))
          cycle = cyclesdata[cycletocheckagainst]
-         cycle = list(set(cycle))
-         cycle.sort()
          cyclerange = []
          for item in cycle:
-            l = list(item)
-            cyclerange.extend(range(l[0], l[0] + l[2]))
+            cyclerange.extend(range(item[0], item[0] + item[2]))
          cycleset = set(cyclerange)
 
          #check this one against all cycles
-   
          for cycletocheck in range(0, nrcyclestocheck):
 
             if cycletocheckagainst > cycletocheck:
@@ -197,31 +167,28 @@ def main():
 
                if len(sys.argv) >= 6:
                   if (cycletocheck + 1) > int(sys.argv[5]):
-                     #sys.stderr.write('max1 reached : %d-%d\n' % (cycletocheck + 1, cycletocheckagainst + 1))
                      continue
 
                if len(sys.argv) == 7:
                   if (cycletocheckagainst - cycletocheck) >= int(sys.argv[6]):
-                     #sys.stderr.write('max2 reached\n')
                      continue;
 
                sys.stderr.write('(%s)#%-5d checking %d-%d\n' % (str(tf-ts), nrchecks, cycletocheck + 1, cycletocheckagainst + 1))
                cycleresultstrings = cyclesresultstrings[cycletocheck]
                cycleuses = cyclesuses[cycletocheck]
 
-               cycledata = list(set(cyclesdata[cycletocheck]))
-               cycledata.sort()
+               cycledata = cyclesdata[cycletocheck]
 
                # do the check
                i = 0
                for item in cycledata:
-                  itemlist = list(item)
 
                   if not cycleresultstrings[i]:
-                     cycleresultstrings[i] = str('0x%08x %6d %6d %6d %s=x') %(itemlist[0], itemlist[2], itemlist[4], itemlist[3], itemlist[1])
+                     cycleresultstrings[i] = str('0x%08x %6d %6d %6d %s=x') %(item[0], item[2], item[4], item[3], item[1])
 
-                  rs = set(range(itemlist[0], itemlist[0] + itemlist[2]))
-                  if bool(rs & cycleset):
+                  rs = set(range(item[0], item[0] + item[2]))
+                  result = bool(rs & cycleset)
+                  if result:
                      cycleresultstrings[i]+= '+'
                      cycleuses[i]+= 1
                   else:
@@ -239,7 +206,6 @@ def main():
                      sys.stderr.write('just checked %d-%d\n' % (cycletocheck + 1, cycletocheckagainst + 1))
 
                      #add result
-
                      leakchecklist_full = []
                      leakchecklist_leaksonly = []
                      leakchecklist_leaksonly_minimized = []
@@ -271,57 +237,7 @@ def main():
                      sys.stderr.write('cycle(%-3d)total = %d Bytes\n' % (cycletocheck + 1, total))
                      leakchecklist_leaksonly_minimized.insert(0, 'total = %d Bytes' %total)
 
-
-
-      #process results
-
-      if len(sys.argv) >= 6:
-         cyclestocheck = int(sys.argv[5])
-      else:
-         cyclestocheck = nrcyclestocheck
-
-      if cyclestocheck > len(cyclesdata):
-         cyclestocheck = len(cyclesdata)
-
-
-      """
-      for cycletocheck in range(0, cyclestocheck):
-
-         leakchecklist_full = []
-         leakchecklist_leaksonly = []
-         leakchecklist_leaksonly_minimized = []
-
-         cycleresultstrings = cyclesresultstrings[cycletocheck]
-         cycleuses = cyclesuses[cycletocheck]
-
-         k = 0
-         for t in cycleresultstrings:
-            if cycleuses[k] == 0:
-               cycleresultstrings[k]+= '!'
-               leakchecklist_leaksonly.append(cycleresultstrings[k].split('x=')[0])
-               #sys.stderr.write('%s\n' % cycleresultstrings[k])
-            k+= 1
-     
-         leakchecklist_leaksonly.sort(key = sortby, reverse=True)
-
-         addrs = []
-         total = 0
-         for r in leakchecklist_leaksonly:
-            if not r.split()[0] in addrs:
-               leakchecklist_leaksonly_minimized.append(str('%s %s' %((r.split()[4]).split('=x')[0], r.split()[1])))
-               addrs.append(r.split()[0])
-               total += int(r.split()[1])
-
-         leakchecklist_leaksonly_minimized.sort(key = sortby1, reverse=True)
-         for r in leakchecklist_leaksonly_minimized:
-            sys.stderr.write('cycle(%-3d)[%s]\n' % (cycletocheck + 1, str(r)))
-         sys.stderr.write('cycle(%-3d)total = %d Bytes\n' % (cycletocheck + 1, total))
-         leakchecklist_leaksonly_minimized.insert(0, 'total = %d Bytes' %total)
-
-
-         leakchecklists.append(leakchecklist_leaksonly_minimized)
-
-         """
+                     leakchecklists.append(leakchecklist_leaksonly_minimized)
 
       for row in izip_longest(*leakchecklists):
          print row

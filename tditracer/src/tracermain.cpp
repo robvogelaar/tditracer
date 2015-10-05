@@ -250,13 +250,13 @@ static void init(void) {
         if (getenv("EGL")) {
             eglrecording = (atoi(getenv("EGL")) >= 1);
         } else {
-            eglrecording = true;
+            eglrecording = false;
         }
 
         if (getenv("GLES")) {
             glesrecording = (atoi(getenv("GLES")) >= 1);
         } else {
-            glesrecording = true;
+            glesrecording = false;
         }
 
         if (getenv("GLDRAW")) {
