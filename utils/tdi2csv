@@ -4,10 +4,15 @@ import sys
 import re
 from datetime import datetime
 
-TASKS  = 0
+TASKS = 0
+ISRS = 1
+AGENTS = 8
+
 QUEUES = 3
 EVENTS = 4
 NOTES  = 7
+
+
 
 tasksnames = []
 queuesnames = []
@@ -78,7 +83,7 @@ def build(tdifilename):
             first_tstamp = tstamp
 
 
-         if int(stawords[1]) == 0: # @T+ STA DSC
+         if int(stawords[1]) == TASKS or int(stawords[1]) == ISRS or int(stawords[1]) == AGENTS: # @T+ / @A+ / @I+ STA DSC
 
             dscwords = f.next().split()
 
@@ -94,7 +99,7 @@ def build(tdifilename):
             evts.append(str(offset_nsec + tstamp) + ' ' + stawords[1] + ' ' + 'STA' + ' ' + thenam + ' ' + dscwords[3])
 
 
-         if int(stawords[1]) == 4: # @E+  STA STO DSC
+         if int(stawords[1]) == EVENTS: # @E+  STA STO DSC
 
             stowords = f.next().split()
 
@@ -112,7 +117,7 @@ def build(tdifilename):
             evts.append(str(offset_nsec + tstamp) + ' ' + stawords[1] + ' ' + 'STASTO' + ' ' + thenam + ' ' + dscwords[3])
 
 
-         if int(stawords[1]) == 3: # ~ STA / STO
+         if int(stawords[1]) == QUEUES: # ~ STA / STO
 
             for nam in nams:
                namwords = nam.split()
@@ -137,7 +142,7 @@ def build(tdifilename):
             first_tstamp = tstamp
 
 
-         if int(stowords[1]) == 0: # @T+ STO DSC
+         if int(stowords[1]) == TASKS or int(stowords[1]) == ISRS or int(stowords[1]) == AGENTS: # @T+ / @I+ / @A+ STO DSC
 
             dscwords = f.next().split()
 
@@ -153,7 +158,7 @@ def build(tdifilename):
             evts.append(str(offset_nsec + tstamp) + ' ' + stowords[1] + ' ' + 'STO' + ' ' + thenam + ' ' + dscwords[3])
 
 
-         if int(stowords[1]) == 3: # ~ STA / STO
+         if int(stowords[1]) == QUEUES: # ~ STA / STO
 
             for nam in nams:
                namwords = nam.split()
