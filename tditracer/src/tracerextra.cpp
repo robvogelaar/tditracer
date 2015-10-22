@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include "tdi.h"
 
+#if 0
 extern "C" int extra(int in, int *out) {
 
     static int (*__extra)(int, int *) = NULL;
@@ -14,10 +15,11 @@ extern "C" int extra(int in, int *out) {
         }
     }
 
-    tditrace_ex("@T+extra()");
+    tditrace("@T+extra()");
     int ret = __extra(in, out);
-    tditrace_ex("@T-extra()");
+    tditrace("@T-extra()");
 
     return ret;
 }
 
+#endif

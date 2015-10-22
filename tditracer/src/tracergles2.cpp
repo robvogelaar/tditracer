@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 
+
 extern "C" {
 #include "shadercapture.h"
 #include "texturecapture.h"
@@ -38,6 +39,33 @@ static int glBindTexture_counter = 0;
 
 static int glShaderSource_counter = 0;
 
+
+extern "C" EGLBoolean eglInitialize(EGLDisplay display,
+  	EGLint * major,
+  	EGLint * minor)
+{
+    static EGLBoolean (*__eglInitialize)(EGLDisplay,
+                                          EGLint, EGLint) = NULL;
+
+    if (__eglInitialize == NULL) {
+        __eglInitialize = (EGLBoolean (*)(EGLDisplay, EGLint, EGLint))dlsym(
+            RTLD_NEXT, "eglInitialize");
+        if (NULL == __eglInitialize) {
+            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+        }
+    }
+
+    if (eglrecording)
+        tditrace("@I+eglInitialize()");
+
+    EGLBoolean ret = __eglInitialize(display, major, minor);
+
+    if (eglrecording)
+        tditrace("@I-eglInitialize()");
+
+    return ret;
+}
+
 extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
     static EGLBoolean (*__eglSwapBuffers)(EGLDisplay display,
                                           EGLSurface surface) = NULL;
@@ -57,21 +85,21 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
     }
 
     if (eglrecording)
-        tditrace_ex("@I+eglSwapBuffers()");
+        tditrace("@I+eglSwapBuffers()");
 
     EGLBoolean ret = __eglSwapBuffers(display, surface);
 
     if (eglrecording)
-        tditrace_ex("@I-eglSwapBuffers()");
+        tditrace("@I-eglSwapBuffers()");
 
     if (eglrecording)
-        tditrace_ex("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d",
+        tditrace("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d",
                     draw_counter, texturebind_counter);
 
-    if (eglrecording && glesrecording)
-        tditrace_ex("#gldraws~%d", 0);
-    if (eglrecording && glesrecording)
-        tditrace_ex("#gltexturebinds~%d", 0);
+    if (eglrecording && gles2recording)
+        tditrace("#gldraws~%d", 0);
+    if (eglrecording && gles2recording)
+        tditrace("#gltexturebinds~%d", 0);
 
     glDrawElements_counter = 0;
     glDrawArrays_counter = 0;
@@ -106,12 +134,12 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
     // addrinfo(__builtin_return_address(0)));
 
     if (eglrecording)
-        tditrace_ex(
+        tditrace(
             "@I+eglMakeCurrent() display=%d draw=0x%x read=0x%x context=0x%x",
             display, draw, read, context);
     EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
     if (eglrecording)
-        tditrace_ex("@I-eglMakeCurrent()");
+        tditrace("@I-eglMakeCurrent()");
 
     boundframebuffer = 0;
 
@@ -128,11 +156,11 @@ extern "C" void glFinish(void) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("@I+glFinish()");
+    if (gles2recording)
+        tditrace("@I+glFinish()");
     __glFinish();
-    if (glesrecording)
-        tditrace_ex("@I-glFinish()");
+    if (gles2recording)
+        tditrace("@I-glFinish()");
 }
 
 extern "C" void glFlush(void) {
@@ -145,11 +173,11 @@ extern "C" void glFlush(void) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("@I+glFlush()");
+    if (gles2recording)
+        tditrace("@I+glFlush()");
     __glFlush();
-    if (glesrecording)
-        tditrace_ex("@I-glFlush()");
+    if (gles2recording)
+        tditrace("@I-glFlush()");
 }
 
 extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
@@ -167,8 +195,8 @@ extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glVertexAttribPointer() %d,%d,%s,%d,0x%x", index, size,
+    if (gles2recording)
+        tditrace("glVertexAttribPointer() %d,%d,%s,%d,0x%x", index, size,
                     TYPESTRING(type), stride, pointer);
 
     __glVertexAttribPointer(index, size, type, normalized, stride, pointer);
@@ -188,11 +216,11 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     draw_counter++;
     glDrawArrays_counter++;
 
-    if (glesrecording || gldrawrecording)
-        tditrace_ex("#gldraws~%d", draw_counter);
+    if (gles2recording || gldrawrecording)
+        tditrace("#gldraws~%d", draw_counter);
     if (boundframebuffer != 0) {
-        if (glesrecording || gldrawrecording)
-            tditrace_ex(
+        if (gles2recording || gldrawrecording)
+            tditrace(
                 "@I+glDrawArrays() "
                 "@%d,#%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawArrays_counter, MODESTRING(mode), count,
@@ -206,8 +234,8 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
                                    0x3ff]);
 
     } else {
-        if (glesrecording || gldrawrecording)
-            tditrace_ex("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
+        if (gles2recording || gldrawrecording)
+            tditrace("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawArrays_counter, MODESTRING(mode),
                         count, boundtexture, currentprogram);
     }
@@ -234,8 +262,8 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
         }
     }
 
-    if (glesrecording || gldrawrecording)
-        tditrace_ex("@I-glDrawArrays()");
+    if (gles2recording || gldrawrecording)
+        tditrace("@I-glDrawArrays()");
 }
 
 extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
@@ -255,11 +283,11 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
     draw_counter++;
     glDrawElements_counter++;
 
-    if (glesrecording || gldrawrecording)
-        tditrace_ex("#gldraws~%d", draw_counter);
+    if (gles2recording || gldrawrecording)
+        tditrace("#gldraws~%d", draw_counter);
     if (boundframebuffer) {
-        if (glesrecording || gldrawrecording)
-            tditrace_ex(
+        if (gles2recording || gldrawrecording)
+            tditrace(
                 "@I+glDrawElements() "
                 "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
                 current_frame, glDrawElements_counter, MODESTRING(mode),
@@ -273,8 +301,8 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
                                    0x3ff]);
 
     } else {
-        if (glesrecording || gldrawrecording)
-            tditrace_ex("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
+        if (gles2recording || gldrawrecording)
+            tditrace("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
                         current_frame, glDrawElements_counter, MODESTRING(mode),
                         TYPESTRING(type), count, boundtexture, currentprogram);
     }
@@ -302,8 +330,8 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
         }
     }
 
-    if (glesrecording || gldrawrecording)
-        tditrace_ex("@I-glDrawElements()");
+    if (gles2recording || gldrawrecording)
+        tditrace("@I-glDrawElements()");
 }
 
 extern "C" void glGenTextures(GLsizei n, GLuint *textures) {
@@ -317,8 +345,8 @@ extern "C" void glGenTextures(GLsizei n, GLuint *textures) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glGenTextures() %d", n);
+    if (gles2recording)
+        tditrace("glGenTextures() %d", n);
 
     __glGenTextures(n, textures);
 }
@@ -334,11 +362,11 @@ extern "C" GLvoid glBindTexture(GLenum target, GLuint texture) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("#gltexturebinds~%d\n", ++texturebind_counter);
+    if (gles2recording)
+        tditrace("#gltexturebinds~%d", ++texturebind_counter);
 
-    if (glesrecording)
-        tditrace_ex("glBindTexture() #%d,%u", ++glBindTexture_counter, texture);
+    if (gles2recording)
+        tditrace("glBindTexture() #%d,%u", ++glBindTexture_counter, texture);
 
     __glBindTexture(target, texture);
 
@@ -361,8 +389,8 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("@I+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
+    if (gles2recording)
+        tditrace("@I+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
                     ++glTexImage2D_counter, width, height, TYPESTRING(type),
                     FORMATSTRING(format), boundtexture, pixels);
 
@@ -376,12 +404,12 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
     __glTexImage2D(target, level, internalformat, width, height, border, format,
                    type, pixels);
 
-    if (glesrecording)
-        tditrace_ex("@I-glTexImage2D()");
+    if (gles2recording)
+        tditrace("@I-glTexImage2D()");
 
     GLenum err = GL_NO_ERROR;
     while ((err = glGetError()) != GL_NO_ERROR) {
-        tditrace_ex("@S+GLERROR 0x%x", err);
+        tditrace("@S+GLERROR 0x%x", err);
     }
 }
 
@@ -403,8 +431,8 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("@I+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
+    if (gles2recording)
+        tditrace("@I+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
                     ++glTexSubImage2D_counter, width, height, xoffset, yoffset,
                     TYPESTRING(type), FORMATSTRING(format), boundtexture,
                     pixels);
@@ -419,8 +447,8 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
     __glTexSubImage2D(target, level, xoffset, yoffset, width, height, format,
                       type, pixels);
 
-    if (glesrecording)
-        tditrace_ex("@I-glTexSubImage2D()");
+    if (gles2recording)
+        tditrace("@I-glTexSubImage2D()");
 }
 
 extern "C" GLvoid glCopyTexImage2D(GLenum target, GLint level,
@@ -439,8 +467,8 @@ extern "C" GLvoid glCopyTexImage2D(GLenum target, GLint level,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glCopyTexImage2D() %dx%d+%d+%d,%u", width, height, x, y,
+    if (gles2recording)
+        tditrace("glCopyTexImage2D() %dx%d+%d+%d,%u", width, height, x, y,
                     boundtexture);
 
     __glCopyTexImage2D(target, level, internalformat, x, y, width, height,
@@ -462,8 +490,8 @@ extern "C" GLvoid glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height,
+    if (gles2recording)
+        tditrace("glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height,
                     x, y, xoffset, yoffset, boundtexture);
 
     __glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
@@ -513,8 +541,8 @@ extern "C" GLvoid glShaderSource(GLuint shader, GLsizei count,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glShaderSource() #%d %u", ++glShaderSource_counter,
+    if (gles2recording)
+        tditrace("glShaderSource() #%d %u", ++glShaderSource_counter,
                     shader);
 
     if (shaderrecording) {
@@ -536,15 +564,15 @@ extern "C" GLvoid glAttachShader(GLuint program, GLuint shader) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glAttachShader() %u %u", program, shader);
+    if (gles2recording)
+        tditrace("glAttachShader() %u %u", program, shader);
 
     if (shaderrecording) {
         shadercapture_referenceprogram(shader, program);
     }
 
     __glAttachShader(program, shader);
-    // tditrace_ex("@E+glAttachShader() %u %u", shader, program);
+    // tditrace("@E+glAttachShader() %u %u", shader, program);
 }
 
 extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
@@ -558,8 +586,8 @@ extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glDetachShader() %u %u", program, shader);
+    if (gles2recording)
+        tditrace("glDetachShader() %u %u", program, shader);
 
 #if 0
     if (shaderrecording) {
@@ -568,7 +596,7 @@ extern "C" GLvoid glDetachShader(GLuint program, GLuint shader) {
 #endif
 
     __glDetachShader(program, shader);
-    // tditrace_ex("@E+glDetachShader() %u %u", shader, program);
+    // tditrace("@E+glDetachShader() %u %u", shader, program);
 }
 
 #if 0
@@ -583,7 +611,7 @@ extern "C" GLvoid glEnable(GLenum cap)
         }
     }
 
-    if (glesrecording) tditrace_ex("glEnable() %s", CAPSTRING(cap));
+    if (gles2recording) tditrace("glEnable() %s", CAPSTRING(cap));
 
     __glEnable(cap);
 }
@@ -601,7 +629,7 @@ extern "C" GLvoid glDisable(GLenum cap)
         }
     }
 
-    if (glesrecording) tditrace_ex("glDisable() %s", CAPSTRING(cap));
+    if (gles2recording) tditrace("glDisable() %s", CAPSTRING(cap));
 
     __glDisable(cap);
 }
@@ -619,7 +647,7 @@ extern "C" GLvoid glBlendFunc(GLenum sfactor, GLenum dfactor)
         }
     }
 
-    if (glesrecording) tditrace_ex("glBlendFunc() %s %s", BLENDSTRING(sfactor), BLENDSTRING(dfactor));
+    if (gles2recording) tditrace("glBlendFunc() %s %s", BLENDSTRING(sfactor), BLENDSTRING(dfactor));
 
     __glBlendFunc(sfactor, dfactor);
 }
@@ -637,7 +665,7 @@ extern "C" GLvoid glScissor(GLint x, GLint y, GLsizei width, GLsizei height)
         }
     }
 
-    if (glesrecording) tditrace_ex("glScissor() %dx%d+%d+%d", width, height, x, y);
+    if (gles2recording) tditrace("glScissor() %dx%d+%d+%d", width, height, x, y);
 
     __glScissor(x, y, width, height);
 }
@@ -655,7 +683,7 @@ extern "C" GLvoid glClearColor(GLclampf red, GLclampf green, GLclampf blue, GLcl
         }
     }
 
-    if (glesrecording) tditrace_ex("glClearColor() %g %g %g %g", red, green, blue, alpha);
+    if (gles2recording) tditrace("glClearColor() %g %g %g %g", red, green, blue, alpha);
 
     __glClearColor(red, green, blue, alpha);
 }
@@ -674,13 +702,13 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     // printf("%s,[%s]\n", CLEARSTRING(mask),
     // addrinfo(__builtin_return_address(0)));
 
-    if (glesrecording)
-        tditrace_ex("@I+glClear() %s", CLEARSTRING(mask));
+    if (gles2recording)
+        tditrace("@I+glClear() %s", CLEARSTRING(mask));
 
     __glClear(mask);
 
-    if (glesrecording)
-        tditrace_ex("@I-glClear()");
+    if (gles2recording)
+        tditrace("@I-glClear()");
 }
 
 extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
@@ -694,8 +722,8 @@ extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glBindBuffer() %u", buffer);
+    if (gles2recording)
+        tditrace("glBindBuffer() %u", buffer);
 
     __glBindBuffer(target, buffer);
 }
@@ -711,8 +739,8 @@ extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glGenFramebuffers() %d", n);
+    if (gles2recording)
+        tditrace("glGenFramebuffers() %d", n);
 
     __glGenFramebuffers(n, framebuffers);
 }
@@ -728,8 +756,8 @@ extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glBindFramebuffer() %u", framebuffer);
+    if (gles2recording)
+        tditrace("glBindFramebuffer() %u", framebuffer);
 
     __glBindFramebuffer(target, framebuffer);
 
@@ -751,8 +779,8 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glFramebufferTexture2D() %s,%u",
+    if (gles2recording)
+        tditrace("glFramebufferTexture2D() %s,%u",
                     ATTACHMENTSTRING(attachment), texture);
 
     __glFramebufferTexture2D(target, attachment, textarget, texture, level);
@@ -774,8 +802,8 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glRenderbufferStorage() %s0x%x,%dx%d",
+    if (gles2recording)
+        tditrace("glRenderbufferStorage() %s0x%x,%dx%d",
                     IFORMATSTRING(internalformat), internalformat, width,
                     height);
 
@@ -796,8 +824,8 @@ extern GLvoid glGenRenderbuffers(GLsizei n, GLuint *renderbuffers) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glgenRenderbuffers() %d", n);
+    if (gles2recording)
+        tditrace("glgenRenderbuffers() %d", n);
 
     __glgenRenderbuffers(n, renderbuffers);
 }
@@ -817,8 +845,8 @@ extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment,
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glFramebufferRenderbuffer() %s,%u",
+    if (gles2recording)
+        tditrace("glFramebufferRenderbuffer() %s,%u",
                     ATTACHMENTSTRING(attachment), renderbuffer);
 
     __glFramebufferRenderbuffer(target, attachment, renderbuffertarget,
@@ -838,8 +866,8 @@ extern "C" GLvoid glBindRenderbuffer(GLenum target, GLuint renderbuffer) {
         }
     }
 
-    if (glesrecording)
-        tditrace_ex("glBindRenderbuffer() %u", renderbuffer);
+    if (gles2recording)
+        tditrace("glBindRenderbuffer() %u", renderbuffer);
 
     __glBindRenderbuffer(target, renderbuffer);
 
@@ -859,7 +887,7 @@ extern "C" GLuint glCreateProgram(void) {
     }
 
     GLuint program = __glCreateProgram();
-    tditrace_ex("@E+glCreateProgram() %u", program);
+    tditrace("@E+glCreateProgram() %u", program);
 
     return program;
 }
@@ -875,9 +903,9 @@ extern "C" void glLinkProgram(GLuint program) {
         }
     }
 
-    //tditrace_ex("@I+glLinkProgram() %d", program);
+    //tditrace("@I+glLinkProgram() %d", program);
     __glLinkProgram(program);
-    //tditrace_ex("@I-glLinkProgram() %d", program);
+    //tditrace("@I-glLinkProgram() %d", program);
 
 }
 
@@ -892,7 +920,7 @@ extern "C" void glDeleteProgram(GLuint program) {
     }
 
     __glDeleteProgram(program);
-    tditrace_ex("@E+glDeleteProgram() %d", program);
+    tditrace("@E+glDeleteProgram() %d", program);
 
 
 
@@ -900,14 +928,14 @@ extern "C" void glDeleteProgram(GLuint program) {
     GLint curprog = 0;
 
     glGetIntegerv(GL_CURRENT_PROGRAM, &curprog);
-    tditrace_ex("@E+glDeleteProgram() %d GL_CURRENT_PROGRAM=%d", program, curprog);
+    tditrace("@E+glDeleteProgram() %d GL_CURRENT_PROGRAM=%d", program, curprog);
     
     if (glIsProgram(program)) {
         glGetProgramiv(program, GL_DELETE_STATUS, &params); 
-        tditrace_ex("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
+        tditrace("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
 
         glGetProgramiv(program, GL_ATTACHED_SHADERS, &params); 
-        tditrace_ex("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
+        tditrace("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
 
         if (program == curprog) {
 
@@ -916,26 +944,26 @@ extern "C" void glDeleteProgram(GLuint program) {
             __glDeleteProgram(program);
 
             if (glIsProgram(program)) {
-                tditrace_ex("@E+glDeleteProgram() %d is_not_deleted", program);
+                tditrace("@E+glDeleteProgram() %d is_not_deleted", program);
 
                 glGetProgramiv(program, GL_DELETE_STATUS, &params); 
-                tditrace_ex("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
+                tditrace("@E+glDeleteProgram() %d GL_DELETE_STATUS=%d", program, params);
 
                 glGetProgramiv(program, GL_ATTACHED_SHADERS, &params); 
-                tditrace_ex("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
+                tditrace("@E+glDeleteProgram() %d GL_ATTACHED_SHADERS=%d", program, params);
 
             } else {
-                tditrace_ex("@E+glDeleteProgram() %d is_deleted", program);
+                tditrace("@E+glDeleteProgram() %d is_deleted", program);
             }
         }
 
     } else {
-        tditrace_ex("@E+glDeleteProgram() %d is_deleted", program);
+        tditrace("@E+glDeleteProgram() %d is_deleted", program);
     }
 
     GLenum err = GL_NO_ERROR;
     while ((err = glGetError()) != GL_NO_ERROR) {
-        tditrace_ex("@E+GLERROR 0x%x", err);
+        tditrace("@E+GLERROR 0x%x", err);
     }
 
 }
@@ -951,7 +979,7 @@ extern "C" GLuint glCreateShader(GLenum shaderType){
     }
 
     GLuint shader = __glCreateShader(shaderType);
-    tditrace_ex("@E+glCreateShader() %u", shader);
+    tditrace("@E+glCreateShader() %u", shader);
 
     return shader;
 }
@@ -967,6 +995,6 @@ extern "C" void glDeleteShader(GLuint shader) {
     }
 
     __glDeleteShader(shader);
-    tditrace_ex("@E+glDeleteShader() %u", shader);
+    tditrace("@E+glDeleteShader() %u", shader);
 }
 #endif

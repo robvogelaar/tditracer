@@ -14,6 +14,7 @@
 #define MAXSTRLEN 512
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
+
 #if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
@@ -49,7 +50,7 @@ extern "C" void* dlopen(const char* filename, int flag)
      */
     init();
 
-    // tditrace_ex("dlopen() %s", filename);
+    // tditrace("dlopen() %s", filename);
 
     bool intercept = false;
     if (filename) {
@@ -136,7 +137,7 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
     return EACCES;
 #endif
 
-    tditrace_ex("connect()");
+    tditrace("connect()");
 
     return __connect(sockfd,serv_addr,addrlen);
 
@@ -166,13 +167,13 @@ extern "C" int open(const char *pathname, int flags, ...) {
     va_end(args);
 
     if (libcrecording && libcopenrecording) {
-        tditrace_ex("@A+open() %s", pathname);
+        tditrace("@A+open() %s", pathname);
     }
 
     int ret = __open(pathname, flags, a1);
 
     if (libcrecording && libcopenrecording) {
-        tditrace_ex("@A-open() =%d", pathname, ret);
+        tditrace("@A-open() =%d", pathname, ret);
     }
 
     return ret;
@@ -191,13 +192,13 @@ extern "C" FILE *fopen(const char *path, const char *mode) {
     }
 
     if (libcrecording && libcfopenrecording) {
-        tditrace_ex("@A+fopen() %s", path);
+        tditrace("@A+fopen() %s", path);
     }
 
     FILE *ret = __fopen(path, mode);
 
     if (libcrecording && libcfopenrecording) {
-        tditrace_ex("@A-fopen() =%d", ret);
+        tditrace("@A-fopen() =%d", ret);
     }
 
     return ret;
@@ -214,13 +215,13 @@ extern "C" FILE *fdopen(int fd, const char *mode) {
     }
 
     if (libcrecording && libcfdopenrecording) {
-        tditrace_ex("@A+fdopen() %d", fd);
+        tditrace("@A+fdopen() %d", fd);
     }
 
     FILE *ret = __fdopen(fd, mode);
 
     if (libcrecording && libcfdopenrecording) {
-        tditrace_ex("@A-fdopen() =%d", ret);
+        tditrace("@A-fdopen() =%d", ret);
     }
 
     return ret;
@@ -238,19 +239,19 @@ extern "C" FILE *freopen(const char *path, const char *mode, FILE *stream) {
     }
 
     if (libcrecording && libcfreopenrecording) {
-        tditrace_ex("@A+freopen() %s", path);
+        tditrace("@A+freopen() %s", path);
     }
 
     FILE *ret = __freopen(path, mode, stream);
 
     if (libcrecording && libcfreopenrecording) {
-        tditrace_ex("@A-freopen() =%d", ret);
+        tditrace("@A-freopen() =%d", ret);
     }
 
     return ret;
 }
 
-#if 1
+#if 0
 extern "C" ssize_t read(int fd, void *buf, size_t count) {
     static ssize_t (*__read)(int, void *, size_t) = NULL;
 
@@ -262,24 +263,24 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
     }
 
     if (libcrecording && libcreadrecording) {
-        tditrace_ex("@A+read() %d %d", fd, count);
+        tditrace("@A+read() %d %d", fd, count);
     }
 
     ssize_t ret = __read(fd, buf, count);
 
     if (libcrecording && libcreadrecording) {
         if (ret == -1) {
-            tditrace_ex("@A-read() =-1");
+            tditrace("@A-read() =-1");
         } else if (ret == 0) {
-            tditrace_ex("@A-read() =0");
+            tditrace("@A-read() =0");
         } else {
             if (0) {
                 char s[MAXSTRLEN + 1];
                 strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
                 s[MIN(MAXSTRLEN, ret)] = '\0';
-                tditrace_ex("@A-read() =%d \"%s\"", ret, s);
+                tditrace("@A-read() =%d \"%s\"", ret, s);
             } else {
-                tditrace_ex("@A-read() =%d", ret);
+                tditrace("@A-read() =%d", ret);
             }
         }
     }
@@ -288,7 +289,7 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     static ssize_t (*__write)(int, const void *, size_t) = NULL;
 
@@ -300,26 +301,22 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
         }
     }
 
-#if 1
     if (libcrecording && libcwriterecording) {
         if (0) {
             char s[MAXSTRLEN + 1];
             strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count));
             s[MIN(MAXSTRLEN, count)] = '\0';
-            tditrace_ex("@A+write() %d %d \"%s\"", fd, count, s);
+            tditrace("@A+write() %d %d \"%s\"", fd, count, s);
         } else {
-            tditrace_ex("@A+write() %d %d", fd, count);
+            tditrace("@A+write() %d %d", fd, count);
         }
     }
-#endif
 
     ssize_t ret = __write(fd, buf, count);
 
-#if 1
     if (libcrecording && libcwriterecording) {
-        tditrace_ex("@A-write() =%d", ret);
+        tditrace("@A-write() =%d", ret);
     }
-#endif
 
     return ret;
 }
@@ -337,13 +334,13 @@ extern "C" int socket(int domain, int type, int protocol) {
     }
 
     if (libcrecording && libcsocketrecording) {
-        tditrace_ex("@A+socket() %d %d %d", domain, type, protocol);
+        tditrace("@A+socket() %d %d %d", domain, type, protocol);
     }
 
     int ret = __socket(domain, type, protocol);
 
     if (libcrecording && libcsocketrecording) {
-        tditrace_ex("@A-socket() =%d", ret);
+        tditrace("@A-socket() =%d", ret);
     }
 
     return ret;
@@ -372,26 +369,26 @@ extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
                 if (strncmp((const char *)buf, "HTTP", 4) == 0 ||
                     strncmp((const char *)buf, "{", 1) == 0 ||
                     strncmp((const char *)buf, "data:", 5) == 0) {
-                    tditrace_ex("@E+send()_%d %d \"%s\"", sockfd, len, s);
-                    tditrace_ex("@A+send() %d %d \"%s\"", sockfd, len, s);
+                    tditrace("@E+send()_%d %d \"%s\"", sockfd, len, s);
+                    tditrace("@A+send() %d %d \"%s\"", sockfd, len, s);
                 } else {
                     s[MIN(16, len)] = '\0';
-                    tditrace_ex("@A+send() %d %d \"%s\"...", sockfd, len, s);
+                    tditrace("@A+send() %d %d \"%s\"...", sockfd, len, s);
                 }
 
             } else {
-                tditrace_ex("@A+send() %d %d \"???\"", sockfd, len);
+                tditrace("@A+send() %d %d \"???\"", sockfd, len);
             }
 
         } else {
-            tditrace_ex("@A+send() %d %d ", sockfd, len);
+            tditrace("@A+send() %d %d ", sockfd, len);
         }
     }
 
     ssize_t ret = __send(sockfd, buf, len, flags);
 
     if (libcrecording && libcsendrecording) {
-        tditrace_ex("@A-send() =%d", ret);
+        tditrace("@A-send() =%d", ret);
     }
 
     return ret;
@@ -416,16 +413,16 @@ extern "C" ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
             char s[MAXSTRLEN + 1];
             strncpy(s, (const char *)buf, MIN(MAXSTRLEN, len));
             s[MIN(MAXSTRLEN, len)] = '\0';
-            tditrace_ex("@A+sendto() %d %d \"%s\"", sockfd, len, s);
+            tditrace("@A+sendto() %d %d \"%s\"", sockfd, len, s);
         } else {
-            tditrace_ex("@A+sendto() %d %d ", sockfd, len);
+            tditrace("@A+sendto() %d %d ", sockfd, len);
         }
     }
 
     ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 
     if (libcrecording && libcsendtorecording) {
-        tditrace_ex("@A-sendto() =%d", ret);
+        tditrace("@A-sendto() =%d", ret);
     }
 
     return ret;
@@ -443,16 +440,16 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
     }
 
     if (libcrecording && libcsendmsgrecording) {
-        // tditrace_ex("@A+sendmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
+        // tditrace("@A+sendmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
         // msg->msg_iov[0].iov_base);
-        tditrace_ex("@A+sendmsg() %d %d \"\"", sockfd, msg->msg_iovlen);
+        tditrace("@A+sendmsg() %d %d \"\"", sockfd, msg->msg_iovlen);
     }
 
     ssize_t ret = __sendmsg(sockfd, msg, flags);
 
     if (libcrecording && libcsendmsgrecording) {
-        tditrace_ex("@A-sendmsg() =%d", ret);
-        tditrace_ex("@E+sendmsg()_%d =%d %d \"\"", sockfd, ret,
+        tditrace("@A-sendmsg() =%d", ret);
+        tditrace("@E+sendmsg()_%d =%d %d \"\"", sockfd, ret,
                     msg->msg_iovlen);
     }
 
@@ -472,13 +469,13 @@ extern "C" int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
     }
 
     if (libcrecording && libcsendmmsgrecording) {
-        tditrace_ex("@A+sendmmsg() %d 0x%x", sockfd, msgvec);
+        tditrace("@A+sendmmsg() %d 0x%x", sockfd, msgvec);
     }
 
     int ret = __sendmmsg(sockfd, msgvec, vlen, flags);
 
     if (libcrecording && libcsendmmsgrecording) {
-        tditrace_ex("@A-sendmmsg() =%d", ret);
+        tditrace("@A-sendmmsg() =%d", ret);
     }
 
     return ret;
@@ -496,16 +493,16 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     }
 
     if (libcrecording && libcrecvrecording) {
-        tditrace_ex("@A+recv() %d %d", sockfd, len);
+        tditrace("@A+recv() %d %d", sockfd, len);
     }
 
     ssize_t ret = __recv(sockfd, buf, len, flags);
 
     if (libcrecording && libcrecvrecording) {
         if (ret == -1) {
-            tditrace_ex("@A-recv() =-1");
+            tditrace("@A-recv() =-1");
         } else if (ret == 0) {
-            tditrace_ex("@A-recv() =0");
+            tditrace("@A-recv() =0");
         } else {
             if (MAXSTRLEN) {
                 if (buf && !strchr((char *)buf, '\f')) {
@@ -516,18 +513,19 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
                     if (strncmp((const char *)buf, "GET", 3) == 0 ||
                         strncmp((const char *)buf, "POST", 4) == 0 ||
                         strncmp((const char *)buf, "{", 1) == 0) {
-                        tditrace_ex("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
-                        tditrace_ex("@A-recv() =%d \"%s\"", ret, s);
+                        tditrace("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
+                        tditrace("@A-recv() =%d \"%s\"", ret, s);
                     } else {
-                        s[MIN(16, len)] = '\0';
-                        tditrace_ex("@A-recv() =%d \"%s\"...", ret, s);
+                        s[MIN(4, len)] = '\0';
+                        //tditrace("@A-recv() =%d \"%s\"...", ret, s);
+                        tditrace("@A-recv() =%d \"%s\"...", ret, "xxx");
                     }
 
                 } else {
-                    tditrace_ex("@A-recv() =%d \"???\"", ret);
+                    tditrace("@A-recv() =%d \"???\"", ret);
                 }
             } else {
-                tditrace_ex("@A-recv() =%d", ret);
+                tditrace("@A-recv() =%d", ret);
             }
         }
     }
@@ -549,24 +547,24 @@ extern "C" ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
     }
 
     if (libcrecording && libcrecvfromrecording) {
-        tditrace_ex("@A+recvfrom() %d %d 0x%x", sockfd, len, flags);
+        tditrace("@A+recvfrom() %d %d 0x%x", sockfd, len, flags);
     }
 
     ssize_t ret = __recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 
     if (libcrecording && libcrecvfromrecording) {
         if (ret == -1) {
-            tditrace_ex("@A-recvfrom() =-1");
+            tditrace("@A-recvfrom() =-1");
         } else if (ret == 0) {
-            tditrace_ex("@A-recvfrom() =0");
+            tditrace("@A-recvfrom() =0");
         } else {
             if (MAXSTRLEN) {
                 char s[MAXSTRLEN + 1];
                 strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
                 s[MIN(MAXSTRLEN, ret)] = '\0';
-                tditrace_ex("@A-recvfrom() =%d \"%s\"", ret, s);
+                tditrace("@A-recvfrom() =%d \"%s\"", ret, s);
             } else {
-                tditrace_ex("@A-recvfrom() =%d", ret);
+                tditrace("@A-recvfrom() =%d", ret);
             }
         }
     }
@@ -586,42 +584,45 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     }
 
     if (libcrecording && libcrecvmsgrecording) {
-        tditrace_ex("@A+recvmsg() %d %d", sockfd, msg->msg_iovlen);
+        tditrace("@A+recvmsg() %d %d", sockfd, msg->msg_iovlen);
     }
 
     ssize_t ret = __recvmsg(sockfd, msg, flags);
 
     if (libcrecording && libcrecvmsgrecording) {
-        // tditrace_ex("@A+recvmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
+        // tditrace("@A+recvmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
         // msg->msg_iov[0].iov_base);
-        tditrace_ex("@A-recvmsg() =%d \"\"", ret);
-        tditrace_ex("@E+recvmsg()_%d =%d \"\"", sockfd, ret);
+
+        tditrace("@A-recvmsg() =%d \"\"", ret);
+        tditrace("@E+recvmsg()_%d =%d \"\"", sockfd, ret);
     }
 
     return ret;
 }
 
+
 extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-                        int flags, const timespec *timeout) {
+                        int flags, timespec *timeout) {
+
     static int (*__recvmmsg)(int, struct mmsghdr *, unsigned int, int,
-                             const timespec *) = NULL;
+                             timespec *) = NULL;
 
     if (__recvmmsg == NULL) {
         __recvmmsg = (int (*)(int, struct mmsghdr *, unsigned int, int,
-                              const timespec *))dlsym(RTLD_NEXT, "recvmmsg");
+                              timespec *))dlsym(RTLD_NEXT, "recvmmsg");
         if (NULL == __recvmmsg) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
     }
 
     if (libcrecording && libcrecvmmsgrecording) {
-        tditrace_ex("@A+recvmmsg() %d 0x%x %d", sockfd, msgvec, vlen);
+        tditrace("@A+recvmmsg() %d 0x%x %d", sockfd, msgvec, vlen);
     }
 
     int ret = __recvmmsg(sockfd, msgvec, vlen, flags, timeout);
 
     if (libcrecording && libcrecvmmsgrecording) {
-        tditrace_ex("@A-recvmmsg() =%d", ret);
+        tditrace("@A-recvmmsg() =%d", ret);
     }
 
     return ret;
@@ -641,14 +642,14 @@ extern "C" int select(int nfds, fd_set *readfds, fd_set *writefds,
     }
 
     if (libcrecording && libcselectrecording) {
-        tditrace_ex("@A+select() %d %x %x %x", nfds, readfds, writefds,
+        tditrace("@A+select() %d %x %x %x", nfds, readfds, writefds,
                     exceptfds);
     }
 
     int ret = __select(nfds, readfds, writefds, exceptfds, timeout);
 
     if (libcrecording && libcselectrecording) {
-        tditrace_ex("@A-select() =%d", ret);
+        tditrace("@A-select() =%d", ret);
     }
 
     return ret;
@@ -666,13 +667,13 @@ extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
     }
 
     if (libcrecording && libcpollrecording) {
-        tditrace_ex("@A+poll() %x %d %d", fds, nfds, timeout);
+        tditrace("@A+poll() %x %d %d", fds, nfds, timeout);
     }
 
     int ret = __poll(fds, nfds, timeout);
 
     if (libcrecording && libcpollrecording) {
-        tditrace_ex("@A-poll() =%d", ret);
+        tditrace("@A-poll() =%d", ret);
     }
 
     return ret;
@@ -694,13 +695,13 @@ extern "C" int ioctl(int d, int request, ...) {
     va_end(args);
 
     if (libcrecording && libcioctlrecording) {
-        tditrace_ex("@A+ioctl() %d 0x%x", d, request);
+        tditrace("@A+ioctl() %d 0x%x", d, request);
     }
 
     int ret = __ioctl(d, request, a1);
 
     if (libcrecording && libcioctlrecording) {
-        tditrace_ex("@A-ioctl() =%d", ret);
+        tditrace("@A-ioctl() =%d", ret);
     }
 
     return ret;
@@ -719,13 +720,13 @@ extern "C" void *memcpy(void *dest, const void *src, size_t n) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+memcpy() 0x%x 0x%x %d", dest, src, n);
+        tditrace("@A+memcpy() 0x%x 0x%x %d", dest, src, n);
     }
 
     void *ret = __memcpy(dest, src, n);
 
     if (libcrecording) {
-        tditrace_ex("@A-memcpy()");
+        tditrace("@A-memcpy()");
     }
 
     return ret;
@@ -744,13 +745,13 @@ extern "C" void *memset(void *dest, int c, size_t n) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+memset() 0x%x,0x%x,%d", dest, c, n);
+        tditrace("@A+memset() 0x%x,0x%x,%d", dest, c, n);
     }
 
     void *ret = __memset(dest, c, n);
 
     if (libcrecording) {
-        tditrace_ex("@A-memset()");
+        tditrace("@A-memset()");
     }
 
     return ret;
@@ -769,13 +770,13 @@ extern "C" char *strcpy(char *dest, const char *src) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+strcpy() 0x%x,0x%x", dest, src);
+        tditrace("@A+strcpy() 0x%x,0x%x", dest, src);
     }
 
     char *ret = __strcpy(dest, src);
 
     if (libcrecording) {
-        tditrace_ex("@A-strcpy()");
+        tditrace("@A-strcpy()");
     }
 
     return ret;
@@ -795,13 +796,13 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
     }
 
     if (libcrecording) {
-        tditrace_ex("@A+strncpy() 0x%x 0x%x %d", dest, src, n);
+        tditrace("@A+strncpy() 0x%x 0x%x %d", dest, src, n);
     }
 
     char *ret = __strncpy(dest, src, n);
 
     if (libcrecording) {
-        tditrace_ex("@A-strncpy()");
+        tditrace("@A-strncpy()");
     }
 
     return ret;
@@ -925,17 +926,17 @@ extern "C" void *malloc(size_t size) {
 
         if (size >= libcmalloc) {
 
-            tditrace_ex("m =%x,ra=%x,sz=%d", ret, ra, size);
+            tditrace("m =%x,ra=%x,sz=%d", ret, ra, size);
 
             #if 0
             if (size == 420)
-                tditrace_ex("420m =%x,ra=%x,sz=%d", ret, ra, size);
+                tditrace("420m =%x,ra=%x,sz=%d", ret, ra, size);
             #endif
 
             #if 0
             if (v3ddriver_base) {
                 if ((ra >= v3ddriver_base) && (ra <= v3ddriver_base + 0x110000)) {
-                    tditrace_ex("v3dm =%x,ra=%x,sz=%d", ret, ra, size);
+                    tditrace("v3dm =%x,ra=%x,sz=%d", ret, ra, size);
                 }
             }
             #endif
@@ -943,17 +944,17 @@ extern "C" void *malloc(size_t size) {
             if (___ftext) {
                 if ((ra == ___ftext + 0x3534) && (size >= 1024)) {
                     closelog();
-                    tditrace_ex("v3dftext1024m =%x,ra=%x,sz=%d", ret, ra, size);
+                    tditrace("v3dftext1024m =%x,ra=%x,sz=%d", ret, ra, size);
                     fprintf(stderr, "v3dftextm %d\n", size);
                 }
             }
             #endif
             #if 0
             if ((ra >= __new - 256) && (ra <= __new + 256)) {
-                tditrace_ex("newm =%x,ra=%x,sz=%d", ret, ra, size);
+                tditrace("newm =%x,ra=%x,sz=%d", ret, ra, size);
 
                 if (size > 1024) {
-                    tditrace_ex("new1024m =%x,ra=%x,sz=%d", ret, ra, size);
+                    tditrace("new1024m =%x,ra=%x,sz=%d", ret, ra, size);
                     closelog();
                 }
             }
@@ -965,11 +966,26 @@ extern "C" void *malloc(size_t size) {
 }
 #endif
 
+
+
+// our temporary calloc used until we get the address of libc provided
+// one in our interposed calloc
+static void* temporary_calloc(size_t x, size_t y)
+{
+    //printf("empty calloc called\n");
+	return NULL;
+}
+
+
 #if 1
 extern "C" void *calloc(size_t nmemb, size_t size) {
+
     static void *(*__calloc)(size_t, size_t) = NULL;
 
     if (__calloc == NULL) {
+
+        __calloc = temporary_calloc;
+
         __calloc = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
         if (NULL == __calloc) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -986,7 +1002,7 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
     if (libccalloc) {
 
         if ((nmemb * size) >= libccalloc) {
-            tditrace_ex("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
+            tditrace("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
         }
     }
 
@@ -1016,7 +1032,7 @@ extern "C" void *realloc(void *ptr, size_t size)
     if (libcrealloc) {
 
         if (size >= libcrealloc){
-            tditrace_ex("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+            tditrace("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
         }
     }
 
@@ -1040,15 +1056,15 @@ extern "C" void free(void *ptr) {
         #ifdef __mips__
         asm volatile("move %0, $ra" : "=r"(ra));
         #endif            
-        tditrace_ex("f ra=%p", ra);
+        tditrace("f ra=%p", ra);
 
-        //tditrace_ex("@A+free() 0x%x", ptr);
+        //tditrace("@A+free() 0x%x", ptr);
     }
 
     __free(ptr);
 
     if (libcrecording) {
-        //tditrace_ex("@A-free()");
+        //tditrace("@A-free()");
     }
 }
 #endif
@@ -1061,9 +1077,9 @@ extern "C" int brk(void *__addr) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+brk()");
+    tditrace("@A+brk()");
     int ret = __brk(__addr);
-    tditrace_ex("@A-brk()");
+    tditrace("@A-brk()");
     return ret;
 }
 
@@ -1075,9 +1091,9 @@ extern "C" void *sbrk(intptr_t __delta) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+sbrk()");
+    tditrace("@A+sbrk()");
     void *ret = __sbrk(__delta);
-    tditrace_ex("@A-sbrk()");
+    tditrace("@A-sbrk()");
     return ret;
 }
 
@@ -1092,9 +1108,9 @@ extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+mmap()");
+    tditrace("@A+mmap()");
     void *ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
-    tditrace_ex("@A-mmap()");
+    tditrace("@A-mmap()");
     return ret;
 }
 
@@ -1106,9 +1122,9 @@ extern "C" int munmap(void *__addr, size_t __len) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+munmap()");
+    tditrace("@A+munmap()");
     int ret = __munmap(__addr, __len);
-    tditrace_ex("@A-munmap()");
+    tditrace("@A-munmap()");
     return ret;
 }
 #endif
@@ -1121,9 +1137,9 @@ extern "C" void *pvalloc(size_t __size) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+pvalloc()");
+    tditrace("@A+pvalloc()");
     void *ret = __pvalloc(__size);
-    tditrace_ex("@A-pvalloc()");
+    tditrace("@A-pvalloc()");
     return ret;
 }
 
@@ -1136,9 +1152,9 @@ extern "C" void *aligned_alloc(size_t __alignment, size_t __size) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+aligned_alloc()");
+    tditrace("@A+aligned_alloc()");
     void *ret = __aligned_alloc(__alignment, __size);
-    tditrace_ex("@A-aligned_alloc()");
+    tditrace("@A-aligned_alloc()");
     return ret;
 }
 
@@ -1150,9 +1166,9 @@ extern "C" void *valloc(size_t __size) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+valloc()");
+    tditrace("@A+valloc()");
     void *ret = __valloc(__size);
-    tditrace_ex("@A-valloc()");
+    tditrace("@A-valloc()");
     return ret;
 }
 
@@ -1164,9 +1180,9 @@ extern "C" void *memalign(size_t __alignment, size_t __size) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+memalign()");
+    tditrace("@A+memalign()");
     void *ret = __memalign(__alignment, __size);
-    tditrace_ex("@A-memalign()");
+    tditrace("@A-memalign()");
     return ret;
 }
 
@@ -1180,9 +1196,9 @@ extern "C" int posix_memalign(void **__memptr, size_t __alignment,
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+posix_memalign()");
+    tditrace("@A+posix_memalign()");
     int ret = __posix_memalign(__memptr, __alignment, __size);
-    tditrace_ex("@A-posix_memalign()");
+    tditrace("@A-posix_memalign()");
     return ret;
 }
 
@@ -1195,9 +1211,9 @@ extern "C" int mprotect(void *__addr, size_t __len, int __prot) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+mprotect()");
+    tditrace("@A+mprotect()");
     int ret = __mprotect(__addr, __len, __prot);
-    tditrace_ex("@A-mprotect()");
+    tditrace("@A-mprotect()");
     return ret;
 }
 #endif
@@ -1210,9 +1226,9 @@ extern "C" int msync(void *__addr, size_t __len, int __flags) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+msync()");
+    tditrace("@A+msync()");
     int ret = __msync(__addr, __len, __flags);
-    tditrace_ex("@A-msync()");
+    tditrace("@A-msync()");
     return ret;
 }
 
@@ -1225,9 +1241,9 @@ extern "C" int madvise(void *__addr, size_t __len, int __advice) {
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());
         }
     }
-    tditrace_ex("@A+madvise()");
+    tditrace("@A+madvise()");
     int ret = __madvise(__addr, __len, __advice);
-    tditrace_ex("@A-madvise()");
+    tditrace("@A-madvise()");
     return ret;
 }
 #endif
@@ -1275,7 +1291,7 @@ void* operator new(unsigned int i){
 
     void* ret = malloc(i);
 
-    tditrace_ex("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
 
     return ret;
 }

@@ -32,7 +32,7 @@ extern unsigned int libcrealloc;
 extern bool pthreadrecording;
 
 extern bool eglrecording;
-extern bool glesrecording;
+extern bool gles2recording;
 extern bool gldrawrecording;
 
 extern int shaders_captured;

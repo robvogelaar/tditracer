@@ -7,7 +7,8 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-#if 1
+
+#if 0
 extern "C" int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                               void *(*start)(void *), void *arg) {
     static int (*__pthread_create)(pthread_t *, const pthread_attr_t *,
@@ -19,7 +20,7 @@ extern "C" int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                                     void *))dlsym(RTLD_NEXT, "pthread_create");
 
     if (pthreadrecording) {
-        tditrace_ex("pthread_create() 0x%x %p", *thread, start);
+        tditrace("pthread_create() 0x%x %p", *thread, start);
     }
     // TDIPRINTF("[%ld]+pthread_create(), called from: %s, thread: %s\n",
     // syscall(SYS_gettid), addrinfo(__builtin_return_address(0)),
@@ -63,7 +64,7 @@ extern "C" int pthread_mutex_trylock(pthread_mutex_t *mutex) {
             RTLD_NEXT, "pthread_mutex_trylock");
 
     if (pthreadrecording) {
-        tditrace_ex("pthread_mutex_trylock() 0x%x", mutex);
+        tditrace("pthread_mutex_trylock() 0x%x", mutex);
     }
 
     return __pthread_mutex_trylock(mutex);
@@ -79,7 +80,7 @@ extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
             (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_lock");
 
     if (pthreadrecording) {
-        tditrace_ex("@T+pthread_mutex_lock() 0x%x", mutex);
+        tditrace("@T+pthread_mutex_lock() 0x%x", mutex);
     }
 
     // TDIPRINTF("[%ld]+pthread_mutex_lock(0x%x), %s\n", syscall(SYS_gettid),
@@ -91,7 +92,7 @@ extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
     // TDIPRINTF("[%ld]-pthread_mutex_lock()\n", syscall(SYS_gettid));
 
     if (pthreadrecording) {
-        tditrace_ex("@T-pthread_mutex_lock() 0x%x", mutex);
+        tditrace("@T-pthread_mutex_lock() 0x%x", mutex);
     }
 
     return r;
@@ -107,7 +108,7 @@ extern "C" int pthread_mutex_unlock(pthread_mutex_t *mutex) {
             RTLD_NEXT, "pthread_mutex_unlock");
 
     if (pthreadrecording) {
-        tditrace_ex("@T+pthread_mutex_unlock() 0x%x", mutex);
+        tditrace("@T+pthread_mutex_unlock() 0x%x", mutex);
     }
     // TDIPRINTF("[%ld]+pthread_mutex_unlock(0x%x), %s\n", syscall(SYS_gettid),
     // (int)mutex, addrinfo(__builtin_return_address(0)));
@@ -117,7 +118,7 @@ extern "C" int pthread_mutex_unlock(pthread_mutex_t *mutex) {
     // TDIPRINTF("[%ld]-pthread_mutex_unlock()\n", syscall(SYS_gettid));
 
     if (pthreadrecording) {
-        tditrace_ex("@T-pthread_mutex_unlock() 0x%x", mutex);
+        tditrace("@T-pthread_mutex_unlock() 0x%x", mutex);
     }
 
     return r;
@@ -132,7 +133,7 @@ extern "C" int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex)
     if (!__pthread_cond_wait)
         __pthread_cond_wait = (int (*)(pthread_cond_t*, pthread_mutex_t*)) dlsym(RTLD_NEXT, "pthread_cond_wait");
 
-    // tditrace_ex("@T+pthread_cond_wait()");
+    // tditrace("@T+pthread_cond_wait()");
 
     //TDIPRINTF("[%ld]+pthread_cond_wait   (0x%x, 0x%x), %s\n", syscall(SYS_gettid), (int)cond, (int)mutex, addrinfo(__builtin_return_address(0)));
     //print_stacktrace(MAXFRAMES);
@@ -141,7 +142,7 @@ extern "C" int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex)
 
     // TDIPRINTF("[%ld]-pthread_cond_wait()\n", syscall(SYS_gettid));
 
-    if (pthread) tditrace_ex("@T+cond 0x%x,0x%x,%s", cond, mutex, addrinfo(__builtin_return_address(0)));
+    if (pthread) tditrace("@T+cond 0x%x,0x%x,%s", cond, mutex, addrinfo(__builtin_return_address(0)));
 
     return r;
 }
@@ -155,7 +156,7 @@ extern "C" int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mut
     if (!__pthread_cond_timedwait)
         __pthread_cond_timedwait = (int (*)(pthread_cond_t*, pthread_mutex_t*, const struct timespec*)) dlsym(RTLD_NEXT, "pthread_cond_timedwait");
 
-    //tditrace_ex("@T+pthread_cond_timedwait()");
+    //tditrace("@T+pthread_cond_timedwait()");
 
     //TDIPRINTF("[%ld]+pthread_cond_timedwait   (0x%x, 0x%x), %s\n", syscall(SYS_gettid), (int)cond, (int)mutex, addrinfo(__builtin_return_address(0)));
 
@@ -163,7 +164,7 @@ extern "C" int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mut
 
     //TDIPRINTF("[%ld]-pthread_cond_timedwait()\n", syscall(SYS_gettid));
 
-    //tditrace_ex("@T-pthread_cond_timedwait()");
+    //tditrace("@T-pthread_cond_timedwait()");
 
     return r;
 }
@@ -177,7 +178,7 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
     if (!__pthread_cond_signal)
         __pthread_cond_signal = (int (*)(pthread_cond_t*)) dlsym(RTLD_NEXT, "pthread_cond_signal");
 
-    //tditrace_ex("@T+pthread_cond_signal()");
+    //tditrace("@T+pthread_cond_signal()");
 
     //TDIPRINTF("[%ld]+pthread_cond_signal (0x%x), %s\n", syscall(SYS_gettid), (int)cond, addrinfo(__builtin_return_address(0)));
 
@@ -187,10 +188,11 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
 
     //TDIPRINTF("[%ld]-pthread_cond_signal()\n", syscall(SYS_gettid));
 
-    //tditrace_ex("@T-pthread_cond_signal()");
+    //tditrace("@T-pthread_cond_signal()");
 
-    if (pthread) tditrace_ex("@T-cond 0x%x,%s", cond, addrinfo(__builtin_return_address(0)));
+    if (pthread) tditrace("@T-cond 0x%x,%s", cond, addrinfo(__builtin_return_address(0)));
 
     return r;
 }
 #endif
+

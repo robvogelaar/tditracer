@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include "tdi.h"
 
+#if 0
 extern "C" int SGXQueueTransfer(void *hTransferContext,
                                 struct tag *psQueueTransfer) {
     static int (*__SGXQueueTransfer)(void *, struct tag *) = NULL;
@@ -15,12 +16,13 @@ extern "C" int SGXQueueTransfer(void *hTransferContext,
         }
     }
 
-    tditrace_ex("@T+SGXQueueTransfer()");
+    tditrace("@T+SGXQueueTransfer()");
     int ret = __SGXQueueTransfer(hTransferContext, psQueueTransfer);
-    tditrace_ex("@T-SGXQueueTransfer()");
+    tditrace("@T-SGXQueueTransfer()");
 
     return ret;
 }
+#endif
 
 /*
  *  0xc01c6700  ENUM_DEVICES
@@ -187,7 +189,7 @@ static const char *strings[] = {
 
 typedef struct package_tag { unsigned int id; } package_t;
 
-#if 1
+#if 0
 extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex,
                                void *data, unsigned long size) {
     static int (*__drmCommandWrite)(int, unsigned long, void *, unsigned long) =
@@ -204,11 +206,11 @@ extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex,
 
     package_t *ppackage = (package_t *)data;
 
-    tditrace_ex("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
+    tditrace("drmCommandWrite() \"%s\"", strings[ppackage->id - 0xc01c6700]);
     int ret = __drmCommandWrite(fd, drmCommandIndex, data, size);
     /*
      * cannot trace here...
-     * tditrace_ex("drmCommandWrite()");
+     * tditrace("drmCommandWrite()");
      */
     return ret;
 }

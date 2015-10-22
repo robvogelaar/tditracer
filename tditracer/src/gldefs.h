@@ -1,5 +1,6 @@
 
 typedef int EGLBoolean;
+typedef int32_t EGLint;
 typedef void *EGLDisplay;
 typedef void *EGLSurface;
 typedef void *EGLContext;

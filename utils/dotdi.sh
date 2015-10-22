@@ -35,3 +35,8 @@ for i in `find . -name 'tditracebuffer*' | sort -V` ; do echo $i && tdidump $i >
 
 
 /home/rev/git/tditracer/utils/tdiprune combined1-45.tdi 'OK|arena' > combined1-45-prOKarena.tdi
+
+
+
+
+for i in `find output/images/rootfs -name '*.so*' | sort -V` ; do echo $i &&  mklibs-readelf -n $i | grep png; done

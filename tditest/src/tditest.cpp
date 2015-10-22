@@ -6,7 +6,6 @@
 #include <sys/time.h>
 
 extern "C" void tditrace(const char *format, ...) __attribute__((weak));
-extern "C" void tditrace_ex(const char *format, ...) __attribute__((weak));
 
 void run_1(void) {
 #if 0
@@ -54,10 +53,10 @@ printf("0 -> UTC time and date: %s\n",
         printf("tditrace\n");
     else
         printf("no tditrace\n");
-    if (tditrace_ex)
-        printf("tditrace_ex\n");
+    if (tditrace)
+        printf("tditrace\n");
     else
-        printf("no tditrace_ex\n");
+        printf("no tditrace\n");
 
     for (i = 0; i < 25; i++) {
 

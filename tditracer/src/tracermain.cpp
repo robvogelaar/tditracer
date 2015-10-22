@@ -26,6 +26,7 @@ static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();
 
 static void tditracer_constructor() {
+
     tditrace_init();
 
     init();
@@ -66,7 +67,7 @@ unsigned int libcrealloc;
 
 bool pthreadrecording;
 bool eglrecording;
-bool glesrecording;
+bool gles2recording;
 bool gldrawrecording;
 
 int shaders_captured = 0;
@@ -253,10 +254,10 @@ static void init(void) {
             eglrecording = false;
         }
 
-        if (getenv("GLES")) {
-            glesrecording = (atoi(getenv("GLES")) >= 1);
+        if (getenv("GLES2")) {
+            gles2recording = (atoi(getenv("GLES2")) >= 1);
         } else {
-            glesrecording = false;
+            gles2recording = false;
         }
 
         if (getenv("GLDRAW")) {
