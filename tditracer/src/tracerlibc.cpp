@@ -602,14 +602,14 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 
 
 extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-                        int flags, timespec *timeout) {
+                        int flags, const struct timespec *timeout) {
 
     static int (*__recvmmsg)(int, struct mmsghdr *, unsigned int, int,
-                             timespec *) = NULL;
+                             const struct timespec *) = NULL;
 
     if (__recvmmsg == NULL) {
         __recvmmsg = (int (*)(int, struct mmsghdr *, unsigned int, int,
-                              timespec *))dlsym(RTLD_NEXT, "recvmmsg");
+                              const struct timespec *))dlsym(RTLD_NEXT, "recvmmsg");
         if (NULL == __recvmmsg) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
