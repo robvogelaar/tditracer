@@ -1003,12 +1003,12 @@ void *monitor_thread(void *param) {
 
 
         #if 0
-        printf("tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename, st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
+        fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename, st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
 
         if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
             stat(gtracebufferfilename, &gtrace_buffer_st);
 
-            printf("tdi: [%s][%d], rewinding...\n", gprocname, gpid);
+            fprintf(stderr, "tdi: [%s][%d], rewinding...\n", gprocname, gpid);
             tditrace_rewind();
             do_dump_proc_self_maps = 1;
         }
@@ -1040,8 +1040,9 @@ void *monitor_thread(void *param) {
                             offload_location, gprocname, gpid, offload_counter);
 
                     if ((offload_file = fopen(offloadfilename, "w+")) == 0) {
-                        fprintf(stderr, "Error creating file \"%s\"",
-                                offloadfilename);
+                        int errsv = errno;
+                        fprintf(stderr, "Error creating file \"%s\" [%d]\n",
+                                offloadfilename, errsv);
                     }
 
                     (void)ftruncate(fileno(offload_file), TRACEBUFFERSIZE);
@@ -1101,7 +1102,7 @@ void *delayed_init_thread(void *param) {
     int *pdelay = (int *)param;
     int delay = *pdelay;
 
-    printf("tdi: init[%s][%d], delay is %d\n", gprocname, gpid, delay);
+    fprintf(stderr, "tdi: init[%s][%d], delay is %d\n", gprocname, gpid, delay);
 
     if (delay == -1) {
 
@@ -1118,7 +1119,7 @@ void *delayed_init_thread(void *param) {
                      ptm);
 
             if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
-                printf(
+                fprintf(stderr, 
                     "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
                     "timeofday is set\n",
                     gprocname, gpid, time_string);
@@ -1128,7 +1129,7 @@ void *delayed_init_thread(void *param) {
             ptm = localtime(&tv.tv_sec);
             strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S",
                      ptm);
-            printf("tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
+            fprintf(stderr, "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
                    "timeofday "
                    "is not set\n",
                    gprocname, gpid, time_string);
@@ -1143,7 +1144,7 @@ void *delayed_init_thread(void *param) {
          */
 
         while (1) {
-            printf("tdi: init[%s][%d], paused...\n", gprocname, gpid);
+            fprintf(stderr, "tdi: init[%s][%d], paused...\n", gprocname, gpid);
             usleep(1 * 1000000);
 
             struct stat st;
@@ -1159,7 +1160,7 @@ void *delayed_init_thread(void *param) {
             */
 
             if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-                printf("tdi: init[%s][%d], started...\n", gprocname, gpid);
+                fprintf(stderr, "tdi: init[%s][%d], started...\n", gprocname, gpid);
 
                 stat(gtracebufferfilename, &gtrace_buffer_st);
                 break;
@@ -1169,7 +1170,7 @@ void *delayed_init_thread(void *param) {
     } else {
 
         while (delay > 0) {
-            printf("tdi: init[%s][%d], delay %d second(s)...\n", gprocname, gpid, delay);
+            fprintf(stderr, "tdi: init[%s][%d], delay %d second(s)...\n", gprocname, gpid, delay);
             usleep(1 * 1000000);
 
             #if 0
@@ -1182,7 +1183,7 @@ void *delayed_init_thread(void *param) {
         }
     }
 
-    printf("tdi: init[%s][%d], delay finished...\n", gprocname, gpid, delay);
+    fprintf(stderr, "tdi: init[%s][%d], delay finished...\n", gprocname, gpid, delay);
 
     /*
      * Create tracebuffer
@@ -1200,7 +1201,7 @@ void *delayed_init_thread(void *param) {
     for (i = 0; i < TRACEBUFFERSIZE; i++) {
         gtrace_buffer[i] = 0;
     }
-    printf("tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname, gpid,
+    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname, gpid,
            gtracebufferfilename);
 
 
@@ -1217,7 +1218,7 @@ void *delayed_init_thread(void *param) {
     trace_buffer_ptr +=
         sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
     gtrace_buffer_rewind_ptr = trace_buffer_ptr;
-    printf("tdi: init[%s][%d], timeofday_timestamp:%lld, "
+    fprintf(stderr, "tdi: init[%s][%d], timeofday_timestamp:%lld, "
            "monotonic_timestamp:%lld\n",
            gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
     reported_full = 0;
@@ -1247,19 +1248,19 @@ int tditrace_init(void) {
     get_process_name_by_pid(gpid, gprocname);
 
     if (strcmp(gprocname, "mkdir") == 0) {
-        printf("tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n", gprocname,
+        fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n", gprocname,
                gpid);
         return;
-    } else if (strcmp(gprocname, "sh") == 0) {
-        printf("tdi: init[%s][%d], procname is \"sh\" ; not tracing\n", gprocname,
+    } else if (strncmp(gprocname, "sh", 2) == 0) {
+        fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing this\n", gprocname,
                gpid);
         return;
     } else if (strcmp(gprocname, "strace") == 0) {
-        printf("tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
+        fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
                gprocname, gpid);
         return;
     } else if (strcmp(gprocname, "gdbserver") == 0) {
-        printf("tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
+        fprintf(stderr, "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
                gprocname, gpid);
         return;
     } else {
@@ -1360,7 +1361,7 @@ int tditrace_init(void) {
         for (i = 0; i < TRACEBUFFERSIZE; i++) {
             gtrace_buffer[i] = 0;
         }
-        printf("tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname, gpid,
+        fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname, gpid,
                gtracebufferfilename);
 
 
@@ -1377,7 +1378,7 @@ int tditrace_init(void) {
         trace_buffer_ptr +=
             sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
         gtrace_buffer_rewind_ptr = trace_buffer_ptr;
-        printf("tdi: init[%s][%d], timeofday_timestamp:%lld, "
+        fprintf(stderr, "tdi: init[%s][%d], timeofday_timestamp:%lld, "
                "monotonic_timestamp:%lld\n",
                gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
         reported_full = 0;
@@ -1471,7 +1472,7 @@ void tditrace_exit(int argc, char *argv[]) {
                     stat(tracebuffers[buffers].filename, &st);
 
                     if (st.st_size == 0) {
-                        printf("empty tracebuffer, skipping\n");
+                        fprintf(stderr, "empty tracebuffer, skipping\n");
                         break;
                     }
 
@@ -1546,7 +1547,7 @@ void tditrace_exit(int argc, char *argv[]) {
                         stat(tracebuffers[buffers].filename, &st);
 
                         if (st.st_size == 0) {
-                            printf("empty tracebuffer, skipping\n");
+                            fprintf(stderr, "empty tracebuffer, skipping\n");
                             break;
                         }
 
