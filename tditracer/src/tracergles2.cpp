@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdlib.h>
-
+#include <malloc.h>
 
 extern "C" {
 #include "shadercapture.h"
@@ -39,16 +39,12 @@ static int glBindTexture_counter = 0;
 
 static int glShaderSource_counter = 0;
 
-
-extern "C" EGLBoolean eglInitialize(EGLDisplay display,
-  	EGLint * major,
-  	EGLint * minor)
-{
-    static EGLBoolean (*__eglInitialize)(EGLDisplay,
-                                          EGLint, EGLint) = NULL;
+extern "C" EGLBoolean eglInitialize(EGLDisplay display, EGLint *major,
+                                    EGLint *minor) {
+    static EGLBoolean (*__eglInitialize)(EGLDisplay, EGLint *, EGLint *) = NULL;
 
     if (__eglInitialize == NULL) {
-        __eglInitialize = (EGLBoolean (*)(EGLDisplay, EGLint, EGLint))dlsym(
+        __eglInitialize = (EGLBoolean (*)(EGLDisplay, EGLint *, EGLint *))dlsym(
             RTLD_NEXT, "eglInitialize");
         if (NULL == __eglInitialize) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -78,12 +74,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
         }
     }
 
-    if (framestorecord > 0) {
-
-        framecapture_capframe();
-        frames_captured++;
-    }
-
     if (eglrecording)
         tditrace("@I+eglSwapBuffers()");
 
@@ -93,8 +83,8 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
         tditrace("@I-eglSwapBuffers()");
 
     if (eglrecording)
-        tditrace("@E+eglSwapBuffers() #gldraws=%d #gltexturebinds=%d",
-                    draw_counter, texturebind_counter);
+        tditrace("@E+eglSwapBuffers() #%d #gldraws=%d #gltexturebinds=%d",
+                 current_frame, draw_counter, texturebind_counter);
 
     if (eglrecording && gles2recording)
         tditrace("#gldraws~%d", 0);
@@ -109,6 +99,36 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
 
     draw_counter = 0;
     texturebind_counter = 0;
+
+    if (framerecording) {
+        static char *framebuffer = 0;
+        if (!framebuffer) {
+            framebuffer = (char *)memalign(4096, 1280 * 720 * 4);
+        }
+        glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
+        framecapture_capframe(framebuffer);
+        frames_captured++;
+    }
+
+    /*
+     */
+
+    if ((current_frame == shaderrecording) ||
+        (current_frame == texturerecording) ||
+        (current_frame == framerecording)) {
+
+        if (shaderrecording) {
+            shadercapture_writeshaders();
+        }
+        if (texturerecording) {
+            texturecapture_writepngtextures();
+            texturecapture_deletetextures();
+        }
+        if (framerecording) {
+            framecapture_writepngframes();
+            framecapture_deleteframes();
+        }
+    }
 
     current_frame++;
 
@@ -197,7 +217,7 @@ extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
 
     if (gles2recording)
         tditrace("glVertexAttribPointer() %d,%d,%s,%d,0x%x", index, size,
-                    TYPESTRING(type), stride, pointer);
+                 TYPESTRING(type), stride, pointer);
 
     __glVertexAttribPointer(index, size, type, normalized, stride, pointer);
 }
@@ -236,8 +256,8 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     } else {
         if (gles2recording || gldrawrecording)
             tditrace("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u",
-                        current_frame, glDrawArrays_counter, MODESTRING(mode),
-                        count, boundtexture, currentprogram);
+                     current_frame, glDrawArrays_counter, MODESTRING(mode),
+                     count, boundtexture, currentprogram);
     }
     __glDrawArrays(mode, first, count);
 
@@ -303,8 +323,8 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
     } else {
         if (gles2recording || gldrawrecording)
             tditrace("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
-                        current_frame, glDrawElements_counter, MODESTRING(mode),
-                        TYPESTRING(type), count, boundtexture, currentprogram);
+                     current_frame, glDrawElements_counter, MODESTRING(mode),
+                     TYPESTRING(type), count, boundtexture, currentprogram);
     }
 
     __glDrawElements(mode, count, type, indices);
@@ -391,8 +411,8 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
 
     if (gles2recording)
         tditrace("@I+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
-                    ++glTexImage2D_counter, width, height, TYPESTRING(type),
-                    FORMATSTRING(format), boundtexture, pixels);
+                 ++glTexImage2D_counter, width, height, TYPESTRING(type),
+                 FORMATSTRING(format), boundtexture, pixels);
 
     if (texturerecording) {
         texturecapture_captexture(boundtexture, PARENT, current_frame, 0, 0,
@@ -433,9 +453,8 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
 
     if (gles2recording)
         tditrace("@I+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
-                    ++glTexSubImage2D_counter, width, height, xoffset, yoffset,
-                    TYPESTRING(type), FORMATSTRING(format), boundtexture,
-                    pixels);
+                 ++glTexSubImage2D_counter, width, height, xoffset, yoffset,
+                 TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
 
     if (texturerecording) {
         texturecapture_captexture(boundtexture, SUB, current_frame, xoffset,
@@ -469,7 +488,7 @@ extern "C" GLvoid glCopyTexImage2D(GLenum target, GLint level,
 
     if (gles2recording)
         tditrace("glCopyTexImage2D() %dx%d+%d+%d,%u", width, height, x, y,
-                    boundtexture);
+                 boundtexture);
 
     __glCopyTexImage2D(target, level, internalformat, x, y, width, height,
                        border);
@@ -491,8 +510,8 @@ extern "C" GLvoid glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
     }
 
     if (gles2recording)
-        tditrace("glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height,
-                    x, y, xoffset, yoffset, boundtexture);
+        tditrace("glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height, x,
+                 y, xoffset, yoffset, boundtexture);
 
     __glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
 }
@@ -542,8 +561,7 @@ extern "C" GLvoid glShaderSource(GLuint shader, GLsizei count,
     }
 
     if (gles2recording)
-        tditrace("glShaderSource() #%d %u", ++glShaderSource_counter,
-                    shader);
+        tditrace("glShaderSource() #%d %u", ++glShaderSource_counter, shader);
 
     if (shaderrecording) {
         shadercapture_capshader(shader, count, string, length);
@@ -780,8 +798,8 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment,
     }
 
     if (gles2recording)
-        tditrace("glFramebufferTexture2D() %s,%u",
-                    ATTACHMENTSTRING(attachment), texture);
+        tditrace("glFramebufferTexture2D() %s,%u", ATTACHMENTSTRING(attachment),
+                 texture);
 
     __glFramebufferTexture2D(target, attachment, textarget, texture, level);
 
@@ -804,8 +822,7 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat,
 
     if (gles2recording)
         tditrace("glRenderbufferStorage() %s0x%x,%dx%d",
-                    IFORMATSTRING(internalformat), internalformat, width,
-                    height);
+                 IFORMATSTRING(internalformat), internalformat, width, height);
 
     __glRenderbufferStorage(target, internalformat, width, height);
 
@@ -847,7 +864,7 @@ extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment,
 
     if (gles2recording)
         tditrace("glFramebufferRenderbuffer() %s,%u",
-                    ATTACHMENTSTRING(attachment), renderbuffer);
+                 ATTACHMENTSTRING(attachment), renderbuffer);
 
     __glFramebufferRenderbuffer(target, attachment, renderbuffertarget,
                                 renderbuffer);

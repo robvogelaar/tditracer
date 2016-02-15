@@ -10,8 +10,8 @@
 frame_struct_t *framelinkedlist_head = NULL;
 frame_struct_t *framelinkedlist_curr = NULL;
 
-frame_struct_t *framelinkedlist_create_list(int id, int name, int page,
-                                            void *buf) {
+frame_struct_t *framelinkedlist_create_list(int id, int name, void *buf,
+                                            int size) {
     printf("\n creating list with headnode as [%d]\n", id);
     frame_struct_t *ptr = (frame_struct_t *)malloc(sizeof(frame_struct_t));
     if (NULL == ptr) {
@@ -20,18 +20,18 @@ frame_struct_t *framelinkedlist_create_list(int id, int name, int page,
     }
     ptr->id = id;
     ptr->name = name;
-    ptr->page = page;
     ptr->buf = buf;
+    ptr->size = size;
     ptr->next = NULL;
 
     framelinkedlist_head = framelinkedlist_curr = ptr;
     return ptr;
 }
 
-frame_struct_t *framelinkedlist_add_to_list(int id, int name, int page,
-                                            void *buf, bool add_to_end) {
+frame_struct_t *framelinkedlist_add_to_list(int id, int name, void *buf,
+                                            int size, bool add_to_end) {
     if (NULL == framelinkedlist_head) {
-        return (framelinkedlist_create_list(id, name, page, buf));
+        return (framelinkedlist_create_list(id, name, buf, size));
     }
 
     if (add_to_end)
@@ -46,8 +46,8 @@ frame_struct_t *framelinkedlist_add_to_list(int id, int name, int page,
     }
     ptr->id = id;
     ptr->name = name;
-    ptr->page = page;
     ptr->buf = buf;
+    ptr->size = size;
     ptr->next = NULL;
 
     if (add_to_end) {
@@ -96,6 +96,11 @@ int framelinkedlist_delete_from_list(int id) {
     if (del == NULL) {
         return -1;
     } else {
+
+        if (del->buf) {
+            free(del->buf);
+        }
+
         if (prev != NULL)
             prev->next = del->next;
 

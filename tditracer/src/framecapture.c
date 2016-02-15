@@ -16,6 +16,20 @@
 
 #include "framelinkedlist.h"
 
+
+typedef unsigned int mz_uint;
+typedef int mz_bool;
+extern void *tdefl_write_image_to_png_file_in_memory(const void *pImage,
+                                                         int w, int h,
+                                                         int num_chans,
+                                                         size_t *pLen_out);
+extern void *
+tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h,
+                                           int num_chans, size_t *pLen_out,
+                                           mz_uint level, mz_bool flip);
+
+
+
 extern int WriteBitmap(char *filename, unsigned char *bitmap, int width,
                        int height, int colordepth);
 
@@ -23,26 +37,32 @@ extern int WriteBitmap(char *filename, unsigned char *bitmap, int width,
 extern void write_png_file(char* file_name, int width, int height, png_bytep *row_pointers);
 #endif
 
+#if 0
 char *map_base;
 uint8_t *framesbuffer;
+#endif
 
 int currentframe = 0;
 
+#if 0
 void *memcpy_arm(void *, const void *, size_t);
 void *memcpy_neon(void *, const void *, size_t);
+#endif
 
 static int nr_frames = 0;
 
 #define FRAMESIZE (1280 * 720 * 4)
 
 int framecapture_init(void);
-void framecapture_capframe(void);
+void framecapture_capframe(const void *pixels);
 void framecapture_writebmpframes(int frames);
 void framecapture_writepngframes(void);
 
 int framecapture_inited = 0;
 
 int framecapture_init(void) {
+
+#if 0
     int fbdev;
     int memdev;
 
@@ -78,10 +98,14 @@ int framecapture_init(void) {
         return -1;
     }
 
+#endif
+
     return 0;
 }
 
-void framecapture_capframe(void) {
+void framecapture_capframe(const void *pixels) {
+
+#if 0
     if (!framecapture_inited) {
         framecapture_init();
         framecapture_inited = 1;
@@ -106,8 +130,18 @@ void framecapture_capframe(void) {
     page++;
     if (page == 3)
         page = 0;
+#endif
+
+
+    void *pPNG_data = 0;
+    size_t png_data_size = 0;
+    pPNG_data = tdefl_write_image_to_png_file_in_memory_ex(pixels, 1280, 720, 4, &png_data_size, 6, 1);
+    framelinkedlist_add_to_list(nr_frames, nr_frames + 1, pPNG_data, png_data_size, true);
+
+    nr_frames++;
 }
 
+#if 0
 void framecapture_writebmpframes(int frames) {
     int frame;
 
@@ -122,6 +156,7 @@ void framecapture_writebmpframes(int frames) {
                     720, 4);
     }
 }
+#endif
 
 void framecapture_writepngframes(void) {
     int frame;
@@ -137,11 +172,12 @@ void framecapture_writepngframes(void) {
         } else {
 
             char fname[64];
-            sprintf(fname, "f%03d-frame%d-p%d.png", frame_ptr->id,
-                    frame_ptr->name, frame_ptr->page);
+            sprintf(fname, "f%03d-frame%d.png", frame_ptr->id,
+                    frame_ptr->name);
 
             printf("writing frame, %s\n", fname);
 
+            #if 0
             int x, y;
 
             png_bytep *row_pointers;
@@ -165,13 +201,28 @@ void framecapture_writepngframes(void) {
                     ptr[3] = buf[(y * 1280 + x) * 4 + 3]; /* A */
                 }
             }
-
+            #endif
 #if 0
             write_png_file(fname, 1280, 720, row_pointers);
 #endif
             /*
              * write_png_file frees row_pointers
              */
+
+            FILE *pFile = fopen(fname, "wb");
+            fwrite(frame_ptr->buf, 1, frame_ptr->size, pFile);
+            chmod(fname, 0666);
+            fclose(pFile);
+             
+             
         }
     }
+}
+
+void framecapture_deleteframes(void) {
+    int i;
+    for (i = 0; i < nr_frames; i++) {
+        framelinkedlist_delete_from_list(i);
+    }
+    nr_frames = 0;
 }

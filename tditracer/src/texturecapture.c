@@ -20,13 +20,14 @@
 #include "texturelinkedlist.h"
 
 static int nr_textures = 0;
+static int textures_data_size = 0;
 
 typedef unsigned char uint8;
 
 void texturecapture_captexture(unsigned int name, int ttype, int frame,
                                int xoffset, int yoffset, int width, int height,
                                int format, int type, const void *pixels) {
-    void *pPNG_data;
+    void *pPNG_data = 0;
 
     size_t png_data_size = 0;
 
@@ -61,6 +62,7 @@ void texturecapture_captexture(unsigned int name, int ttype, int frame,
                                   png_data_size, true);
 
     nr_textures++;
+    textures_data_size += png_data_size;
 }
 
 void texturecapture_writepngtextures(void) {
@@ -218,8 +220,10 @@ void texturecapture_writepngtextures(void) {
 }
 
 void texturecapture_deletetextures(void) {
+
     int i;
-    for (i = 0; i < 1000; i++) {
+    for (i = 0; i < nr_textures; i++) {
         texturelinkedlist_delete_from_list(i);
     }
+    nr_textures = 0;
 }

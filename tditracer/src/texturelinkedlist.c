@@ -121,7 +121,8 @@ int texturelinkedlist_delete_from_list(int id) {
     if (del == NULL) {
         return -1;
     } else {
-        free(del->png_data);
+        if (del->png_data)
+            free(del->png_data);
 
         if (prev != NULL) {
             prev->next = del->next;

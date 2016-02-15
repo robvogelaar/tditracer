@@ -1,8 +1,8 @@
 
-extern int framestorecord;
-extern bool texturerecording;
-extern bool renderbufferrecording;
-extern bool shaderrecording;
+extern int framerecording;
+extern int texturerecording;
+extern int renderbufferrecording;
+extern int shaderrecording;
 
 extern bool libcrecording;
 extern bool libcopenrecording;
@@ -10,7 +10,6 @@ extern bool libcfopenrecording;
 extern bool libcfdopenrecording;
 extern bool libcfreopenrecording;
 extern bool libcreadrecording;
-
 extern bool libcwriterecording;
 extern bool libcsocketrecording;
 extern bool libcsendrecording;
@@ -24,6 +23,7 @@ extern bool libcrecvmmsgrecording;
 extern bool libcselectrecording;
 extern bool libcpollrecording;
 extern bool libcioctlrecording;
+extern bool libcsyslogrecording;
 
 extern unsigned int libcmalloc;
 extern unsigned int libccalloc;
