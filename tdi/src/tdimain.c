@@ -19,6 +19,7 @@
 #include <dirent.h>
 
 void tditrace(const char *format, ...);
+void tditrace_ex(int mask, const char *format, ...) {
 
 pid_t gpid;
 char gprocname[128];
@@ -926,6 +927,8 @@ static void dump_proc_self_maps(void) {
     tditrace("MAPS end");
 }
 
+static int gmask = 0xffffffff;
+
 static int do_mallinfo = 0;
 
 static int monitor;
@@ -991,8 +994,8 @@ void *monitor_thread(void *param) {
         struct stat st;
         stat(gtracebufferfilename, &st);
 
-#if 0
-        fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename, st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
+#if 1
+        //fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename, st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
 
         if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
             stat(gtracebufferfilename, &gtrace_buffer_st);
@@ -1263,6 +1266,11 @@ int tditrace_init(void) {
     }
 
     char *env;
+
+    gmask = 0xffffffff;
+    if (env = getenv("MASK")) {
+        gmask = (int)strtol(env, 0, 16);
+    }
 
     do_mallinfo = 0;
     if (env = getenv("MALLINFO")) {
@@ -1682,8 +1690,8 @@ void tditrace_exit(int argc, char *argv[]) {
             asctime(gmtime((const time_t *)&atime)));
 }
 
-void tditrace(const char *format, ...) {
-    va_list args;
+
+void tditrace_internal(va_list args, const char *format) {
 
     if (!tditrace_inited) {
         return;
@@ -1761,7 +1769,6 @@ void tditrace(const char *format, ...) {
     *trace_text_ptr++ = 0x0c;
 
     // obtain the trace string
-    va_start(args, format);
 
     char ch;
 
@@ -1858,8 +1865,6 @@ void tditrace(const char *format, ...) {
         }
     }
 
-    va_end(args);
-
 #if 0
     trace_text[trace_text_ptr-trace_text] = 0;
 
@@ -1908,4 +1913,31 @@ void tditrace(const char *format, ...) {
     }
 
     simplefu_mutex_unlock(&myMutex);
+}
+
+void tditrace(const char *format, ...) {
+    va_list args;
+
+    va_start(args, format);
+
+    tditrace_internal(args, format);
+
+    va_end(args);
+}
+
+void tditrace_ex(int mask, const char *format, ...) {
+    va_list args;
+
+    /*
+     * check mask against gmask
+     */
+
+    if (mask && gmask) {
+
+        va_start(args, format);
+
+        tditrace_internal(args, format);
+
+        va_end(args);
+    }
 }
