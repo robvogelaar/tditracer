@@ -19,7 +19,7 @@
 #include <dirent.h>
 
 void tditrace(const char *format, ...);
-void tditrace_ex(int mask, const char *format, ...) {
+void tditrace_ex(int mask, const char *format, ...);
 
 pid_t gpid;
 char gprocname[128];
