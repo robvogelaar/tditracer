@@ -1932,7 +1932,8 @@ void tditrace_ex(int mask, const char *format, ...) {
      * check mask against gmask
      */
 
-    if (mask && gmask) {
+    if (((mask & 0xffff0000) & (gmask & 0xffff0000)) &&
+        ((mask & 0x0000ffff) & (gmask & 0x0000ffff))) {
 
         va_start(args, format);
 
