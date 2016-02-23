@@ -1269,7 +1269,7 @@ int tditrace_init(void) {
 
     gmask = 0xffffffff;
     if (env = getenv("MASK")) {
-        gmask = (int)strtol(env, 0, 16);
+        gmask = strtoul(env, 0, 16);
     }
 
     do_mallinfo = 0;
@@ -1932,9 +1932,7 @@ void tditrace_ex(int mask, const char *format, ...) {
      * check mask against gmask
      */
 
-    if (((mask & 0xffff0000) & (gmask & 0xffff0000)) &&
-        ((mask & 0x0000ffff) & (gmask & 0x0000ffff))) {
-
+    if (mask & gmask) {
         va_start(args, format);
 
         tditrace_internal(args, format);
