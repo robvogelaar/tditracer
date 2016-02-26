@@ -598,6 +598,12 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     return ret;
 }
 
+#if defined (HAVE_REFSW_NEXUS_CONFIG_H) || defined(__i386)
+#define USE_CONST
+#else
+#define USE_CONST const
+#endif
+
 extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
                         int flags, const struct timespec *timeout) {
 
