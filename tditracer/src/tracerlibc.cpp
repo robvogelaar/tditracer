@@ -605,15 +605,15 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 #endif
 
 extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-                        int flags, const struct timespec *timeout) {
+                        int flags, USE_CONST struct timespec *timeout) {
 
     static int (*__recvmmsg)(int, struct mmsghdr *, unsigned int, int,
-                             const struct timespec *) = NULL;
+                             USE_CONST struct timespec *) = NULL;
 
     if (__recvmmsg == NULL) {
         __recvmmsg =
             (int (*)(int, struct mmsghdr *, unsigned int, int,
-                     const struct timespec *))dlsym(RTLD_NEXT, "recvmmsg");
+                     USE_CONST struct timespec *))dlsym(RTLD_NEXT, "recvmmsg");
         if (NULL == __recvmmsg) {
             fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
         }
