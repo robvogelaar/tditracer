@@ -1415,6 +1415,20 @@ void tditrace_rewind() {
     tditrace_inited = 0;
     simplefu_mutex_unlock(&myMutex);
 
+    trace_buffer_ptr = gtrace_buffer;
+    // write one time start text
+    trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
+    // obtain timeofday timestamp and write to buffer
+    _u64 timeofday_timestamp = timestamp_timeofday_nsec();
+    // obtain monotonic timestamp and write to buffer
+    _u64 monotonic_timestamp = timestamp_monotonic_nsec();
+    trace_buffer_ptr +=
+        sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
+    // obtain monotonic timestamp and write to buffer
+    trace_buffer_ptr +=
+        sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
+    gtrace_buffer_rewind_ptr = trace_buffer_ptr;
+
     for (i = gtrace_buffer_rewind_ptr - gtrace_buffer; i < TRACEBUFFERSIZE;
          i++) {
         gtrace_buffer[i] = 0;
