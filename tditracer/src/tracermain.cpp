@@ -123,8 +123,8 @@ static void init(void) {
             libcfopenrecording = true;
             libcfdopenrecording = true;
             libcfreopenrecording = true;
-            libcreadrecording = true;
-            libcwriterecording = true;
+            libcreadrecording = false;
+            libcwriterecording = false;
             libcsocketrecording = true;
             libcsendrecording = true;
             libcsendtorecording = true;
@@ -134,8 +134,8 @@ static void init(void) {
             libcrecvfromrecording = true;
             libcrecvmsgrecording = true;
             libcrecvmmsgrecording = true;
-            libcselectrecording = true;
-            libcpollrecording = true;
+            libcselectrecording = false;
+            libcpollrecording = false;
             libcioctlrecording = false;
             libcsyslogrecording = true;
             libcmalloc = 0;

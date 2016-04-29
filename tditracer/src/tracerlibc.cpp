@@ -250,7 +250,7 @@ extern "C" FILE *freopen(const char *path, const char *mode, FILE *stream) {
     return ret;
 }
 
-#if 0
+#if 1
 extern "C" ssize_t read(int fd, void *buf, size_t count) {
     static ssize_t (*__read)(int, void *, size_t) = NULL;
 
@@ -261,13 +261,13 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
         }
     }
 
-    if (libcrecording || libcreadrecording) {
+    if (libcreadrecording) {
         tditrace("@I+read() %d %d", fd, count);
     }
 
     ssize_t ret = __read(fd, buf, count);
 
-    if (libcrecording || libcreadrecording) {
+    if (libcreadrecording) {
         if (ret == -1) {
             tditrace("@I-read() =-1");
         } else if (ret == 0) {
@@ -288,7 +288,7 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
 }
 #endif
 
-#if 0
+#if 1
 extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     static ssize_t (*__write)(int, const void *, size_t) = NULL;
 
@@ -300,7 +300,7 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
         }
     }
 
-    if (libcrecording || libcwriterecording) {
+    if (libcwriterecording) {
         if (0) {
             char s[MAXSTRLEN + 1];
             strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count));
@@ -313,7 +313,7 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
 
     ssize_t ret = __write(fd, buf, count);
 
-    if (libcrecording || libcwriterecording) {
+    if (libcwriterecording) {
         tditrace("@I-write() =%d", ret);
     }
 
@@ -645,13 +645,13 @@ extern "C" int select(int nfds, fd_set *readfds, fd_set *writefds,
         }
     }
 
-    if (libcrecording || libcselectrecording) {
+    if (libcselectrecording) {
         tditrace("@I+select() %d %x %x %x", nfds, readfds, writefds, exceptfds);
     }
 
     int ret = __select(nfds, readfds, writefds, exceptfds, timeout);
 
-    if (libcrecording || libcselectrecording) {
+    if (libcselectrecording) {
         tditrace("@I-select() =%d", ret);
     }
 
@@ -669,13 +669,13 @@ extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
         }
     }
 
-    if (libcrecording || libcpollrecording) {
+    if (libcpollrecording) {
         tditrace("@I+poll() %x %d %d", fds, nfds, timeout);
     }
 
     int ret = __poll(fds, nfds, timeout);
 
-    if (libcrecording || libcpollrecording) {
+    if (libcpollrecording) {
         tditrace("@I-poll() =%d", ret);
     }
 
@@ -697,13 +697,13 @@ extern "C" int ioctl(int d, int request, ...) {
     int a1 = va_arg(args, int);
     va_end(args);
 
-    if (libcrecording || libcioctlrecording) {
+    if (libcioctlrecording) {
         tditrace("@I+ioctl() %d 0x%x", d, request);
     }
 
     int ret = __ioctl(d, request, a1);
 
-    if (libcrecording || libcioctlrecording) {
+    if (libcioctlrecording) {
         tditrace("@I-ioctl() =%d", ret);
     }
 
@@ -1284,7 +1284,9 @@ void* operator new(unsigned int i){
 
     void* ret = malloc(i);
 
-    tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    if (i >= 128) {
+        tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    }
 
     return ret;
 }

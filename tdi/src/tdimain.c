@@ -931,6 +931,8 @@ static int gmask = 0xffffffff;
 
 static int do_mallinfo = 0;
 
+static int allow_rewind = 0;
+
 static int monitor;
 
 static int do_offload = 0;
@@ -994,7 +996,7 @@ void *monitor_thread(void *param) {
         struct stat st;
         stat(gtracebufferfilename, &st);
 
-#if 1
+        if (allow_rewind) {
         //fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename, st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
 
         if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
@@ -1004,7 +1006,7 @@ void *monitor_thread(void *param) {
             tditrace_rewind();
             do_dump_proc_self_maps = 1;
         }
-#endif
+        }
 
         if (do_offload) {
 
@@ -1270,6 +1272,11 @@ int tditrace_init(void) {
     gmask = 0xffffffff;
     if (env = getenv("MASK")) {
         gmask = strtoul(env, 0, 16);
+    }
+
+    allow_rewind = 0;
+    if (env = getenv("REWIND")) {
+        allow_rewind = (atoi(env) >= 1);
     }
 
     do_mallinfo = 0;
@@ -1796,8 +1803,12 @@ void tditrace_internal(va_list args, const char *format) {
                 char *s;
                 s = va_arg(args, char *);
                 if (s) {
-                    while (*s)
+                    int i = 0;
+                    while (*s) {
                         *trace_text_ptr++ = *s++;
+                        i++;
+                        if (i > 256) break;
+                    }
                 } else {
                     *trace_text_ptr++ = 'n';
                     *trace_text_ptr++ = 'i';
