@@ -3,7 +3,6 @@
 import sys
 import re
 
-
 def main():
 
    ids = []
@@ -14,19 +13,15 @@ def main():
       last_sta_sto_occ_id = 0
       last_sta_sto_occ_line = None
 
-      nam_match = ''
-      dsc_match = ''
+      dsc_match = '.*'
 
       if len(sys.argv) == 4:
-         nam_match = sys.argv[3].split()[0]
-         dsc_match = sys.argv[3].split()[1]
-
+         dsc_match = sys.argv[3]
 
       f = open(sys.argv[1])
       for line in f:
 
          if line.startswith('NAM'):
-
 
             if re.findall(sys.argv[2], line):
                id = line.split()[2]
@@ -35,13 +30,6 @@ def main():
                   sys.stderr.write('keeping : \"%s\"\n' % line[:-1])
 
                print line,
-
-               if len(sys.argv) == 4:
-                  if re.findall(nam_match, line):
-                     id = line.split()[2]
-                     if not id in ids_finetune:
-                        ids_finetune.append(id)
-                        sys.stderr.write('fine tuning : \"%s\" with \"%s\"\n' % (line[:-1], dsc_match))
 
          elif line.startswith('STA') or line.startswith('STO') or line.startswith('OCC'):
             last_sta_sto_occ_id = line.split()[2]
@@ -53,12 +41,9 @@ def main():
                   last_sta_sto_occ_line = line
 
          elif line.startswith('DSC'):
+
             if last_sta_sto_occ_id in ids:
-               if last_sta_sto_occ_id in ids_finetune:
-                  if re.search(dsc_match, line):
-                     print last_sta_sto_occ_line,
-                     print line,
-               else:
+               if re.search(dsc_match, line):
                   print last_sta_sto_occ_line,
                   print line,
 
