@@ -372,6 +372,7 @@ extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
                     tditrace("@I+send() %d %d \"%s\"", sockfd, len, s);
                 } else {
                     s[MIN(16, len)] = '\0';
+                    tditrace("@E+send()_%d %d \"%s\"", sockfd, len, s);
                     tditrace("@I+send() %d %d \"%s\"...", sockfd, len, s);
                 }
 
@@ -439,16 +440,19 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
     }
 
     if (libcrecording || libcsendmsgrecording) {
-        // tditrace("@I+sendmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
-        // msg->msg_iov[0].iov_base);
-        tditrace("@I+sendmsg() %d %d \"\"", sockfd, msg->msg_iovlen);
+
+        //tditrace("@I+sendmsg() %d %d \"%s\"", sockfd, msg->msg_iov[0].iov_len,
+        //msg->msg_iov[0].iov_base);
+
+        tditrace("@I+sendmsg() %d %d %d \"...\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len);
     }
 
     ssize_t ret = __sendmsg(sockfd, msg, flags);
 
     if (libcrecording || libcsendmsgrecording) {
+
         tditrace("@I-sendmsg() =%d", ret);
-        tditrace("@E+sendmsg()_%d =%d %d \"\"", sockfd, ret, msg->msg_iovlen);
+        tditrace("@E+sendmsg()_%d =%d", sockfd, ret);
     }
 
     return ret;
@@ -491,6 +495,7 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     }
 
     if (libcrecording || libcrecvrecording) {
+        tditrace("@E+recv() %d %d", sockfd, len);
         tditrace("@I+recv() %d %d", sockfd, len);
     }
 
@@ -588,11 +593,12 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     ssize_t ret = __recvmsg(sockfd, msg, flags);
 
     if (libcrecording || libcrecvmsgrecording) {
-        // tditrace("@I+recvmsg() %d %d \"%s\"", sockfd, msg->msg_iovlen,
-        // msg->msg_iov[0].iov_base);
 
-        tditrace("@I-recvmsg() =%d \"\"", ret);
-        tditrace("@E+recvmsg()_%d =%d \"\"", sockfd, ret);
+        //tditrace("@I-recvmsg() %d %d \"%s\"", sockfd, msg->msg_iov[0].iov_len,
+        //msg->msg_iov[0].iov_base);
+        tditrace("@I-recvmsg() =%d \"...\"", ret);
+
+        tditrace("@E+recvmsg()_%d =%d \"...\"", sockfd, ret);
     }
 
     return ret;
