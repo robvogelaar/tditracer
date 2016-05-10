@@ -70,6 +70,7 @@ bool pthreadrecording;
 bool eglrecording;
 bool gles2recording;
 bool gldrawrecording;
+bool gltexturerecording;
 
 int shaders_captured = 0;
 int textures_captured = 0;
@@ -125,7 +126,7 @@ static void init(void) {
             libcfreopenrecording = true;
             libcreadrecording = false;
             libcwriterecording = false;
-            libcsocketrecording = true;
+            libcsocketrecording = false;
             libcsendrecording = true;
             libcsendtorecording = true;
             libcsendmsgrecording = true;
@@ -213,6 +214,13 @@ static void init(void) {
         } else {
             gldrawrecording = false;
         }
+
+        if (getenv("GLTEXTURE")) {
+            gltexturerecording = (atoi(getenv("GLTEXTURE")) >= 1);
+        } else {
+            gltexturerecording = false;
+        }
+
 
         if (getenv("TR")) {
             texturerecording = atoi(getenv("TR"));

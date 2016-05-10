@@ -409,7 +409,7 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
         }
     }
 
-    if (gles2recording)
+    if (gles2recording || gltexturerecording)
         tditrace("@I+glTexImage2D() #%d,%dx%d,%s,%s,%u,0x%x",
                  ++glTexImage2D_counter, width, height, TYPESTRING(type),
                  FORMATSTRING(format), boundtexture, pixels);
@@ -424,7 +424,7 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
     __glTexImage2D(target, level, internalformat, width, height, border, format,
                    type, pixels);
 
-    if (gles2recording)
+    if (gles2recording || gltexturerecording)
         tditrace("@I-glTexImage2D()");
 
     GLenum err = GL_NO_ERROR;
@@ -451,7 +451,7 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
         }
     }
 
-    if (gles2recording)
+    if (gles2recording || gltexturerecording)
         tditrace("@I+glTexSubImage2D() #%d,%dx%d+%d+%d,%s,%s,%u,0x%x",
                  ++glTexSubImage2D_counter, width, height, xoffset, yoffset,
                  TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
@@ -466,7 +466,7 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
     __glTexSubImage2D(target, level, xoffset, yoffset, width, height, format,
                       type, pixels);
 
-    if (gles2recording)
+    if (gles2recording || gltexturerecording)
         tditrace("@I-glTexSubImage2D()");
 }
 

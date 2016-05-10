@@ -34,6 +34,7 @@ extern bool pthreadrecording;
 extern bool eglrecording;
 extern bool gles2recording;
 extern bool gldrawrecording;
+extern bool gltexturerecording;
 
 extern int shaders_captured;
 extern int textures_captured;

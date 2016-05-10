@@ -273,13 +273,24 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
         } else if (ret == 0) {
             tditrace("@I-read() =0");
         } else {
-            if (0) {
+
+            if (buf) {
                 char s[MAXSTRLEN + 1];
                 strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
                 s[MIN(MAXSTRLEN, ret)] = '\0';
-                tditrace("@I-read() =%d \"%s\"", ret, s);
-            } else {
-                tditrace("@I-read() =%d", ret);
+
+                if (strncmp((const char *)buf, "POST", 4) == 0 ||
+                    strncmp((const char *)buf, "HTTP", 4) == 0 ||
+                    strncmp((const char *)buf, "PUT", 3) == 0 ||
+                    strncmp((const char *)buf, "GET", 3) == 0 ||
+                    strncmp((const char *)buf, "{\"result", 8) == 0 ||
+                    strncmp((const char *)buf, "{\"method", 8) == 0 ||
+                    strncmp((const char *)buf, "data:", 5) == 0 || ret == 1) {
+                    tditrace("@E+read()_%d =%d \"%s\"", fd, ret, s);
+                } else {
+                    s[MIN(0, ret)] = '\0';
+                    tditrace("@E+read()_%d =%d \"%s\"...", fd, ret, s);
+                }
             }
         }
     }
@@ -301,13 +312,25 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     }
 
     if (libcwriterecording) {
-        if (0) {
+        tditrace("@I+write() %d", count);
+
+        if (buf) {
             char s[MAXSTRLEN + 1];
             strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count));
             s[MIN(MAXSTRLEN, count)] = '\0';
-            tditrace("@I+write() %d %d \"%s\"", fd, count, s);
-        } else {
-            tditrace("@I+write() %d %d", fd, count);
+
+            if (strncmp((const char *)buf, "POST", 4) == 0 ||
+                strncmp((const char *)buf, "HTTP", 4) == 0 ||
+                strncmp((const char *)buf, "PUT", 3) == 0 ||
+                strncmp((const char *)buf, "GET", 3) == 0 ||
+                strncmp((const char *)buf, "{\"result", 8) == 0 ||
+                strncmp((const char *)buf, "{\"method", 8) == 0 ||
+                strncmp((const char *)buf, "data:", 5) == 0 || count == 1) {
+                tditrace("@E+write()_%d %d \"%s\"", fd, count, s);
+            } else {
+                s[MIN(0, count)] = '\0';
+                tditrace("@E+write()_%d =%d \"%s\"...", fd, count, s);
+            }
         }
     }
 
@@ -332,7 +355,7 @@ extern "C" int socket(int domain, int type, int protocol) {
         }
     }
 
-    if (libcrecording || libcsocketrecording) {
+    if (libcsocketrecording) {
         tditrace("@I+socket() %d %d %d", domain, type, protocol);
     }
 
@@ -346,6 +369,7 @@ extern "C" int socket(int domain, int type, int protocol) {
 }
 #endif
 
+#if 1
 extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
     static ssize_t (*__send)(int, const void *, size_t, int) = NULL;
 
@@ -358,30 +382,35 @@ extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
     }
 
     if (libcrecording || libcsendrecording) {
+
+        tditrace("@I+send() %d %d", sockfd, len);
+
         if (MAXSTRLEN) {
 
-            if (buf && !strchr((char *)buf, '\f')) {
+            if (buf) {
                 char s[MAXSTRLEN + 1];
                 strncpy(s, (const char *)buf, MIN(MAXSTRLEN, len));
                 s[MIN(MAXSTRLEN, len)] = '\0';
 
-                if (strncmp((const char *)buf, "HTTP", 4) == 0 ||
-                    strncmp((const char *)buf, "{", 1) == 0 ||
-                    strncmp((const char *)buf, "data:", 5) == 0) {
+                if (strncmp((const char *)buf, "POST", 4) == 0 ||
+                    strncmp((const char *)buf, "HTTP", 4) == 0 ||
+                    strncmp((const char *)buf, "PUT", 3) == 0 ||
+                    strncmp((const char *)buf, "GET", 3) == 0 ||
+                    strncmp((const char *)buf, "{\"result", 8) == 0 ||
+                    strncmp((const char *)buf, "{\"method", 8) == 0 ||
+                    strncmp((const char *)buf, "data:", 5) == 0 || len == 1) {
                     tditrace("@E+send()_%d %d \"%s\"", sockfd, len, s);
-                    tditrace("@I+send() %d %d \"%s\"", sockfd, len, s);
                 } else {
-                    s[MIN(16, len)] = '\0';
-                    tditrace("@E+send()_%d %d \"%s\"", sockfd, len, s);
-                    tditrace("@I+send() %d %d \"%s\"...", sockfd, len, s);
+                    s[MIN(0, len)] = '\0';
+                    tditrace("@E+send()_%d %d \"%s...\"", sockfd, len, s);
                 }
 
             } else {
-                tditrace("@I+send() %d %d \"???\"", sockfd, len);
+                tditrace("@E+send()_%d %d \"???\"", sockfd, len);
             }
 
         } else {
-            tditrace("@I+send() %d %d", sockfd, len);
+            tditrace("@E+send()_%d %d", sockfd, len);
         }
     }
 
@@ -440,11 +469,8 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
     }
 
     if (libcrecording || libcsendmsgrecording) {
-
-        //tditrace("@I+sendmsg() %d %d \"%s\"", sockfd, msg->msg_iov[0].iov_len,
-        //msg->msg_iov[0].iov_base);
-
-        tditrace("@I+sendmsg() %d %d %d \"...\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len);
+        tditrace("@I+sendmsg() %d", sockfd);
+        tditrace("@E+sendmsg()_%d [%d]-%d-%d \"%s\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_base : "???");
     }
 
     ssize_t ret = __sendmsg(sockfd, msg, flags);
@@ -452,7 +478,6 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
     if (libcrecording || libcsendmsgrecording) {
 
         tditrace("@I-sendmsg() =%d", ret);
-        tditrace("@E+sendmsg()_%d =%d", sockfd, ret);
     }
 
     return ret;
@@ -495,7 +520,6 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     }
 
     if (libcrecording || libcrecvrecording) {
-        tditrace("@E+recv() %d %d", sockfd, len);
         tditrace("@I+recv() %d %d", sockfd, len);
     }
 
@@ -504,33 +528,33 @@ extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     if (libcrecording || libcrecvrecording) {
         if (ret == -1) {
             tditrace("@I-recv() =-1");
+            tditrace("@E+recv()_%d =-1", sockfd);
         } else if (ret == 0) {
             tditrace("@I-recv() =0");
+            tditrace("@E+recv()_%d =0", sockfd);
         } else {
             if (MAXSTRLEN) {
-                if (buf && !strchr((char *)buf, '\f')) {
+                if (buf) {
                     char s[MAXSTRLEN + 1];
                     strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
                     s[MIN(MAXSTRLEN, ret)] = '\0';
 
-                    if (strncmp((const char *)buf, "GET", 3) == 0 ||
-                        strncmp((const char *)buf, "POST", 4) == 0 ||
-                        strncmp((const char *)buf, "{", 1) == 0) {
+                    if (strncmp((const char *)buf, "POST", 4) == 0 ||
+                        strncmp((const char *)buf, "HTTP", 4) == 0 ||
+                        strncmp((const char *)buf, "PUT", 3) == 0 ||
+                        strncmp((const char *)buf, "GET", 3) == 0 ||
+                        strncmp((const char *)buf, "{\"result", 8) == 0 ||
+                        strncmp((const char *)buf, "{\"method", 8) == 0 ||
+                        strncmp((const char *)buf, "data:", 5) == 0 || ret == 1) {
                         tditrace("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
-                        tditrace("@I-recv() =%d \"%s\"", ret, s);
                     } else {
-                        s[MIN(4, len)] = '\0';
-                        // tditrace("@I-recv() =%d \"%s\"...", ret, s);
-                        tditrace("@I-recv() =%d \"%s\"...", ret, "xxx");
+                        s[MIN(0, ret)] = '\0';
+                        tditrace("@E+recv()_%d =%d \"%s\"...", sockfd, ret, s);
                     }
-
-                } else {
-                    tditrace("@I-recv() =%d \"???\"", ret);
                 }
-            } else {
-                tditrace("@I-recv() =%d", ret);
             }
         }
+        tditrace("@I-recv() =%d", ret);
     }
 
     return ret;
@@ -587,7 +611,7 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     }
 
     if (libcrecording || libcrecvmsgrecording) {
-        tditrace("@I+recvmsg() %d %d", sockfd, msg->msg_iovlen);
+        tditrace("@I+recvmsg() %d", sockfd);
     }
 
     ssize_t ret = __recvmsg(sockfd, msg, flags);
@@ -596,9 +620,8 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 
         //tditrace("@I-recvmsg() %d %d \"%s\"", sockfd, msg->msg_iov[0].iov_len,
         //msg->msg_iov[0].iov_base);
-        tditrace("@I-recvmsg() =%d \"...\"", ret);
-
-        tditrace("@E+recvmsg()_%d =%d \"...\"", sockfd, ret);
+        tditrace("@I-recvmsg() =%d", ret);
+        tditrace("@E+recvmsg()_%d [%d]-%d=%d \"???\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, ret);
     }
 
     return ret;
@@ -663,6 +686,7 @@ extern "C" int select(int nfds, fd_set *readfds, fd_set *writefds,
 
     return ret;
 }
+#endif
 
 extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
     static int (*__poll)(struct pollfd *, nfds_t, int) = NULL;
