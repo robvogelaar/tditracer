@@ -406,7 +406,7 @@ extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
                 }
 
             } else {
-                tditrace("@E+send()_%d %d \"???\"", sockfd, len);
+                tditrace("@E+send()_%d %d", sockfd, len);
             }
 
         } else {
@@ -442,7 +442,8 @@ extern "C" ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
             char s[MAXSTRLEN + 1];
             strncpy(s, (const char *)buf, MIN(MAXSTRLEN, len));
             s[MIN(MAXSTRLEN, len)] = '\0';
-            tditrace("@I+sendto() %d %d \"%s\"", sockfd, len, s);
+            tditrace("@I+sendto() %d %d", sockfd, len);
+            tditrace("@E+sendto()_%d =%d \"%s\"", sockfd, len, s);
         } else {
             tditrace("@I+sendto() %d %d ", sockfd, len);
         }
@@ -470,7 +471,7 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
 
     if (libcrecording || libcsendmsgrecording) {
         tditrace("@I+sendmsg() %d", sockfd);
-        tditrace("@E+sendmsg()_%d [%d]-%d-%d \"%s\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_base : "???");
+        tditrace("@E+sendmsg()_%d [%d]-%d-%d", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
     }
 
     ssize_t ret = __sendmsg(sockfd, msg, flags);
@@ -589,7 +590,8 @@ extern "C" ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
                 char s[MAXSTRLEN + 1];
                 strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
                 s[MIN(MAXSTRLEN, ret)] = '\0';
-                tditrace("@I-recvfrom() =%d \"%s\"", ret, s);
+                tditrace("@I-recvfrom() =%d", ret);
+                tditrace("@E+recvfrom()_%d =%d \"%s\"", sockfd, ret, s);
             } else {
                 tditrace("@I-recvfrom() =%d", ret);
             }
@@ -617,11 +619,8 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
     ssize_t ret = __recvmsg(sockfd, msg, flags);
 
     if (libcrecording || libcrecvmsgrecording) {
-
-        //tditrace("@I-recvmsg() %d %d \"%s\"", sockfd, msg->msg_iov[0].iov_len,
-        //msg->msg_iov[0].iov_base);
         tditrace("@I-recvmsg() =%d", ret);
-        tditrace("@E+recvmsg()_%d [%d]-%d=%d \"???\"", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, ret);
+        tditrace("@E+recvmsg()_%d [%d]-%d=%d", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, ret);
     }
 
     return ret;
@@ -906,7 +905,6 @@ extern "C" void *malloc(size_t size) {
                 fprintf(stderr, "/usr/lib/libv3ddriver.so - not resident\n");
                 v3ddriver_base = NULL;
             }
-
 
         } else {
             fprintf(stderr, "dladdr, failed\n");

@@ -720,12 +720,12 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     // printf("%s,[%s]\n", CLEARSTRING(mask),
     // addrinfo(__builtin_return_address(0)));
 
-    if (gles2recording)
+    if (gles2recording || gldrawrecording || gltexturerecording)
         tditrace("@I+glClear() %s", CLEARSTRING(mask));
 
     __glClear(mask);
 
-    if (gles2recording)
+    if (gles2recording || gldrawrecording || gltexturerecording)
         tditrace("@I-glClear()");
 }
 
