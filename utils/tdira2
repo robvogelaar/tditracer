@@ -10,41 +10,48 @@ import datetime
 libs = []
 maps = []
 
-def getlibandaddr2line(address):
+def getlibandaddr2line(address, procid):
 
    global libs
    global maps
 
    result = 'lib?|function?'
    for map in maps:
-      maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
-      mapareas = maparea.split('-')
 
-      if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16):
+      if procid in map:
 
-         #sys.stderr.write('%s\n' % address)
-         #sys.stderr.write('%d\n' % len(libs))
+         #sys.stderr.write('map=%s\n' % map)
 
-         for lib in libs:
+         maparea = (re.search(r'[0-9a-f]+-[0-9a-f]+', map)).group()
+         mapareas = maparea.split('-')
 
-            #sys.stderr.write('lib=%s\n' % lib)
+         #sys.stderr.write('mapareas=%s' % mapareas)
 
-            if os.path.basename(map.split()[5]) in lib:
-               cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
-               #sys.stderr.write('cmd=%s\n' % cmd)
+         if int(address, 16) >= int(mapareas[0], 16) and int(address, 16) < int(mapareas[1], 16):
 
-               addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
+            #sys.stderr.write('%s\n' % address)
+            #sys.stderr.write('%d\n' % len(libs))
 
-               thelib = os.path.basename(map.split()[5])
-               thefullfunc = addr2line.split(' at ')[0]
-               thefullfunc = thefullfunc.replace(', ', ',')
-               thefullfunc = thefullfunc.replace(' ', '-')
-               thefuncname = thefullfunc.split('(')[0]
+            for lib in libs:
 
-               #result = thefuncname
-               result = str('<%s>%s' % (thelib, thefullfunc))
-               break
-         break
+               #sys.stderr.write('lib=%s\n' % lib)
+
+               if os.path.basename(map.split()[6]) in lib:
+                  cmd = 'addr2line -s -f -p -C' + ' -e ' + lib + ' -a ' + hex(int(address, 16) - int(mapareas[0], 16))
+                  #sys.stderr.write('cmd=%s\n' % cmd)
+
+                  addr2line = subprocess.check_output(cmd, shell = True).replace('\n', '').split(': ')[1]
+
+                  thelib = os.path.basename(map.split()[5])
+                  thefullfunc = addr2line.split(' at ')[0]
+                  thefullfunc = thefullfunc.replace(', ', ',')
+                  thefullfunc = thefullfunc.replace(' ', '-')
+                  thefuncname = thefullfunc.split('(')[0]
+
+                  #result = thefuncname
+                  result = str('<%s>%s' % (thelib, thefullfunc))
+                  break
+            break
 
    return result
 
@@ -62,20 +69,36 @@ def main():
 
    if len(sys.argv) == 3:
 
-      f = open(sys.argv[1])
       #build maps
+      f = open(sys.argv[1])
       #DSC 0 0 MAPS,741b1000-74213000,r-xp,00000000,00:10,56754894,,,/lib/libuClibc-0.9.32.1.so
       for line in f:
-         result = re.match(r'DSC 0 0 MAPS,[0-9a-f]{8}', line)
+         #result = re.match(r'DSC 0 0 MAPS,[0-9a-f]{8}', line)
+         result = re.match(r'DSC 0 0 MAPS.*r-xp', line)
          if result:
-            l = line[13:].replace(',',' ')
+            l = line[12:].replace(',',' ')
             if l not in maps:
                maps.append(l)
-
-
       f.close()
       #for m in maps:
-      #   sys.stderr.write('maps=[%s]\n' %m)
+      #   sys.stderr.write('maps=%s' %m)
+
+      #build procids lookup
+      procids = [None] * 10000;
+      f = open(sys.argv[1])
+      #NAM 1 1000 [rpcprocess][14082][0]mmap()
+      for line in f:
+         if line.startswith('NAM'):
+            n = int (line.split()[2])
+            s = line.split()[3].split('[0]')[0];
+            #sys.stderr.write('procids [%d] = %s\n' %(n, s))
+            procids[ n ] = s;
+      f.close()
+      #n = 0
+      #for p in procids:
+      #   sys.stderr.write('procids=%d %s\n' %(n, p))
+      #   n = n + 1;
+
 
       #build libs
       libs = []
@@ -105,7 +128,11 @@ def main():
       sys.stderr.write('labeling return addresses...')
       sys.stderr.flush()
 
+      id = 0;
       for line in f:
+
+         if line.startswith('STA') or line.startswith('STO') or line.startswith('OCC'):
+            id = int(line.split(' ')[2]);
 
          if line.startswith('DSC'):
 
@@ -115,7 +142,7 @@ def main():
                address = (result.group().split(',')[0])[3:]
                if not address in addresses:
                   addresses.append(address)
-                  addr2line = getlibandaddr2line(address)
+                  addr2line = getlibandaddr2line(address, procids[id])
 
                   #sys.stderr.write('%s\n' % addr2line)
 

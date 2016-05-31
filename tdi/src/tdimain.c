@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <linux/futex.h>
 #include <errno.h>
 #include <limits.h>
@@ -889,11 +890,11 @@ static void dump_proc_self_maps(void) {
 
     fprintf(stderr, "tdi: [%s][%d], dump maps\n", gprocname, gpid);
 
-    tditrace("MAPS begin");
+    tditrace("MAPS [%s][%d] begin", gprocname, gpid);
 
     fd = open("/proc/self/maps", O_RDONLY);
     if (fd < 0) {
-        tditrace("MAPS end");
+        tditrace("MAPS [%s][%d] end", gprocname, gpid);
         return;
     }
 
@@ -911,7 +912,7 @@ static void dump_proc_self_maps(void) {
             while (line) {
                 if (strlen(line) > 50) {
                     // fprintf(stderr, "+%d[%s]\n", strlen(line), line);
-                    tditrace("MAPS %s", line);
+                    tditrace("MAPS [%s][%d] %s", gprocname, gpid, line);
                     // fprintf(stderr, "=%d\n", trace_buffer_ptr -
                     // gtrace_buffer);
                 }
@@ -924,12 +925,14 @@ static void dump_proc_self_maps(void) {
 
     close(fd);
 
-    tditrace("MAPS end");
+    tditrace("MAPS [%s][%d] end", gprocname, gpid);
 }
 
 static int gmask = 0xffffffff;
 
 static int do_mallinfo = 0;
+
+static int do_resourceusage = 0;
 
 static int allow_rewind = 0;
 
@@ -981,17 +984,50 @@ void *monitor_thread(void *param) {
             // printf("Topmost releasable block (keepcost):   %d\n",
             // mi.keepcost);
 
-            tditrace("mi.arena~%d", mi.arena);
-            // tditrace("mi.ordblks~%d", mi.ordblks);
-            // tditrace("mi.smblks~%d", mi.smblks);
-            // tditrace("mi.hblks~%d", mi.hblks);
-            // tditrace("mi.hblkhd~%d", mi.hblkhd);
-            // tditrace("mi.usmblks~%d", mi.usmblks);
-            // tditrace("mi.fsmblks~%d", mi.fsmblks);
-            // tditrace("mi.uordblks~%d", mi.uordblks);
-            // tditrace("mi.fordblks~%d", mi.fordblks);
-            // tditrace("mi.keepcost~%d", mi.keepcost);
+            tditrace("mi_arena~%d", mi.arena);
+            // tditrace("mi_ordblks~%d", mi.ordblks);
+            // tditrace("mi_smblks~%d", mi.smblks);
+            // tditrace("mi_hblks~%d", mi.hblks);
+            // tditrace("mi_hblkhd~%d", mi.hblkhd);
+            // tditrace("mi_usmblks~%d", mi.usmblks);
+            // tditrace("mi_fsmblks~%d", mi.fsmblks);
+            // tditrace("mi_uordblks~%d", mi.uordblks);
+            // tditrace("mi_fordblks~%d", mi.fordblks);
+            // tditrace("mi_keepcost~%d", mi.keepcost);
         }
+
+        if (do_resourceusage) {
+
+            struct rusage resourceUsage;
+            getrusage(RUSAGE_SELF, &resourceUsage);
+
+            //struct rusage {
+            //       struct timeval ru_utime; /* user CPU time used */
+            //       struct timeval ru_stime; /* system CPU time used */
+            //       long   ru_maxrss;        /* maximum resident set size */
+            //       long   ru_ixrss;         /* integral shared memory size */
+            //       long   ru_idrss;         /* integral unshared data size */
+            //       long   ru_isrss;         /* integral unshared stack size */
+            //       long   ru_minflt;        /* page reclaims (soft page faults) */
+            //       long   ru_majflt;        /* page faults (hard page faults) */
+            //       long   ru_nswap;         /* swaps */
+            //       long   ru_inblock;       /* block input operations */
+            //       long   ru_oublock;       /* block output operations */
+            //       long   ru_msgsnd;        /* IPC messages sent */
+            //       long   ru_msgrcv;        /* IPC messages received */
+            //       long   ru_nsignals;      /* signals received */
+            //       long   ru_nvcsw;         /* voluntary context switches */
+            //       long   ru_nivcsw;        /* involuntary context switches */
+            //   };
+
+
+            tditrace("ru_maxrss~%d", resourceUsage.ru_maxrss);
+
+            tditrace("ru_minflt~%d", resourceUsage.ru_minflt);
+            tditrace("ru_majflt~%d", resourceUsage.ru_majflt);
+
+        }
+
 
         struct stat st;
         stat(gtracebufferfilename, &st);
@@ -1196,10 +1232,12 @@ void *delayed_init_thread(void *param) {
     gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fileno(file), 0);
     stat(gtracebufferfilename, &gtrace_buffer_st);
-    for (i = 0; i < TRACEBUFFERSIZE; i++) {
-        gtrace_buffer[i] = 0;
-    }
-    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname,
+
+    //for (i = 0; i < TRACEBUFFERSIZE; i++) {
+    //    gtrace_buffer[i] = 0;
+    //}
+
+    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\"\n", gprocname,
             gpid, gtracebufferfilename);
 
     trace_buffer_ptr = gtrace_buffer;
@@ -1282,6 +1320,11 @@ int tditrace_init(void) {
     do_mallinfo = 0;
     if (env = getenv("MALLINFO")) {
         do_mallinfo = (atoi(env) >= 1);
+    }
+
+    do_resourceusage = 0;
+    if (env = getenv("RESOURCEUSAGE")) {
+        do_resourceusage = (atoi(env) >= 1);
     }
 
     do_offload = 0;
