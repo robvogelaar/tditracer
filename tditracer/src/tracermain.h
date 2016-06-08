@@ -28,6 +28,9 @@ extern bool libcsyslogrecording;
 extern unsigned int libcmalloc;
 extern unsigned int libccalloc;
 extern unsigned int libcrealloc;
+extern unsigned int libcmemalign;
+extern unsigned int libcmmap;
+extern unsigned int libcmunmap;
 
 extern bool pthreadrecording;
 

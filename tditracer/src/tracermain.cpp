@@ -65,6 +65,9 @@ bool libcsyslogrecording;
 unsigned int libcmalloc;
 unsigned int libccalloc;
 unsigned int libcrealloc;
+unsigned int libcmemalign;
+unsigned int libcmmap;
+unsigned int libcmunmap;
 
 bool pthreadrecording;
 bool eglrecording;
@@ -142,6 +145,9 @@ static void init(void) {
             libcmalloc = 0;
             libccalloc = 0;
             libcrealloc = 0;
+            libcmemalign = 0;
+            libcmmap = 0;
+            libcmunmap = 0;
 
         } else {
             libcrecording = false;
@@ -180,6 +186,17 @@ static void init(void) {
         if (env = getenv("LIBCREALLOC")) {
             libcrealloc = atoi(env);
         }
+
+        if (env = getenv("LIBCMEMALIGN")) {
+            libcmemalign = atoi(env);
+        }
+        if (env = getenv("LIBCMMAP")) {
+            libcmmap = atoi(env);
+        }
+        if (env = getenv("LIBCMUNMAP")) {
+            libcmunmap = atoi(env);
+        }
+
 
         if (env = getenv("LIBCSEND")) {
             libcsendrecording = (atoi(env) >= 1);
