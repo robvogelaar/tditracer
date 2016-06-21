@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <syscall.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -984,11 +985,13 @@ void *monitor_thread(void *param) {
             // printf("Topmost releasable block (keepcost):   %d\n",
             // mi.keepcost);
 
-            tditrace("mi_arena~%d", mi.arena);
+            tditrace("arena~%d", mi.arena);
             // tditrace("mi_ordblks~%d", mi.ordblks);
             // tditrace("mi_smblks~%d", mi.smblks);
-            // tditrace("mi_hblks~%d", mi.hblks);
-            // tditrace("mi_hblkhd~%d", mi.hblkhd);
+
+            tditrace("hblks~%d", mi.hblks);
+            tditrace("hblkhd~%d", mi.hblkhd);
+
             // tditrace("mi_usmblks~%d", mi.usmblks);
             // tditrace("mi_fsmblks~%d", mi.fsmblks);
             // tditrace("mi_uordblks~%d", mi.uordblks);
@@ -997,6 +1000,21 @@ void *monitor_thread(void *param) {
         }
 
         if (do_resourceusage) {
+
+            unsigned long vmsize = 0L;
+            unsigned long rss = 0L;
+
+            int fh = 0;
+            char buffer[65];
+            int gotten;
+            fh = open("/proc/self/statm", O_RDONLY);
+            gotten = read(fh, buffer, 64);
+            buffer[gotten] = '\0';
+            if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
+                tditrace("vmsize~%d", (int)(vmsize * 4096));
+                tditrace("rss~%d", (int)(rss * 4096));
+            }
+            close(fh);
 
             struct rusage resourceUsage;
             getrusage(RUSAGE_SELF, &resourceUsage);
@@ -1021,13 +1039,11 @@ void *monitor_thread(void *param) {
             //   };
 
 
-            tditrace("ru_maxrss~%d", resourceUsage.ru_maxrss);
-
-            tditrace("ru_minflt~%d", resourceUsage.ru_minflt);
-            tditrace("ru_majflt~%d", resourceUsage.ru_majflt);
+            //tditrace("maxrss~%d", resourceUsage.ru_maxrss);
+            //tditrace("ru_minflt~%d", resourceUsage.ru_minflt);
+            //tditrace("ru_majflt~%d", resourceUsage.ru_majflt);
 
         }
-
 
         struct stat st;
         stat(gtracebufferfilename, &st);
@@ -1285,22 +1301,22 @@ int tditrace_init(void) {
         fprintf(stderr,
                 "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
                 gprocname, gpid);
-        return;
+        return 0;
     } else if (strncmp(gprocname, "sh", 2) == 0) {
         fprintf(stderr,
                 "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
                 gprocname, gpid);
-        return;
+        return 0;
     } else if (strcmp(gprocname, "strace") == 0) {
         fprintf(stderr,
                 "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
                 gprocname, gpid);
-        return;
+        return 0;
     } else if (strcmp(gprocname, "gdbserver") == 0) {
         fprintf(stderr,
                 "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
                 gprocname, gpid);
-        return;
+        return 0;
     } else {
         // printf("tdi: init[%s][%d]\n", gprocname, gpid);
     }
@@ -1933,30 +1949,6 @@ void tditrace_internal(va_list args, const char *format) {
         }
     }
 
-#if 0
-    trace_text[trace_text_ptr-trace_text] = 0;
-
-    char trace_text2[1024];
-
-    strcpy(trace_text2, trace_text);
-
-    int count = 0;
-    char *str = trace_text2;
-    while(*str) {
-        if (*str == 0x0c) {
-            *str = '|';
-            ++count;
-        }
-        str++;
-    }
-
-    if (count != 4) {
-        fprintf(stderr, "COUNT NOT 4 : {%s}\n", trace_text2);
-    }
-
-    fprintf(stderr, "{%s}\n", trace_text2);
-#endif
-
     simplefu_mutex_lock(&myMutex);
 
     memcpy(trace_buffer_ptr, trace_text, trace_text_ptr - trace_text);
@@ -1996,10 +1988,6 @@ void tditrace(const char *format, ...) {
 void tditrace_ex(int mask, const char *format, ...) {
     va_list args;
 
-    /*
-     * check mask against gmask
-     */
-
     if (mask & gmask) {
         va_start(args, format);
 
@@ -2008,3 +1996,4 @@ void tditrace_ex(int mask, const char *format, ...) {
         va_end(args);
     }
 }
+

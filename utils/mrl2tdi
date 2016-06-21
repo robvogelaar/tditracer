@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+
+import sys
+import re
+from datetime import datetime
+
+QUEUE = 3
+
+ids = []
+prev_values = []
+
+offset_stamp = 0
+
+def addentry(id, value, stamp):
+
+   global offset_stamp
+
+   if id not in ids:
+      ids.append(id);
+      print('NAM %d %d %s' %(QUEUE, QUEUE * 1000 + ids.index(id), id))
+      prev_values.append(0);
+
+   prev_value = prev_values[ids.index(id)];
+
+   if (value >= prev_value):
+      print 'STA %d %d %d %d' %(QUEUE, QUEUE * 1000 + ids.index(id), (stamp - offset_stamp), value - prev_value)
+   else:
+      print 'STO %d %d %d %d' %(QUEUE, QUEUE * 1000 + ids.index(id), (stamp - offset_stamp), prev_value - value)
+
+   prev_values[ids.index(id)] = value;
+
+
+def main():
+
+   global offset_stamp
+
+   if len(sys.argv) == 2:
+
+      print 'TIME 1000000000'
+      print 'SPEED 1000000000'
+
+      f = open(sys.argv[1])
+      for line in f:
+
+         #sys.stderr.write('line:\'%s\'\n' % line)
+
+         if line.startswith('@@@TIMESTAMP'):
+
+            #@@@TIMESTAMP 1464092401
+            stamp = int(line.split()[1]) * 1000000000;
+            if offset_stamp == 0:
+               offset_stamp = stamp;
+
+
+         #MemFree:          253532 kB
+         if 'MemFree' in line:
+            #sys.stderr.write('line:\'%s\'\n' % line);
+            rss = line.split()[1];
+            value = int(rss);
+            addentry('MemFree', value, stamp);
+
+         #2267 qtbrowse  20   0  757m 129m  28m R   47 26.2   0:19.02 qtbrowser
+         if ' qtbrowser' in line:
+            #sys.stderr.write('line:\'%s\'\n' % line);
+            rss = line.split()[5];
+            if rss.endswith('m'):
+               value = int(rss[:-1]) * 1024 * 1024;
+            else:
+               value = int(rss);
+            addentry('qtbrowser-rss', value, stamp);
+
+            virt = line.split()[4];
+            if virt.endswith('m'):
+               value = int(virt[:-1]) * 1024 * 1024;
+            else:
+               value = int(virt);
+            addentry('qtbrowser-virt', value, stamp);
+
+         #1964 mpeos-ma  20   0  701m  29m  12m S   25  6.0   0:10.57 mpeos-main    
+         if ' mpeos-main' in line:
+            #sys.stderr.write('line:\'%s\'\n' % line);
+            rss = line.split()[5];
+            if rss.endswith('m'):
+               value = int(rss[:-1]) * 1024 * 1024;
+            else:
+               value = int(rss);
+            addentry('mpeos-main-rss', value, stamp);
+
+            virt = line.split()[5];
+            if virt.endswith('m'):
+               value = int(virt[:-1]) * 1024 * 1024;
+            else:
+               value = int(virt);
+            addentry('mpeos-main-virt', value, stamp);
+
+         #2    0x30000000 0x10000000 eApp     46%  59% 0x064d1900
+         if ' eApp ' in line:
+            #sys.stderr.write('line:\'%s\'\n' % line);
+            value = int(line.split()[4][:-1]);
+            addentry('gpu-pct', value, stamp);
+
+      f.close();
+
+      print 'END %d UTC' % (offset_stamp), datetime.utcfromtimestamp(offset_stamp / 1000000000).strftime('%Y-%m-%d %H:%M:%S')
+
+   else:
+
+      print("Usage: %s <mrecord.log file>" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

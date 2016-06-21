@@ -8,30 +8,49 @@ def sortby(x):
 
 def main():
 
-   if len(sys.argv) == 3:
+   if len(sys.argv) >= 3:
+
+      fro_sec = 0.0;
+      to_sec = sys.float_info.max;
+
+      if len(sys.argv) == 4:
+         fro_sec = float(sys.argv[3]);
+
+      if len(sys.argv) == 5:
+         fro_sec = float(sys.argv[3]);
+         to_sec = float(sys.argv[4]);
+
 
       matches = []
       iterations = []
       totals = []
 
+      stamp = 0.0;
+
       f = open(sys.argv[1])
 
       for line in f:
 
-         if line.startswith('DSC'):
-            m = re.search(sys.argv[2], line)
-            if m:
-               s = line.split(sys.argv[2])[1].split(',')[0];
-               l = re.split(r'<\d+>', line.split(sys.argv[2])[0])[1];
+         if line.startswith('OCC'):
+            stamp = int(line.split()[3]) / (1000 * 1000 * 1000);
 
-               #print s;
-               if l not in matches:
-                  matches.append(l);
-                  iterations.append(1);
-                  totals.append(int(s));
-               else:
-                  iterations[matches.index(l)] += 1;
-                  totals[matches.index(l)] += int(s);
+         if line.startswith('DSC'):
+
+            if (stamp > fro_sec) and (stamp < to_sec):
+
+               m = re.search(sys.argv[2], line)
+               if m:
+                  s = line.split(sys.argv[2])[1].split(',')[0];
+                  l = re.split(r'<\d+>', line.split(sys.argv[2])[0])[1];
+
+                  #print s;
+                  if l not in matches:
+                     matches.append(l);
+                     iterations.append(1);
+                     totals.append(int(s));
+                  else:
+                     iterations[matches.index(l)] += 1;
+                     totals[matches.index(l)] += int(s);
 
       f.close()
 
@@ -48,7 +67,7 @@ def main():
          print r;
 
    else:
-      print("Usage: %s tdifile pattern" % sys.argv[0])
+      print("Usage: %s tdifile pattern <from> <to>" % sys.argv[0])
 
 if __name__ == "__main__":
    main()

@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/resource.h>
@@ -290,8 +291,13 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
         }
     }
 
+    unsigned int ra = 0;
+    #ifdef __mips__
+        asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
+
     if (libcwriterecording) {
-        tditrace("@I+write() %d %d", fd, count);
+        //tditrace("@I+write() %d %d", fd, count);
 
         if (MAXSTRLEN) {
 
@@ -301,16 +307,18 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
                 s[MIN(MAXSTRLEN, count)] = '\0';
 
                 if (strncmp((const char *)buf, "GET", 3) == 0)
-                    tditrace("@E+write()_%d_GET %d \"%s\"", fd, count, s);
+                    tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
                 else if (strncmp((const char *)buf, "PUT", 3) == 0)
-                    tditrace("@E+write()_%d_PUT %d \"%s\"", fd, count, s);
+                    tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
                 else if (strncmp((const char *)buf, "POST", 4) == 0)
-                    tditrace("@E+write()_%d_POST %d \"%s\"", fd, count, s);
+                    tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
                 else if (strncmp((const char *)buf, "{\"", 2) == 0)
-                    tditrace("@E+write()_%d_{ %d \"%s\"", fd, count, s);
+                    tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
+                else if (strncmp((const char *)buf + 2, "xml", 3) == 0)
+                    tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
                 else {
                     s[MIN(1, count)] = '\0';
-                    tditrace("@E+write()_%d \"%s...\"", fd, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
+                    tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
                     //tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
                 }
 
@@ -326,7 +334,7 @@ extern "C" ssize_t write(int fd, const void *buf, size_t count) {
     ssize_t ret = __write(fd, buf, count);
 
     if (libcwriterecording) {
-        tditrace("@I-write() =%d", ret);
+        //tditrace("@I-write() =%d", ret);
     }
 
     return ret;
@@ -344,19 +352,27 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
         }
     }
 
+    unsigned int ra = 0;
+    #ifdef __mips__
+        asm volatile("move %0, $ra" : "=r"(ra));
+    #endif
+
     if (libcreadrecording) {
-        tditrace("@I+read() %d %d", fd, count);
+        //tditrace("@I+read() %d %d", fd, count);
     }
 
     ssize_t ret = __read(fd, buf, count);
 
     if (libcreadrecording) {
+
         if (ret == -1) {
-            tditrace("@I-read()) =-1");
-            tditrace("@E+read()_%d =-1", fd);
+            //tditrace("@I-read()) =-1");
+            tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
         } else if (ret == 0) {
-            tditrace("@I-read() =0");
-            tditrace("@E+read()_%d =0", fd);
+            //tditrace("@I-read() =0");
+            tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
+        } else if (count == 64) {
+            // ignore the read from /proc/pid/statm
         } else {
             if (MAXSTRLEN) {
                 if (buf) {
@@ -365,15 +381,15 @@ extern "C" ssize_t read(int fd, void *buf, size_t count) {
                     s[MIN(MAXSTRLEN, ret)] = '\0';
 
                     if (strncmp((const char *)buf, "HTTP", 4) == 0)
-                        tditrace("@E+read()_%d_HTTP =%d \"%s\"", fd, ret, s);
+                        tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret, ra, s);
                     else {
                         s[MIN(1, ret)] = '\0';
-                        tditrace("@E+read()_%d =%d \"%s...\"", fd, ret, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
+                        tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret, ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
                     }
                 }
             }
         }
-        tditrace("@I-read() =%d", ret);
+        //tditrace("@I-read() =%d", ret);
     }
 
     return ret;
@@ -866,16 +882,53 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 #endif
 
 
-static void ru_maxrss(void) {
-    struct rusage resourceUsage;
-    getrusage(RUSAGE_SELF, &resourceUsage);
-    tditrace("ru_maxrss~%d", resourceUsage.ru_maxrss);
-}
-
-static void mi_arena(void) {
+static void mi(void) {
     struct mallinfo mi;
     mi = mallinfo();
-    tditrace("mi_arena~%d", mi.arena);
+    static int prev_arena = 0;
+    static int prev_hblks = 0;
+    static int prev_hblkhd = 0;
+    if (mi.arena != prev_arena) {
+        tditrace("arena~%d", mi.arena);
+        prev_arena = mi.arena;
+    }
+    if (mi.hblks != prev_hblks) {
+        tditrace("hblks~%d", mi.hblks);
+        prev_hblks = mi.hblks;   
+    }
+    if (mi.hblkhd != prev_hblkhd) {
+        tditrace("hblkhd~%d", mi.hblkhd);
+        prev_hblkhd = mi.hblkhd;
+    }
+}
+
+static void ru(void) {
+    unsigned long vmsize = 0L;
+    static unsigned long prev_vmsize = 0L;
+    unsigned long rss = 0L;
+    static unsigned long prev_rss = 0L;
+
+    int fh = 0;
+    char buffer[65];
+    int gotten;
+    fh = open("/proc/self/statm", O_RDONLY);
+    gotten = read(fh, buffer, 64);
+    buffer[gotten] = '\0';
+    if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
+        if (vmsize != prev_vmsize) {
+            tditrace("vmsize~%d", (int)(vmsize * 4096));
+            prev_vmsize = vmsize;
+        }
+        if (rss != prev_rss) {
+            tditrace("rss~%d", (int)(rss * 4096));
+            prev_rss = rss;
+        }
+    }
+    close(fh);
+
+    //struct rusage resourceUsage;
+    //getrusage(RUSAGE_SELF, &resourceUsage);
+    //tditrace("maxrss~%d", resourceUsage.ru_maxrss);
 }
 
 
@@ -992,7 +1045,7 @@ extern "C" void *malloc(size_t size) {
         //tditrace("m %d", size);
         tditrace("m %d,ra=%x", size, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
 
 #if 0
         if (size == 420)
@@ -1061,7 +1114,7 @@ extern "C" void *calloc(size_t nmemb, size_t size) {
         //tditrace("c %d", nmemb * size);
         tditrace("c %d,ra=%x", nmemb * size, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;
@@ -1091,7 +1144,7 @@ extern "C" void *realloc(void *ptr, size_t size) {
         //tditrace("r %d", size);
         tditrace("r %d,ra=%x", size, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;
@@ -1179,7 +1232,7 @@ extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
         //tditrace("mmap %d =%x,ra=%x", (int)__len, ret, ra);
         tditrace("mmap %d,ra=%x", (int)__len, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;
@@ -1207,7 +1260,7 @@ extern "C" int munmap(void *__addr, size_t __len) {
 
         tditrace("munmap %d,ra=%x", __len, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;
@@ -1236,7 +1289,7 @@ extern "C" void *memalign(size_t __alignment, size_t __size) {
         //tditrace("memalign %d =%x,ra=%x", __size, ret, ra);
         tditrace("memalign %d,ra=%x", __size, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;
@@ -1401,7 +1454,7 @@ void* operator new(unsigned int i){
         //tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
         tditrace("operator_new %d,ra=%x", i, ra);
 
-        mi_arena();ru_maxrss();
+        mi();ru();
     }
 
     return ret;

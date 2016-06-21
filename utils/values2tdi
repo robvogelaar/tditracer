@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+
+import sys
+import re
+from datetime import datetime
+
+QUEUE = 3
+
+ids = []
+prev_values = []
+
+offset_stamp = 0
+
+def addentry(id, value, stamp):
+
+   global offset_stamp
+
+   if id not in ids:
+      ids.append(id);
+      print('NAM %d %d %s' %(QUEUE, QUEUE * 1000 + ids.index(id), id))
+      prev_values.append(0);
+
+   prev_value = prev_values[ids.index(id)];
+
+   if (value >= prev_value):
+      print 'STA %d %d %d %d' %(QUEUE, QUEUE * 1000 + ids.index(id), (stamp - offset_stamp), value - prev_value)
+   else:
+      print 'STO %d %d %d %d' %(QUEUE, QUEUE * 1000 + ids.index(id), (stamp - offset_stamp), prev_value - value)
+
+   prev_values[ids.index(id)] = value;
+
+
+def main():
+
+   global offset_stamp
+
+   if len(sys.argv) == 2:
+
+      print 'TIME 1000000000'
+      print 'SPEED 1000000000'
+
+      stamp = 0;
+      value = 0;
+      max_value = 0;
+
+      f = open(sys.argv[1])
+      for line in f:
+
+         value = int(line.split()[0]);
+         if value > max_value:
+            max_value = value;
+         #sys.stderr.write('line:\'%s\'\n' % line)
+
+         addentry('value', value, stamp * 1000000000);
+         addentry('max', max_value, stamp * 1000000000);
+
+         stamp = stamp + 1;
+
+      f.close();
+
+      print 'END %d UTC' % (0), datetime.utcfromtimestamp(0 / 1000000000).strftime('%Y-%m-%d %H:%M:%S')
+
+   else:
+
+      print("Usage: %s <values file>" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
