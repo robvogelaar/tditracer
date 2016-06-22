@@ -1,9 +1,9 @@
 
 typedef int EGLBoolean;
 typedef int32_t EGLint;
-typedef void *EGLDisplay;
-typedef void *EGLSurface;
-typedef void *EGLContext;
+typedef void* EGLDisplay;
+typedef void* EGLSurface;
+typedef void* EGLContext;
 
 typedef int GLboolean;
 typedef char GLchar;
@@ -116,197 +116,196 @@ typedef float GLclampf;
 #define GL_SHADING_LANGUAGE_VERSION 0x8B8C
 #define GL_CURRENT_PROGRAM 0x8B8D
 
-#define CLEARSTRING(mask)                                                      \
-    (mask == GL_DEPTH_BUFFER_BIT                                               \
-         ? "GL_DEPTH_BUFFER_BIT"                                               \
-         : mask == GL_STENCIL_BUFFER_BIT                                       \
-               ? "GL_STENCIL_BUFFER_BIT"                                       \
-               : mask == GL_COLOR_BUFFER_BIT                                   \
-                     ? "GL_COLOR_BUFFER_BIT"                                   \
-                     : mask == (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)     \
-                           ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT"         \
-                           : "???")
+#define CLEARSTRING(mask)                                                \
+  (mask == GL_DEPTH_BUFFER_BIT                                           \
+       ? "GL_DEPTH_BUFFER_BIT"                                           \
+       : mask == GL_STENCIL_BUFFER_BIT                                   \
+             ? "GL_STENCIL_BUFFER_BIT"                                   \
+             : mask == GL_COLOR_BUFFER_BIT                               \
+                   ? "GL_COLOR_BUFFER_BIT"                               \
+                   : mask == (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) \
+                         ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT"     \
+                         : "???")
 
-#define CAPSTRING(factor)                                                               \
-    (cap == GL_TEXTURE_2D                                                               \
-         ? "GL_TEXTURE_2D"                                                              \
-         : cap == GL_CULL_FACE                                                          \
-               ? "GL_CULL_FACE"                                                         \
-               : cap == GL_BLEND                                                        \
-                     ? "GL_BLEND"                                                       \
-                     : cap == GL_DITHER                                                 \
-                           ? "GL_DITHER"                                                \
-                           : cap == GL_STENCIL_TEST                                     \
-                                 ? "GL_STENCIL_TEST"                                    \
-                                 : cap == GL_DEPTH_TEST                                 \
-                                       ? "GL_DEPTH_TEST"                                \
-                                       : cap == GL_SCISSOR_TEST                         \
-                                             ? "GL_SCISSOR_TEST"                        \
-                                             : cap == GL_POLYGON_OFFSET_FILL            \
-                                                   ? "GL_POLYGON_OFFSET_FILL"           \
-                                                   : cap == GL_SAMPLE_ALPHA_TO_COVERAGE \
-                                                         ? "GL_SAMPLE_ALPHA_"           \
-                                                           "TO_COVERAGE"                \
-                                                         : cap == GL_SAMPLE_COVERAGE    \
-                                                               ? "GL_SAMPLE_"           \
-                                                                 "COVERAGE"             \
-                                                               : "???")
+#define CAPSTRING(factor)                                                             \
+  (cap == GL_TEXTURE_2D                                                               \
+       ? "GL_TEXTURE_2D"                                                              \
+       : cap == GL_CULL_FACE                                                          \
+             ? "GL_CULL_FACE"                                                         \
+             : cap == GL_BLEND                                                        \
+                   ? "GL_BLEND"                                                       \
+                   : cap == GL_DITHER                                                 \
+                         ? "GL_DITHER"                                                \
+                         : cap == GL_STENCIL_TEST                                     \
+                               ? "GL_STENCIL_TEST"                                    \
+                               : cap == GL_DEPTH_TEST                                 \
+                                     ? "GL_DEPTH_TEST"                                \
+                                     : cap == GL_SCISSOR_TEST                         \
+                                           ? "GL_SCISSOR_TEST"                        \
+                                           : cap == GL_POLYGON_OFFSET_FILL            \
+                                                 ? "GL_POLYGON_OFFSET_FILL"           \
+                                                 : cap == GL_SAMPLE_ALPHA_TO_COVERAGE \
+                                                       ? "GL_SAMPLE_ALPHA_"           \
+                                                         "TO_COVERAGE"                \
+                                                       : cap == GL_SAMPLE_COVERAGE    \
+                                                             ? "GL_SAMPLE_"           \
+                                                               "COVERAGE"             \
+                                                             : "???")
 
-#define BLENDSTRING(factor)                                                                    \
-    (factor == GL_ZERO                                                                         \
-         ? "GL_ZERO"                                                                           \
-         : factor == GL_ONE                                                                    \
-               ? "GL_ONE"                                                                      \
-               : factor == GL_SRC_COLOR                                                        \
-                     ? "GL_SRC_COLOR"                                                          \
-                     : factor == GL_ONE_MINUS_SRC_COLOR                                        \
-                           ? "GL_ONE_MINUS_SRC_COLOR"                                          \
-                           : factor == GL_SRC_ALPHA                                            \
-                                 ? "GL_SRC_ALPHA"                                              \
-                                 : factor == GL_ONE_MINUS_SRC_ALPHA                            \
-                                       ? "GL_ONE_MINUS_SRC_ALPHA"                              \
-                                       : factor == GL_DST_ALPHA                                \
-                                             ? "GL_DST_ALPHA"                                  \
-                                             : factor ==                                       \
-                                                       GL_ONE_MINUS_DST_ALPHA                  \
-                                                   ? "GL_ONE_MINUS_DST_ALPHA"                  \
-                                                   : factor == GL_DST_COLOR                    \
-                                                         ? "GL_DST_COLOR"                      \
-                                                         : factor ==                           \
-                                                                   GL_ONE_MINUS_DST_COLOR      \
-                                                               ? "GL_ONE_"                     \
-                                                                 "MINUS_DST_"                  \
-                                                                 "COLOR"                       \
-                                                               : factor ==                     \
-                                                                         GL_SRC_ALPHA_SATURATE \
-                                                                     ? "GL_"                   \
-                                                                       "SRC_"                  \
-                                                                       "ALPHA"                 \
-                                                                       "_SATU"                 \
-                                                                       "RATE"                  \
-                                                                     : "???")
+#define BLENDSTRING(factor)                                                                  \
+  (factor == GL_ZERO                                                                         \
+       ? "GL_ZERO"                                                                           \
+       : factor == GL_ONE                                                                    \
+             ? "GL_ONE"                                                                      \
+             : factor == GL_SRC_COLOR                                                        \
+                   ? "GL_SRC_COLOR"                                                          \
+                   : factor == GL_ONE_MINUS_SRC_COLOR                                        \
+                         ? "GL_ONE_MINUS_SRC_COLOR"                                          \
+                         : factor == GL_SRC_ALPHA                                            \
+                               ? "GL_SRC_ALPHA"                                              \
+                               : factor == GL_ONE_MINUS_SRC_ALPHA                            \
+                                     ? "GL_ONE_MINUS_SRC_ALPHA"                              \
+                                     : factor == GL_DST_ALPHA                                \
+                                           ? "GL_DST_ALPHA"                                  \
+                                           : factor == GL_ONE_MINUS_DST_ALPHA                \
+                                                 ? "GL_ONE_MINUS_DST_ALPHA"                  \
+                                                 : factor == GL_DST_COLOR                    \
+                                                       ? "GL_DST_COLOR"                      \
+                                                       : factor ==                           \
+                                                                 GL_ONE_MINUS_DST_COLOR      \
+                                                             ? "GL_ONE_"                     \
+                                                               "MINUS_DST_"                  \
+                                                               "COLOR"                       \
+                                                             : factor ==                     \
+                                                                       GL_SRC_ALPHA_SATURATE \
+                                                                   ? "GL_"                   \
+                                                                     "SRC_"                  \
+                                                                     "ALPHA"                 \
+                                                                     "_SATU"                 \
+                                                                     "RATE"                  \
+                                                                   : "???")
 
-#define MODESTRING(mode)                                                       \
-    (mode == GL_POINTS                                                         \
-         ? "GL_POINTS"                                                         \
-         : mode == GL_LINES ? "GL_LINES"                                       \
-                            : mode == GL_LINE_LOOP                             \
-                                  ? "GL_LINE_LOOP"                             \
-                                  : mode == GL_LINE_STRIP                      \
-                                        ? "GL_LINE_STRIP"                      \
-                                        : mode == GL_TRIANGLES                 \
-                                              ? "GL_TRIANGLES"                 \
-                                              : mode == GL_TRIANGLE_STRIP      \
-                                                    ? "GL_TRIANGLE_STRIP"      \
-                                                    : mode == GL_TRIANGLE_FAN  \
-                                                          ? "GL_TRIANGLE_FAN"  \
-                                                          : "???")
+#define MODESTRING(mode)                                                    \
+  (mode == GL_POINTS                                                        \
+       ? "GL_POINTS"                                                        \
+       : mode == GL_LINES ? "GL_LINES"                                      \
+                          : mode == GL_LINE_LOOP                            \
+                                ? "GL_LINE_LOOP"                            \
+                                : mode == GL_LINE_STRIP                     \
+                                      ? "GL_LINE_STRIP"                     \
+                                      : mode == GL_TRIANGLES                \
+                                            ? "GL_TRIANGLES"                \
+                                            : mode == GL_TRIANGLE_STRIP     \
+                                                  ? "GL_TRIANGLE_STRIP"     \
+                                                  : mode == GL_TRIANGLE_FAN \
+                                                        ? "GL_TRIANGLE_FAN" \
+                                                        : "???")
 
-#define TYPESTRING(type)                                                                           \
-    (type == GL_BYTE                                                                               \
-         ? "GL_BYTE"                                                                               \
-         : type == GL_UNSIGNED_BYTE                                                                \
-               ? "GL_UNSIGNED_BYTE"                                                                \
-               : type == GL_INT                                                                    \
-                     ? "GL_INT"                                                                    \
-                     : type == GL_UNSIGNED_INT                                                     \
-                           ? "GL_UNSIGNED_INT"                                                     \
-                           : type == GL_FLOAT                                                      \
-                                 ? "GL_FLOAT"                                                      \
-                                 : type == GL_FIXED                                                \
-                                       ? "GL_FIXED"                                                \
-                                       : type == GL_SHORT                                          \
-                                             ? "GL_SHORT"                                          \
-                                             : type == GL_UNSIGNED_SHORT                           \
-                                                   ? "GL_UNSIGNED_SHORT"                           \
-                                                   : type == GL_UNSIGNED_SHORT_5_6_5               \
-                                                         ? "GL_UNSIGNED_"                          \
-                                                           "SHORT_5_6_5"                           \
-                                                         : type == GL_UNSIGNED_SHORT_4_4_4_4       \
-                                                               ? "GL_"                             \
-                                                                 "UNSIGNED_"                       \
-                                                                 "SHORT_4_4_"                      \
-                                                                 "4_4"                             \
-                                                               : type == GL_UNSIGNED_SHORT_5_5_5_1 \
-                                                                     ? "GL_"                       \
-                                                                       "UNSIG"                     \
-                                                                       "NED_"                      \
-                                                                       "SHORT"                     \
-                                                                       "_5_5_"                     \
-                                                                       "5_1"                       \
-                                                                     : "???")
+#define TYPESTRING(type)                                                                         \
+  (type == GL_BYTE                                                                               \
+       ? "GL_BYTE"                                                                               \
+       : type == GL_UNSIGNED_BYTE                                                                \
+             ? "GL_UNSIGNED_BYTE"                                                                \
+             : type == GL_INT                                                                    \
+                   ? "GL_INT"                                                                    \
+                   : type == GL_UNSIGNED_INT                                                     \
+                         ? "GL_UNSIGNED_INT"                                                     \
+                         : type == GL_FLOAT                                                      \
+                               ? "GL_FLOAT"                                                      \
+                               : type == GL_FIXED                                                \
+                                     ? "GL_FIXED"                                                \
+                                     : type == GL_SHORT                                          \
+                                           ? "GL_SHORT"                                          \
+                                           : type == GL_UNSIGNED_SHORT                           \
+                                                 ? "GL_UNSIGNED_SHORT"                           \
+                                                 : type == GL_UNSIGNED_SHORT_5_6_5               \
+                                                       ? "GL_UNSIGNED_"                          \
+                                                         "SHORT_5_6_5"                           \
+                                                       : type == GL_UNSIGNED_SHORT_4_4_4_4       \
+                                                             ? "GL_"                             \
+                                                               "UNSIGNED_"                       \
+                                                               "SHORT_4_4_"                      \
+                                                               "4_4"                             \
+                                                             : type == GL_UNSIGNED_SHORT_5_5_5_1 \
+                                                                   ? "GL_"                       \
+                                                                     "UNSIG"                     \
+                                                                     "NED_"                      \
+                                                                     "SHORT"                     \
+                                                                     "_5_5_"                     \
+                                                                     "5_1"                       \
+                                                                   : "???")
 
-#define FORMATSTRING(format)                                                   \
-    (format == GL_DEPTH_COMPONENT                                              \
-         ? "GL_DEPTH_COMPONENT"                                                \
-         : format == GL_ALPHA                                                  \
-               ? "GL_ALPHA"                                                    \
-               : format == GL_RGB                                              \
-                     ? "GL_RGB"                                                \
-                     : format == GL_RGBA                                       \
-                           ? "GL_RGBA"                                         \
-                           : format == GL_LUMINANCE                            \
-                                 ? "GL_LUMINANCE"                              \
-                                 : format == GL_LUMINANCE_ALPHA                \
-                                       ? "GL_LUMINANCE_ALPHA"                  \
-                                       : format == GL_BGRA_EXT ? "GL_BGRA_EXT" \
-                                                               : "???")
+#define FORMATSTRING(format)                                                 \
+  (format == GL_DEPTH_COMPONENT                                              \
+       ? "GL_DEPTH_COMPONENT"                                                \
+       : format == GL_ALPHA                                                  \
+             ? "GL_ALPHA"                                                    \
+             : format == GL_RGB                                              \
+                   ? "GL_RGB"                                                \
+                   : format == GL_RGBA                                       \
+                         ? "GL_RGBA"                                         \
+                         : format == GL_LUMINANCE                            \
+                               ? "GL_LUMINANCE"                              \
+                               : format == GL_LUMINANCE_ALPHA                \
+                                     ? "GL_LUMINANCE_ALPHA"                  \
+                                     : format == GL_BGRA_EXT ? "GL_BGRA_EXT" \
+                                                             : "???")
 
 #define FORMATSIZE(format)                                                     \
-    (format == GL_DEPTH_COMPONENT                                              \
-         ? 1                                                                   \
-         : format == GL_ALPHA                                                  \
-               ? 1                                                             \
-               : format == GL_RGB                                              \
-                     ? 3                                                       \
-                     : format == GL_RGBA                                       \
-                           ? 4                                                 \
-                           : format == GL_LUMINANCE                            \
-                                 ? 4                                           \
-                                 : format == GL_LUMINANCE_ALPHA                \
-                                       ? 4                                     \
-                                       : format == GL_BGRA_EXT ? 4 : 1)
+  (format == GL_DEPTH_COMPONENT                                                \
+       ? 1                                                                     \
+       : format == GL_ALPHA                                                    \
+             ? 1                                                               \
+             : format == GL_RGB ? 3 : format == GL_RGBA                        \
+                                          ? 4                                  \
+                                          : format == GL_LUMINANCE             \
+                                                ? 4                            \
+                                                : format == GL_LUMINANCE_ALPHA \
+                                                      ? 4                      \
+                                                      : format == GL_BGRA_EXT  \
+                                                            ? 4                \
+                                                            : 1)
 
-#define IFORMATSTRING(format)                                                        \
-    (format == GL_RGBA4                                                              \
-         ? "GL_RGBA4"                                                                \
-         : format == GL_RGB5_A1                                                      \
-               ? "GL_RGB5_A1"                                                        \
-               : format == GL_RGB565                                                 \
-                     ? "GL_RGB565"                                                   \
-                     : format == GL_DEPTH_COMPONENT16                                \
-                           ? "GL_DEPTH_COMPONENT16"                                  \
-                           : format == GL_DEPTH_STENCIL_OES                          \
-                                 ? "GL_DEPTH_STENCIL_OES"                            \
-                                 : format == GL_STENCIL_INDEX                        \
-                                       ? "GL_STENCIL_INDEX"                          \
-                                       : format == GL_STENCIL_INDEX8                 \
-                                             ? "GL_STENCIL_INDEX8"                   \
-                                             : format ==                             \
-                                                       GL_UNSIGNED_INT_24_8_OES      \
-                                                   ? "GL_UNSIGNED_INT_24_8_"         \
-                                                     "OES"                           \
-                                                   : format ==                       \
-                                                             GL_DEPTH24_STENCIL8_OES \
-                                                         ? "GL_DEPTH24_"             \
-                                                           "STENCIL8_OES"            \
-                                                         : "???")
+#define IFORMATSTRING(format)                                                      \
+  (format == GL_RGBA4                                                              \
+       ? "GL_RGBA4"                                                                \
+       : format == GL_RGB5_A1                                                      \
+             ? "GL_RGB5_A1"                                                        \
+             : format == GL_RGB565                                                 \
+                   ? "GL_RGB565"                                                   \
+                   : format == GL_DEPTH_COMPONENT16                                \
+                         ? "GL_DEPTH_COMPONENT16"                                  \
+                         : format == GL_DEPTH_STENCIL_OES                          \
+                               ? "GL_DEPTH_STENCIL_OES"                            \
+                               : format == GL_STENCIL_INDEX                        \
+                                     ? "GL_STENCIL_INDEX"                          \
+                                     : format == GL_STENCIL_INDEX8                 \
+                                           ? "GL_STENCIL_INDEX8"                   \
+                                           : format ==                             \
+                                                     GL_UNSIGNED_INT_24_8_OES      \
+                                                 ? "GL_UNSIGNED_INT_24_8_"         \
+                                                   "OES"                           \
+                                                 : format ==                       \
+                                                           GL_DEPTH24_STENCIL8_OES \
+                                                       ? "GL_DEPTH24_"             \
+                                                         "STENCIL8_OES"            \
+                                                       : "???")
 
-#define ATTACHMENTSTRING(attachment)                                           \
-    (attachment == GL_COLOR_ATTACHMENT0                                        \
-         ? "GL_COLOR_ATTACHMENT0"                                              \
-         : attachment == GL_DEPTH_ATTACHMENT                                   \
-               ? "GL_DEPTH_ATTACHMENT"                                         \
-               : attachment == GL_STENCIL_ATTACHMENT ? "GL_STENCIL_ATTACHMENT" \
-                                                     : "???")
+#define ATTACHMENTSTRING(attachment)                                         \
+  (attachment == GL_COLOR_ATTACHMENT0                                        \
+       ? "GL_COLOR_ATTACHMENT0"                                              \
+       : attachment == GL_DEPTH_ATTACHMENT                                   \
+             ? "GL_DEPTH_ATTACHMENT"                                         \
+             : attachment == GL_STENCIL_ATTACHMENT ? "GL_STENCIL_ATTACHMENT" \
+                                                   : "???")
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 GLenum glGetError(void);
-void glGetProgramiv(GLuint program, GLenum pname, GLint *params);
-void glGetIntegerv(GLenum pname, GLint *data);
+void glGetProgramiv(GLuint program, GLenum pname, GLint* params);
+void glGetIntegerv(GLenum pname, GLint* data);
 GLboolean glIsProgram(GLuint program);
 #ifdef __cplusplus
 }

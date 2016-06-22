@@ -26,192 +26,164 @@ void run_1(void) {
 #endif
 
 void run_2(void) {
+  int i;
+  struct timeval mytimeval;
+  struct timespec mytimespec;
 
-int i;
-struct timeval mytimeval;
-struct timespec mytimespec;
-
-printf("start\n");
+  printf("start\n");
 
 #if 1
 
-time_t t;
-t = time(NULL);
-printf("Local time and date: %s\n", asctime(localtime(&t)));
-printf("UTC time and date: %s\n", asctime(gmtime(&t)));
+  time_t t;
+  t = time(NULL);
+  printf("Local time and date: %s\n", asctime(localtime(&t)));
+  printf("UTC time and date: %s\n", asctime(gmtime(&t)));
 
-struct timespec mytime;
-mytime.tv_nsec = 0;
-mytime.tv_sec = 0;
-printf("0 -> time and date: %s\n", ctime((const time_t *)&mytime));
-printf("0 -> UTC time and date: %s\n",
-       asctime(gmtime((const time_t *)&mytime)));
+  struct timespec mytime;
+  mytime.tv_nsec = 0;
+  mytime.tv_sec = 0;
+  printf("0 -> time and date: %s\n", ctime((const time_t *)&mytime));
+  printf("0 -> UTC time and date: %s\n",
+         asctime(gmtime((const time_t *)&mytime)));
 
 #endif
 
-    if (tditrace)
-        printf("tditrace\n");
-    else
-        printf("no tditrace\n");
-    if (tditrace)
-        printf("tditrace\n");
-    else
-        printf("no tditrace\n");
+  if (tditrace)
+    printf("tditrace\n");
+  else
+    printf("no tditrace\n");
+  if (tditrace)
+    printf("tditrace\n");
+  else
+    printf("no tditrace\n");
 
-    for (i = 0; i < 25; i++) {
+  for (i = 0; i < 25; i++) {
+    printf("%d\n", i);
 
-        printf("%d\n", i);
+    // will all appear in the same "HELLO" , "NOTES"-timeline
+    if (tditrace) tditrace("HELLO");
+    printf("HELLO\n");
 
-        // will all appear in the same "HELLO" , "NOTES"-timeline
-        if (tditrace)
-            tditrace("HELLO");
-        printf("HELLO\n");
+    if (tditrace) tditrace("HELLO %d", i);
+    printf("HELLO %d\n", i);
 
-        if (tditrace)
-            tditrace("HELLO %d", i);
-        printf("HELLO %d\n", i);
+    if (tditrace) tditrace("HELLO %d %s %s", i, "yes", "no");
+    printf("HELLO %d %s %s\n", i, "yes", "no");
 
-        if (tditrace)
-            tditrace("HELLO %d %s %s", i, "yes", "no");
-        printf("HELLO %d %s %s\n", i, "yes", "no");
+    printf("malloc(1 * 1024)\n");
 
-        printf("malloc(1 * 1024)\n");
+    char *d = (char *)malloc(1 * 1024);
+    d[0] = 0;
 
-        char *d = (char*)malloc(1 * 1024);
-        d[0] = 0;
+    // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
+    if (tditrace) tditrace("HELLO%d", i);
 
-        // create separate "HELLO1", "HELLO2" ,..   "NOTES"-timelines
-        if (tditrace)
-            tditrace("HELLO%d", i);
+    // variable~value creates a QUEUES-timeline
+    if (tditrace) tditrace("i~%d", 12);
+    usleep(10000);
 
-        // variable~value creates a QUEUES-timeline
-        if (tditrace)
-            tditrace("i~%d", 12);
-        usleep(10000);
+    if (tditrace) tditrace("i~%d", 16);
+    usleep(10000);
 
-        if (tditrace)
-            tditrace("i~%d", 16);
-        usleep(10000);
-
-        if (tditrace)
-            tditrace("i~%d", 8);
-        usleep(100000);
-
-        // create "TASKS"-timeline, using the @T+ and #T- identifier
-        if (tditrace)
-            tditrace("@T+HELLO");
-
-        usleep(20000);
-
-        if (tditrace)
-            tditrace("@I+interrupt begin");
-
-        usleep(10000);
-
-        if (tditrace)
-            tditrace("@I-interrupt end");
-
-        usleep(20000);
-
-        if (tditrace)
-            tditrace("@T-HELLO");
-
-        if (tditrace)
-            tditrace("@T+TEST");
-
-        if (tditrace)
-            tditrace("@T+T0");
-
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-        gettimeofday(&mytimeval, 0);
-
-        if (tditrace)
-            tditrace("@T-T0");
-
-        if (tditrace)
-            tditrace("@T+T1");
-
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-
-        if (tditrace)
-            tditrace("@T-T1");
-
-        if (tditrace)
-            tditrace("@T+T2 "
-                     "012345678901234567890123456789012345678901234567890123456"
-                     "78901234567890123456789");
-        if (tditrace)
-            tditrace("@T-T2");
-
-        if (tditrace)
-            tditrace("@T+T3 %s", "012345678901234567890123456789012345678901234"
-                                 "567890123456789012345678901234567890123456789"
-                                 "012345678901234567890123456789012345678901234"
-                                 "5678901234567890123456789");
-        if (tditrace)
-            tditrace("@T-T3");
-
-        if (tditrace)
-            tditrace("@T+T5 %d %u %x %p", 0, 0, 0, 0);
-        if (tditrace)
-            tditrace("@T-T5");
-
-        if (tditrace)
-            tditrace("@T+T5 %d %u %x %p", 0xffffffff, 0xffffffff, 0xffffffff,
-                     0xffffffff);
-        if (tditrace)
-            tditrace("@T-T5");
-
-        if (tditrace)
-            tditrace("@T-TEST");
-
-        usleep(25000);
-
-        // create "EVENTS"-timeline, using the @E+ identifier
-        if (tditrace)
-            tditrace("@E+HELLO");
-
-        usleep(25000);
-
-        // create "SEMAPHORES"-timeline, using the @S+ identifier
-        if (tditrace)
-            tditrace("@S+SEMA semaphore test");
-
-        usleep(10000);
-
-        if (tditrace)
-            tditrace("@A+Agent agent test");
-
-        usleep(40000);
-
-        if (tditrace)
-            tditrace("@A-Agent");
-
-        usleep(50000);
-    }
-
+    if (tditrace) tditrace("i~%d", 8);
     usleep(100000);
+
+    // create "TASKS"-timeline, using the @T+ and #T- identifier
+    if (tditrace) tditrace("@T+HELLO");
+
+    usleep(20000);
+
+    if (tditrace) tditrace("@I+interrupt begin");
+
+    usleep(10000);
+
+    if (tditrace) tditrace("@I-interrupt end");
+
+    usleep(20000);
+
+    if (tditrace) tditrace("@T-HELLO");
+
+    if (tditrace) tditrace("@T+TEST");
+
+    if (tditrace) tditrace("@T+T0");
+
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+    gettimeofday(&mytimeval, 0);
+
+    if (tditrace) tditrace("@T-T0");
+
+    if (tditrace) tditrace("@T+T1");
+
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+
+    if (tditrace) tditrace("@T-T1");
+
     if (tditrace)
-        tditrace("END");
+      tditrace(
+          "@T+T2 "
+          "012345678901234567890123456789012345678901234567890123456"
+          "78901234567890123456789");
+    if (tditrace) tditrace("@T-T2");
 
-    printf("stop\n");
+    if (tditrace)
+      tditrace("@T+T3 %s",
+               "012345678901234567890123456789012345678901234"
+               "567890123456789012345678901234567890123456789"
+               "012345678901234567890123456789012345678901234"
+               "5678901234567890123456789");
+    if (tditrace) tditrace("@T-T3");
 
+    if (tditrace) tditrace("@T+T5 %d %u %x %p", 0, 0, 0, 0);
+    if (tditrace) tditrace("@T-T5");
+
+    if (tditrace)
+      tditrace("@T+T5 %d %u %x %p", 0xffffffff, 0xffffffff, 0xffffffff,
+               0xffffffff);
+    if (tditrace) tditrace("@T-T5");
+
+    if (tditrace) tditrace("@T-TEST");
+
+    usleep(25000);
+
+    // create "EVENTS"-timeline, using the @E+ identifier
+    if (tditrace) tditrace("@E+HELLO");
+
+    usleep(25000);
+
+    // create "SEMAPHORES"-timeline, using the @S+ identifier
+    if (tditrace) tditrace("@S+SEMA semaphore test");
+
+    usleep(10000);
+
+    if (tditrace) tditrace("@A+Agent agent test");
+
+    usleep(40000);
+
+    if (tditrace) tditrace("@A-Agent");
+
+    usleep(50000);
+  }
+
+  usleep(100000);
+  if (tditrace) tditrace("END");
+
+  printf("stop\n");
 }
 
 #if 0
@@ -222,10 +194,10 @@ void foo(char* p, int i) {
     unsigned int ra = 0;
     unsigned int sp = 0;
 
-    #ifdef __mips__
+#ifdef __mips__
     asm volatile("move %0, $ra" : "=r"(ra));
     asm volatile("move %0, $sp" : "=r"(sp));
-    #endif
+#endif
 
     printf("foo, return address : %p, ra : %p, sp : %p\n", __builtin_return_address(0), ra, sp);
 
@@ -260,31 +232,24 @@ int main(int argc, char **argv) {
 
 #if 1
 int main(int argc, char **argv) {
+  if (tditrace) tditrace("START");
 
-    if (tditrace)
-        tditrace("START");
+  usleep(2 * 1000 * 1000);
 
-    usleep(2*1000*1000);
+  if (tditrace) tditrace("CHECK");
 
-    if (tditrace)
-        tditrace("CHECK");
+  int i;
+  for (i = 0; i < 10; i++) {
+    // int *p1 = (int*)malloc(5 * sizeof(int));
+    // int *p1 = new int(5);
+    int *p1 = new int[420];
 
+    printf("p1=%d(%x)\n", *p1, p1);
+  }
 
-    int i;
-    for (i = 0; i < 10; i++) {
+  if (tditrace) tditrace("STOP");
 
-        //int *p1 = (int*)malloc(5 * sizeof(int));
-        //int *p1 = new int(5);
-        int *p1 = new int [420];
-    
-        printf("p1=%d(%x)\n", *p1, p1);
-    }
-
-
-    if (tditrace)
-        tditrace("STOP");
-
-    return 0;
+  return 0;
 }
 #endif
 

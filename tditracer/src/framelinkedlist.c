@@ -7,127 +7,124 @@
 
 #define printf(...)
 
-frame_struct_t *framelinkedlist_head = NULL;
-frame_struct_t *framelinkedlist_curr = NULL;
+frame_struct_t* framelinkedlist_head = NULL;
+frame_struct_t* framelinkedlist_curr = NULL;
 
-frame_struct_t *framelinkedlist_create_list(int id, int name, void *buf,
+frame_struct_t* framelinkedlist_create_list(int id, int name, void* buf,
                                             int size) {
-    printf("\n creating list with headnode as [%d]\n", id);
-    frame_struct_t *ptr = (frame_struct_t *)malloc(sizeof(frame_struct_t));
-    if (NULL == ptr) {
-        printf("\n Node creation failed \n");
-        return NULL;
-    }
-    ptr->id = id;
-    ptr->name = name;
-    ptr->buf = buf;
-    ptr->size = size;
-    ptr->next = NULL;
+  printf("\n creating list with headnode as [%d]\n", id);
+  frame_struct_t* ptr = (frame_struct_t*)malloc(sizeof(frame_struct_t));
+  if (NULL == ptr) {
+    printf("\n Node creation failed \n");
+    return NULL;
+  }
+  ptr->id = id;
+  ptr->name = name;
+  ptr->buf = buf;
+  ptr->size = size;
+  ptr->next = NULL;
 
-    framelinkedlist_head = framelinkedlist_curr = ptr;
-    return ptr;
+  framelinkedlist_head = framelinkedlist_curr = ptr;
+  return ptr;
 }
 
-frame_struct_t *framelinkedlist_add_to_list(int id, int name, void *buf,
+frame_struct_t* framelinkedlist_add_to_list(int id, int name, void* buf,
                                             int size, bool add_to_end) {
-    if (NULL == framelinkedlist_head) {
-        return (framelinkedlist_create_list(id, name, buf, size));
-    }
+  if (NULL == framelinkedlist_head) {
+    return (framelinkedlist_create_list(id, name, buf, size));
+  }
 
-    if (add_to_end)
-        printf("\n Adding node to end of list with id [%d]\n", id);
-    else
-        printf("\n Adding node to beginning of list with id [%d]\n", id);
+  if (add_to_end)
+    printf("\n Adding node to end of list with id [%d]\n", id);
+  else
+    printf("\n Adding node to beginning of list with id [%d]\n", id);
 
-    frame_struct_t *ptr = (frame_struct_t *)malloc(sizeof(frame_struct_t));
-    if (NULL == ptr) {
-        printf("\n Node creation failed \n");
-        return NULL;
-    }
-    ptr->id = id;
-    ptr->name = name;
-    ptr->buf = buf;
-    ptr->size = size;
-    ptr->next = NULL;
+  frame_struct_t* ptr = (frame_struct_t*)malloc(sizeof(frame_struct_t));
+  if (NULL == ptr) {
+    printf("\n Node creation failed \n");
+    return NULL;
+  }
+  ptr->id = id;
+  ptr->name = name;
+  ptr->buf = buf;
+  ptr->size = size;
+  ptr->next = NULL;
 
-    if (add_to_end) {
-        framelinkedlist_curr->next = ptr;
-        framelinkedlist_curr = ptr;
-    } else {
-        ptr->next = framelinkedlist_head;
-        framelinkedlist_head = ptr;
-    }
-    return ptr;
+  if (add_to_end) {
+    framelinkedlist_curr->next = ptr;
+    framelinkedlist_curr = ptr;
+  } else {
+    ptr->next = framelinkedlist_head;
+    framelinkedlist_head = ptr;
+  }
+  return ptr;
 }
 
-frame_struct_t *framelinkedlist_search_in_list(int id, frame_struct_t **prev) {
-    frame_struct_t *ptr = framelinkedlist_head;
-    frame_struct_t *tmp = NULL;
-    bool found = false;
+frame_struct_t* framelinkedlist_search_in_list(int id, frame_struct_t** prev) {
+  frame_struct_t* ptr = framelinkedlist_head;
+  frame_struct_t* tmp = NULL;
+  bool found = false;
 
-    printf("\n Searching the list for id [%d] \n", id);
+  printf("\n Searching the list for id [%d] \n", id);
 
-    while (ptr != NULL) {
-        if (ptr->id == id) {
-            found = true;
-            break;
-        } else {
-            tmp = ptr;
-            ptr = ptr->next;
-        }
-    }
-
-    if (true == found) {
-        if (prev)
-            *prev = tmp;
-        return ptr;
+  while (ptr != NULL) {
+    if (ptr->id == id) {
+      found = true;
+      break;
     } else {
-        return NULL;
+      tmp = ptr;
+      ptr = ptr->next;
     }
+  }
+
+  if (true == found) {
+    if (prev) *prev = tmp;
+    return ptr;
+  } else {
+    return NULL;
+  }
 }
 
 int framelinkedlist_delete_from_list(int id) {
-    frame_struct_t *prev = NULL;
-    frame_struct_t *del = NULL;
+  frame_struct_t* prev = NULL;
+  frame_struct_t* del = NULL;
 
-    printf("\n Deleting id [%d] from list\n", id);
+  printf("\n Deleting id [%d] from list\n", id);
 
-    del = framelinkedlist_search_in_list(id, &prev);
-    if (del == NULL) {
-        return -1;
-    } else {
-
-        if (del->buf) {
-            free(del->buf);
-        }
-
-        if (prev != NULL)
-            prev->next = del->next;
-
-        if (del == framelinkedlist_curr) {
-            framelinkedlist_curr = prev;
-        } else if (del == framelinkedlist_head) {
-            framelinkedlist_head = del->next;
-        }
+  del = framelinkedlist_search_in_list(id, &prev);
+  if (del == NULL) {
+    return -1;
+  } else {
+    if (del->buf) {
+      free(del->buf);
     }
 
-    free(del);
-    del = NULL;
+    if (prev != NULL) prev->next = del->next;
 
-    return 0;
+    if (del == framelinkedlist_curr) {
+      framelinkedlist_curr = prev;
+    } else if (del == framelinkedlist_head) {
+      framelinkedlist_head = del->next;
+    }
+  }
+
+  free(del);
+  del = NULL;
+
+  return 0;
 }
 
 void framelinkedlist_print_list(void) {
-    frame_struct_t *ptr = framelinkedlist_head;
+  frame_struct_t* ptr = framelinkedlist_head;
 
-    printf("\n -------Printing list Start------- \n");
-    while (ptr != NULL) {
-        printf("\n [%d] \n", ptr->id);
-        ptr = ptr->next;
-    }
-    printf("\n -------Printing list End------- \n");
+  printf("\n -------Printing list Start------- \n");
+  while (ptr != NULL) {
+    printf("\n [%d] \n", ptr->id);
+    ptr = ptr->next;
+  }
+  printf("\n -------Printing list End------- \n");
 
-    return;
+  return;
 }
 
 #if 0

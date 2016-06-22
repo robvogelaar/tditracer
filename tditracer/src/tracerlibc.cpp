@@ -153,630 +153,622 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
 #endif
 
 #if 1
-extern "C" int open(const char *pathname, int flags, ...) {
-    static int (*__open)(const char *, int, ...) = NULL;
+extern "C" int open(const char* pathname, int flags, ...) {
+  static int (*__open)(const char*, int, ...) = NULL;
 
-    if (__open == NULL) {
-        __open = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
-        if (NULL == __open) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__open == NULL) {
+    __open = (int (*)(const char*, int, ...))dlsym(RTLD_NEXT, "open");
+    if (NULL == __open) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    va_list args;
-    va_start(args, flags);
-    int a1 = va_arg(args, int);
-    va_end(args);
+  va_list args;
+  va_start(args, flags);
+  int a1 = va_arg(args, int);
+  va_end(args);
 
-    if (libcrecording || libcopenrecording) {
-        tditrace("@I+open() %s", pathname);
-    }
+  if (libcrecording || libcopenrecording) {
+    tditrace("@I+open() %s", pathname);
+  }
 
-    int ret = __open(pathname, flags, a1);
+  int ret = __open(pathname, flags, a1);
 
-    if (libcrecording || libcopenrecording) {
-        tditrace("@I-open() =%d", pathname, ret);
-    }
+  if (libcrecording || libcopenrecording) {
+    tditrace("@I-open() =%d", pathname, ret);
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
-extern "C" FILE *fopen(const char *path, const char *mode) {
-    static FILE *(*__fopen)(const char *, const char *) = NULL;
+extern "C" FILE* fopen(const char* path, const char* mode) {
+  static FILE* (*__fopen)(const char*, const char*) = NULL;
 
-    if (__fopen == NULL) {
-        __fopen =
-            (FILE * (*)(const char *, const char *))dlsym(RTLD_NEXT, "fopen");
-        if (NULL == __fopen) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__fopen == NULL) {
+    __fopen = (FILE * (*)(const char*, const char*))dlsym(RTLD_NEXT, "fopen");
+    if (NULL == __fopen) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcfopenrecording) {
-        tditrace("@I+fopen() %s", path);
-    }
+  if (libcrecording || libcfopenrecording) {
+    tditrace("@I+fopen() %s", path);
+  }
 
-    FILE *ret = __fopen(path, mode);
+  FILE* ret = __fopen(path, mode);
 
-    if (libcrecording || libcfopenrecording) {
-        tditrace("@I-fopen() =%d", ret);
-    }
+  if (libcrecording || libcfopenrecording) {
+    tditrace("@I-fopen() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
-extern "C" FILE *fdopen(int fd, const char *mode) {
-    static FILE *(*__fdopen)(int, const char *) = NULL;
+extern "C" FILE* fdopen(int fd, const char* mode) {
+  static FILE* (*__fdopen)(int, const char*) = NULL;
 
-    if (__fdopen == NULL) {
-        __fdopen = (FILE * (*)(int, const char *))dlsym(RTLD_NEXT, "fdopen");
-        if (NULL == __fdopen) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__fdopen == NULL) {
+    __fdopen = (FILE * (*)(int, const char*))dlsym(RTLD_NEXT, "fdopen");
+    if (NULL == __fdopen) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcfdopenrecording) {
-        tditrace("@I+fdopen() %d", fd);
-    }
+  if (libcrecording || libcfdopenrecording) {
+    tditrace("@I+fdopen() %d", fd);
+  }
 
-    FILE *ret = __fdopen(fd, mode);
+  FILE* ret = __fdopen(fd, mode);
 
-    if (libcrecording || libcfdopenrecording) {
-        tditrace("@I-fdopen() =%d", ret);
-    }
+  if (libcrecording || libcfdopenrecording) {
+    tditrace("@I-fdopen() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
-extern "C" FILE *freopen(const char *path, const char *mode, FILE *stream) {
-    static FILE *(*__freopen)(const char *, const char *, FILE *) = NULL;
+extern "C" FILE* freopen(const char* path, const char* mode, FILE* stream) {
+  static FILE* (*__freopen)(const char*, const char*, FILE*) = NULL;
 
-    if (__freopen == NULL) {
-        __freopen = (FILE * (*)(const char *, const char *, FILE *))dlsym(
-            RTLD_NEXT, "freopen");
-        if (NULL == __freopen) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__freopen == NULL) {
+    __freopen = (FILE * (*)(const char*, const char*, FILE*))dlsym(RTLD_NEXT,
+                                                                   "freopen");
+    if (NULL == __freopen) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcfreopenrecording) {
-        tditrace("@I+freopen() %s", path);
-    }
+  if (libcrecording || libcfreopenrecording) {
+    tditrace("@I+freopen() %s", path);
+  }
 
-    FILE *ret = __freopen(path, mode, stream);
+  FILE* ret = __freopen(path, mode, stream);
 
-    if (libcrecording || libcfreopenrecording) {
-        tditrace("@I-freopen() =%d", ret);
-    }
+  if (libcrecording || libcfreopenrecording) {
+    tditrace("@I-freopen() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
-
 
 #if 1
 extern "C" int socket(int domain, int type, int protocol) {
-    static int (*__socket)(int, int, int) = NULL;
+  static int (*__socket)(int, int, int) = NULL;
 
-    if (__socket == NULL) {
-        __socket = (int (*)(int, int, int))dlsym(RTLD_NEXT, "socket");
-        if (NULL == __socket) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__socket == NULL) {
+    __socket = (int (*)(int, int, int))dlsym(RTLD_NEXT, "socket");
+    if (NULL == __socket) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcsocketrecording) {
-        tditrace("@I+socket() %d %d %d", domain, type, protocol);
-    }
+  if (libcsocketrecording) {
+    tditrace("@I+socket() %d %d %d", domain, type, protocol);
+  }
 
-    int ret = __socket(domain, type, protocol);
+  int ret = __socket(domain, type, protocol);
 
-    if (libcrecording || libcsocketrecording) {
-        tditrace("@I-socket() =%d", ret);
-    }
+  if (libcrecording || libcsocketrecording) {
+    tditrace("@I-socket() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" ssize_t write(int fd, const void *buf, size_t count) {
-    static ssize_t (*__write)(int, const void *, size_t) = NULL;
+extern "C" ssize_t write(int fd, const void* buf, size_t count) {
+  static ssize_t (*__write)(int, const void*, size_t) = NULL;
 
-    if (__write == NULL) {
-        __write =
-            (ssize_t (*)(int, const void *, size_t))dlsym(RTLD_NEXT, "write");
-        if (NULL == __write) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+  if (__write == NULL) {
+    __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
+    if (NULL == __write) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcwriterecording) {
+    // tditrace("@I+write() %d %d", fd, count);
+
+    if (MAXSTRLEN) {
+      if (buf) {
+        char s[MAXSTRLEN + 1];
+        strncpy(s, (const char*)buf, MIN(MAXSTRLEN, count));
+        s[MIN(MAXSTRLEN, count)] = '\0';
+
+        if (strncmp((const char*)buf, "GET", 3) == 0)
+          tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
+        else if (strncmp((const char*)buf, "PUT", 3) == 0)
+          tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
+        else if (strncmp((const char*)buf, "POST", 4) == 0)
+          tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
+        else if (strncmp((const char*)buf, "{\"", 2) == 0)
+          tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
+        else if (strncmp((const char*)buf + 2, "xml", 3) == 0)
+          tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
+        else {
+          s[MIN(1, count)] = '\0';
+          tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra,
+                   (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+          // tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
         }
+
+      } else {
+        tditrace("@E+write()_%d %d", fd, count);
+      }
+
+    } else {
+      tditrace("@E+write()_%d %d", fd, count);
     }
+  }
 
-    unsigned int ra = 0;
-    #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-    #endif
+  ssize_t ret = __write(fd, buf, count);
 
-    if (libcwriterecording) {
-        //tditrace("@I+write() %d %d", fd, count);
+  if (libcwriterecording) {
+    // tditrace("@I-write() =%d", ret);
+  }
 
-        if (MAXSTRLEN) {
-
-            if (buf) {
-                char s[MAXSTRLEN + 1];
-                strncpy(s, (const char *)buf, MIN(MAXSTRLEN, count));
-                s[MIN(MAXSTRLEN, count)] = '\0';
-
-                if (strncmp((const char *)buf, "GET", 3) == 0)
-                    tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
-                else if (strncmp((const char *)buf, "PUT", 3) == 0)
-                    tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
-                else if (strncmp((const char *)buf, "POST", 4) == 0)
-                    tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
-                else if (strncmp((const char *)buf, "{\"", 2) == 0)
-                    tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
-                else if (strncmp((const char *)buf + 2, "xml", 3) == 0)
-                    tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
-                else {
-                    s[MIN(1, count)] = '\0';
-                    tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
-                    //tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
-                }
-
-            } else {
-                tditrace("@E+write()_%d %d", fd, count);
-            }
-
-        } else {
-            tditrace("@E+write()_%d %d", fd, count);
-        }
-    }
-
-    ssize_t ret = __write(fd, buf, count);
-
-    if (libcwriterecording) {
-        //tditrace("@I-write() =%d", ret);
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" ssize_t read(int fd, void *buf, size_t count) {
-    static ssize_t (*__read)(int, void *, size_t) = NULL;
+extern "C" ssize_t read(int fd, void* buf, size_t count) {
+  static ssize_t (*__read)(int, void*, size_t) = NULL;
 
-    if (__read == NULL) {
-        __read = (ssize_t (*)(int, void *, size_t))dlsym(RTLD_NEXT, "read");
-        if (NULL == __read) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+  if (__read == NULL) {
+    __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
+    if (NULL == __read) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcreadrecording) {
+    // tditrace("@I+read() %d %d", fd, count);
+  }
+
+  ssize_t ret = __read(fd, buf, count);
+
+  if (libcreadrecording) {
+    if (ret == -1) {
+      // tditrace("@I-read()) =-1");
+      tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
+    } else if (ret == 0) {
+      // tditrace("@I-read() =0");
+      tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
+    } else if (count == 64) {
+      // ignore the read from /proc/pid/statm
+    } else {
+      if (MAXSTRLEN) {
+        if (buf) {
+          char s[MAXSTRLEN + 1];
+          strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+          s[MIN(MAXSTRLEN, ret)] = '\0';
+
+          if (strncmp((const char*)buf, "HTTP", 4) == 0)
+            tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret,
+                     ra, s);
+          else {
+            s[MIN(1, ret)] = '\0';
+            tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret, ra,
+                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+          }
         }
+      }
     }
+    // tditrace("@I-read() =%d", ret);
+  }
 
-    unsigned int ra = 0;
-    #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-    #endif
-
-    if (libcreadrecording) {
-        //tditrace("@I+read() %d %d", fd, count);
-    }
-
-    ssize_t ret = __read(fd, buf, count);
-
-    if (libcreadrecording) {
-
-        if (ret == -1) {
-            //tditrace("@I-read()) =-1");
-            tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
-        } else if (ret == 0) {
-            //tditrace("@I-read() =0");
-            tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
-        } else if (count == 64) {
-            // ignore the read from /proc/pid/statm
-        } else {
-            if (MAXSTRLEN) {
-                if (buf) {
-                    char s[MAXSTRLEN + 1];
-                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
-                    s[MIN(MAXSTRLEN, ret)] = '\0';
-
-                    if (strncmp((const char *)buf, "HTTP", 4) == 0)
-                        tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret, ra, s);
-                    else {
-                        s[MIN(1, ret)] = '\0';
-                        tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret, ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?" );
-                    }
-                }
-            }
-        }
-        //tditrace("@I-read() =%d", ret);
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
-    static ssize_t (*__send)(int, const void *, size_t, int) = NULL;
+extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
+  static ssize_t (*__send)(int, const void*, size_t, int) = NULL;
 
-    if (__send == NULL) {
-        __send = (ssize_t (*)(int, const void *, size_t, int))dlsym(RTLD_NEXT,
-                                                                    "send");
-        if (NULL == __send) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+  if (__send == NULL) {
+    __send =
+        (ssize_t (*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
+    if (NULL == __send) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcrecording || libcsendrecording) {
+    tditrace("@I+send() %d %d", sockfd, len);
+
+    if (MAXSTRLEN) {
+      if (buf) {
+        char s[MAXSTRLEN + 1];
+        strncpy(s, (const char*)buf, MIN(MAXSTRLEN, len));
+        s[MIN(MAXSTRLEN, len)] = '\0';
+
+        if (strncmp((const char*)buf, "GET", 3) == 0)
+          tditrace("@E+send()_%d_GET %d \"%s\"", sockfd, len, s);
+        else if (strncmp((const char*)buf, "PUT", 3) == 0)
+          tditrace("@E+send()_%d_PUT %d \"%s\"", sockfd, len, s);
+        else if (strncmp((const char*)buf, "POST", 4) == 0)
+          tditrace("@E+send()_%d_POST %d \"%s\"", sockfd, len, s);
+        else if (strncmp((const char*)buf, "{\"", 2) == 0)
+          tditrace("@E+send()_%d_{ %d \"%s\"", sockfd, len, s);
+        else {
+          // s[MIN(4, len)] = '\0';
+          // tditrace("@E+send()_%d_? %d \"%s...\"", sockfd, len, s);
+          tditrace("@E+send()_%d %d \"...\"", sockfd, len);
         }
+
+      } else {
+        tditrace("@E+send()_%d %d", sockfd, len);
+      }
+
+    } else {
+      tditrace("@E+send()_%d %d", sockfd, len);
     }
+  }
 
-    if (libcrecording || libcsendrecording) {
+  ssize_t ret = __send(sockfd, buf, len, flags);
 
-        tditrace("@I+send() %d %d", sockfd, len);
+  if (libcrecording || libcsendrecording) {
+    tditrace("@I-send() =%d", ret);
+  }
 
-        if (MAXSTRLEN) {
-
-            if (buf) {
-                char s[MAXSTRLEN + 1];
-                strncpy(s, (const char *)buf, MIN(MAXSTRLEN, len));
-                s[MIN(MAXSTRLEN, len)] = '\0';
-
-                if (strncmp((const char *)buf, "GET", 3) == 0)
-                    tditrace("@E+send()_%d_GET %d \"%s\"", sockfd, len, s);
-                else if (strncmp((const char *)buf, "PUT", 3) == 0)
-                    tditrace("@E+send()_%d_PUT %d \"%s\"", sockfd, len, s);
-                else if (strncmp((const char *)buf, "POST", 4) == 0)
-                    tditrace("@E+send()_%d_POST %d \"%s\"", sockfd, len, s);
-                else if (strncmp((const char *)buf, "{\"", 2) == 0)
-                    tditrace("@E+send()_%d_{ %d \"%s\"", sockfd, len, s);
-                else {
-                    //s[MIN(4, len)] = '\0';
-                    //tditrace("@E+send()_%d_? %d \"%s...\"", sockfd, len, s);
-                    tditrace("@E+send()_%d %d \"...\"", sockfd, len);
-                }
-
-            } else {
-                tditrace("@E+send()_%d %d", sockfd, len);
-            }
-
-        } else {
-            tditrace("@E+send()_%d %d", sockfd, len);
-        }
-    }
-
-    ssize_t ret = __send(sockfd, buf, len, flags);
-
-    if (libcrecording || libcsendrecording) {
-        tditrace("@I-send() =%d", ret);
-    }
-
-    return ret;
+  return ret;
 }
 
-extern "C" ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
-    static ssize_t (*__recv)(int, void *, size_t, int) = NULL;
+extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
+  static ssize_t (*__recv)(int, void*, size_t, int) = NULL;
 
-    if (__recv == NULL) {
-        __recv =
-            (ssize_t (*)(int, void *, size_t, int))dlsym(RTLD_NEXT, "recv");
-        if (NULL == __recv) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+  if (__recv == NULL) {
+    __recv = (ssize_t (*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
+    if (NULL == __recv) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcrecording || libcrecvrecording) {
+    tditrace("@I+recv() %d %d", sockfd, len);
+  }
+
+  ssize_t ret = __recv(sockfd, buf, len, flags);
+
+  if (libcrecording || libcrecvrecording) {
+    if (ret == -1) {
+      tditrace("@I-recv() =-1");
+      tditrace("@E+recv()_%d =-1", sockfd);
+    } else if (ret == 0) {
+      tditrace("@I-recv() =0");
+      tditrace("@E+recv()_%d =0", sockfd);
+    } else {
+      if (MAXSTRLEN) {
+        if (buf) {
+          char s[MAXSTRLEN + 1];
+          strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+          s[MIN(MAXSTRLEN, ret)] = '\0';
+
+          if (strncmp((const char*)buf, "HTTP", 4) == 0)
+            tditrace("@E+recv()_%d_HTTP =%d \"%s\"", sockfd, ret, s);
+
+          //    strncmp((const char *)buf, "PUT", 3) == 0 ||
+          //    strncmp((const char *)buf, "GET", 3) == 0 ||
+          //    strncmp((const char *)buf, "{\"result", 8) == 0 ||
+          //    strncmp((const char *)buf, "{\"method", 8) == 0 ||
+          //    strncmp((const char *)buf, "data:", 5) == 0 || ret == 1) {
+          //    tditrace("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
+          else {
+            // s[MIN(4, ret)] = '\0';
+            // tditrace("@E+recv()_%d_? =%d \"%s\"...", sockfd, ret, s);
+
+            tditrace("@E+recv()_%d =%d \"...\"", sockfd, ret);
+          }
         }
+      }
     }
+    tditrace("@I-recv() =%d", ret);
+  }
 
-    if (libcrecording || libcrecvrecording) {
-        tditrace("@I+recv() %d %d", sockfd, len);
-    }
-
-    ssize_t ret = __recv(sockfd, buf, len, flags);
-
-    if (libcrecording || libcrecvrecording) {
-        if (ret == -1) {
-            tditrace("@I-recv() =-1");
-            tditrace("@E+recv()_%d =-1", sockfd);
-        } else if (ret == 0) {
-            tditrace("@I-recv() =0");
-            tditrace("@E+recv()_%d =0", sockfd);
-        } else {
-            if (MAXSTRLEN) {
-                if (buf) {
-                    char s[MAXSTRLEN + 1];
-                    strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
-                    s[MIN(MAXSTRLEN, ret)] = '\0';
-
-                    if (strncmp((const char *)buf, "HTTP", 4) == 0)
-                        tditrace("@E+recv()_%d_HTTP =%d \"%s\"", sockfd, ret, s);
-
-                    //    strncmp((const char *)buf, "PUT", 3) == 0 ||
-                    //    strncmp((const char *)buf, "GET", 3) == 0 ||
-                    //    strncmp((const char *)buf, "{\"result", 8) == 0 ||
-                    //    strncmp((const char *)buf, "{\"method", 8) == 0 ||
-                    //    strncmp((const char *)buf, "data:", 5) == 0 || ret == 1) {
-                    //    tditrace("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
-                    else {
-                        //s[MIN(4, ret)] = '\0';
-                        //tditrace("@E+recv()_%d_? =%d \"%s\"...", sockfd, ret, s);
-
-                        tditrace("@E+recv()_%d =%d \"...\"", sockfd, ret);
-
-                    }
-                }
-            }
-        }
-        tditrace("@I-recv() =%d", ret);
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
-                          const struct sockaddr *dest_addr, socklen_t addrlen) {
-    static ssize_t (*__sendto)(int, const void *, size_t, int,
-                               const struct sockaddr *, socklen_t) = NULL;
+extern "C" ssize_t sendto(int sockfd, const void* buf, size_t len, int flags,
+                          const struct sockaddr* dest_addr, socklen_t addrlen) {
+  static ssize_t (*__sendto)(int, const void*, size_t, int,
+                             const struct sockaddr*, socklen_t) = NULL;
 
-    if (__sendto == NULL) {
-        __sendto = (ssize_t (*)(int, const void *, size_t, int,
-                                const struct sockaddr *,
-                                socklen_t))dlsym(RTLD_NEXT, "sendto");
-        if (NULL == __sendto) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__sendto == NULL) {
+    __sendto =
+        (ssize_t (*)(int, const void*, size_t, int, const struct sockaddr*,
+                     socklen_t))dlsym(RTLD_NEXT, "sendto");
+    if (NULL == __sendto) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcsendtorecording) {
-        if (MAXSTRLEN) {
-            char s[MAXSTRLEN + 1];
-            strncpy(s, (const char *)buf, MIN(MAXSTRLEN, len));
-            s[MIN(MAXSTRLEN, len)] = '\0';
-            tditrace("@I+sendto() %d %d", sockfd, len);
-            tditrace("@E+sendto()_%d =%d \"%s\"", sockfd, len, s);
-        } else {
-            tditrace("@I+sendto() %d %d ", sockfd, len);
-        }
+  if (libcrecording || libcsendtorecording) {
+    if (MAXSTRLEN) {
+      char s[MAXSTRLEN + 1];
+      strncpy(s, (const char*)buf, MIN(MAXSTRLEN, len));
+      s[MIN(MAXSTRLEN, len)] = '\0';
+      tditrace("@I+sendto() %d %d", sockfd, len);
+      tditrace("@E+sendto()_%d =%d \"%s\"", sockfd, len, s);
+    } else {
+      tditrace("@I+sendto() %d %d ", sockfd, len);
     }
+  }
 
-    ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+  ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 
-    if (libcrecording || libcsendtorecording) {
-        tditrace("@I-sendto() =%d", ret);
-    }
+  if (libcrecording || libcsendtorecording) {
+    tditrace("@I-sendto() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
-extern "C" ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
-                            struct sockaddr *src_addr, socklen_t *addrlen) {
-    static ssize_t (*__recvfrom)(int, void *, size_t, int, struct sockaddr *,
-                                 socklen_t *) = NULL;
+extern "C" ssize_t recvfrom(int sockfd, void* buf, size_t len, int flags,
+                            struct sockaddr* src_addr, socklen_t* addrlen) {
+  static ssize_t (*__recvfrom)(int, void*, size_t, int, struct sockaddr*,
+                               socklen_t*) = NULL;
 
-    if (__recvfrom == NULL) {
-        __recvfrom = (ssize_t (*)(int, void *, size_t, int, struct sockaddr *,
-                                  socklen_t *))dlsym(RTLD_NEXT, "recvfrom");
-        if (NULL == __recvfrom) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__recvfrom == NULL) {
+    __recvfrom = (ssize_t (*)(int, void*, size_t, int, struct sockaddr*,
+                              socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
+    if (NULL == __recvfrom) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcrecvfromrecording) {
-        tditrace("@I+recvfrom() %d %d 0x%x", sockfd, len, flags);
+  if (libcrecording || libcrecvfromrecording) {
+    tditrace("@I+recvfrom() %d %d 0x%x", sockfd, len, flags);
+  }
+
+  ssize_t ret = __recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+
+  if (libcrecording || libcrecvfromrecording) {
+    if (ret == -1) {
+      tditrace("@I-recvfrom() =-1");
+    } else if (ret == 0) {
+      tditrace("@I-recvfrom() =0");
+    } else {
+      if (0 /*MAXSTRLEN*/) {
+        char s[MAXSTRLEN + 1];
+        strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+        s[MIN(MAXSTRLEN, ret)] = '\0';
+        tditrace("@I-recvfrom() =%d", ret);
+        tditrace("@E+recvfrom()_%d =%d \"%s\"", sockfd, ret, s);
+      } else {
+        tditrace("@I-recvfrom() =%d", ret);
+      }
     }
+  }
 
-    ssize_t ret = __recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-
-    if (libcrecording || libcrecvfromrecording) {
-        if (ret == -1) {
-            tditrace("@I-recvfrom() =-1");
-        } else if (ret == 0) {
-            tditrace("@I-recvfrom() =0");
-        } else {
-            if (0 /*MAXSTRLEN*/) {
-                char s[MAXSTRLEN + 1];
-                strncpy(s, (const char *)buf, MIN(MAXSTRLEN, ret));
-                s[MIN(MAXSTRLEN, ret)] = '\0';
-                tditrace("@I-recvfrom() =%d", ret);
-                tditrace("@E+recvfrom()_%d =%d \"%s\"", sockfd, ret, s);
-            } else {
-                tditrace("@I-recvfrom() =%d", ret);
-            }
-        }
-    }
-
-    return ret;
-}
-#endif
-
-#if 1
-extern "C" ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
-    static ssize_t (*__sendmsg)(int, const struct msghdr *, int) = NULL;
-
-    if (__sendmsg == NULL) {
-        __sendmsg = (ssize_t (*)(int, const struct msghdr *, int))dlsym(
-            RTLD_NEXT, "sendmsg");
-        if (NULL == __sendmsg) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
-    }
-
-    if (libcrecording || libcsendmsgrecording) {
-        tditrace("@I+sendmsg() %d", sockfd);
-        tditrace("@E+sendmsg()_%d [%d]-%d-%d", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
-    }
-
-    ssize_t ret = __sendmsg(sockfd, msg, flags);
-
-    if (libcrecording || libcsendmsgrecording) {
-
-        tditrace("@I-sendmsg() =%d", ret);
-    }
-
-    return ret;
-}
-
-extern "C" ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
-    static ssize_t (*__recvmsg)(int, struct msghdr *, int) = NULL;
-
-    if (__recvmsg == NULL) {
-        __recvmsg =
-            (ssize_t (*)(int, struct msghdr *, int))dlsym(RTLD_NEXT, "recvmsg");
-        if (NULL == __recvmsg) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
-    }
-
-    if (libcrecording || libcrecvmsgrecording) {
-        tditrace("@I+recvmsg() %d", sockfd);
-    }
-
-    ssize_t ret = __recvmsg(sockfd, msg, flags);
-
-    if (libcrecording || libcrecvmsgrecording) {
-        tditrace("@I-recvmsg() =%d", ret);
-        tditrace("@E+recvmsg()_%d [%d]-%d=%d", sockfd, msg->msg_iovlen, msg->msg_iov[0].iov_len, ret);
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+extern "C" ssize_t sendmsg(int sockfd, const struct msghdr* msg, int flags) {
+  static ssize_t (*__sendmsg)(int, const struct msghdr*, int) = NULL;
+
+  if (__sendmsg == NULL) {
+    __sendmsg = (ssize_t (*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT,
+                                                                   "sendmsg");
+    if (NULL == __sendmsg) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcrecording || libcsendmsgrecording) {
+    tditrace("@I+sendmsg() %d", sockfd);
+    tditrace("@E+sendmsg()_%d [%d]-%d-%d", sockfd, msg->msg_iovlen,
+             msg->msg_iov[0].iov_len,
+             msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
+  }
+
+  ssize_t ret = __sendmsg(sockfd, msg, flags);
+
+  if (libcrecording || libcsendmsgrecording) {
+    tditrace("@I-sendmsg() =%d", ret);
+  }
+
+  return ret;
+}
+
+extern "C" ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags) {
+  static ssize_t (*__recvmsg)(int, struct msghdr*, int) = NULL;
+
+  if (__recvmsg == NULL) {
+    __recvmsg =
+        (ssize_t (*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
+    if (NULL == __recvmsg) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcrecording || libcrecvmsgrecording) {
+    tditrace("@I+recvmsg() %d", sockfd);
+  }
+
+  ssize_t ret = __recvmsg(sockfd, msg, flags);
+
+  if (libcrecording || libcrecvmsgrecording) {
+    tditrace("@I-recvmsg() =%d", ret);
+    tditrace("@E+recvmsg()_%d [%d]-%d=%d", sockfd, msg->msg_iovlen,
+             msg->msg_iov[0].iov_len, ret);
+  }
+
+  return ret;
+}
+#endif
+
+#if 1
+extern "C" int sendmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen,
                         int flags) {
-    static int (*__sendmmsg)(int, struct mmsghdr *, unsigned int, int) = NULL;
+  static int (*__sendmmsg)(int, struct mmsghdr*, unsigned int, int) = NULL;
 
-    if (__sendmmsg == NULL) {
-        __sendmmsg = (int (*)(int, struct mmsghdr *, unsigned int, int))dlsym(
-            RTLD_NEXT, "sendmmsg");
-        if (NULL == __sendmmsg) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__sendmmsg == NULL) {
+    __sendmmsg = (int (*)(int, struct mmsghdr*, unsigned int, int))dlsym(
+        RTLD_NEXT, "sendmmsg");
+    if (NULL == __sendmmsg) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcsendmmsgrecording) {
-        tditrace("@I+sendmmsg() %d 0x%x", sockfd, msgvec);
-    }
+  if (libcrecording || libcsendmmsgrecording) {
+    tditrace("@I+sendmmsg() %d 0x%x", sockfd, msgvec);
+  }
 
-    int ret = __sendmmsg(sockfd, msgvec, vlen, flags);
+  int ret = __sendmmsg(sockfd, msgvec, vlen, flags);
 
-    if (libcrecording || libcsendmmsgrecording) {
-        tditrace("@I-sendmmsg() =%d", ret);
-    }
+  if (libcrecording || libcsendmmsgrecording) {
+    tditrace("@I-sendmmsg() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
-#if defined (HAVE_REFSW_NEXUS_CONFIG_H) || defined(__i386)
+#if defined(HAVE_REFSW_NEXUS_CONFIG_H) || defined(__i386)
 #define USE_CONST
 #else
 #define USE_CONST const
 #endif
 
-extern "C" int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-                        int flags, USE_CONST struct timespec *timeout) {
+extern "C" int recvmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen,
+                        int flags, USE_CONST struct timespec* timeout) {
+  static int (*__recvmmsg)(int, struct mmsghdr*, unsigned int, int,
+                           USE_CONST struct timespec*) = NULL;
 
-    static int (*__recvmmsg)(int, struct mmsghdr *, unsigned int, int,
-                             USE_CONST struct timespec *) = NULL;
-
-    if (__recvmmsg == NULL) {
-        __recvmmsg =
-            (int (*)(int, struct mmsghdr *, unsigned int, int,
-                     USE_CONST struct timespec *))dlsym(RTLD_NEXT, "recvmmsg");
-        if (NULL == __recvmmsg) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__recvmmsg == NULL) {
+    __recvmmsg =
+        (int (*)(int, struct mmsghdr*, unsigned int, int,
+                 USE_CONST struct timespec*))dlsym(RTLD_NEXT, "recvmmsg");
+    if (NULL == __recvmmsg) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording || libcrecvmmsgrecording) {
-        tditrace("@I+recvmmsg() %d 0x%x %d", sockfd, msgvec, vlen);
-    }
+  if (libcrecording || libcrecvmmsgrecording) {
+    tditrace("@I+recvmmsg() %d 0x%x %d", sockfd, msgvec, vlen);
+  }
 
-    int ret = __recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+  int ret = __recvmmsg(sockfd, msgvec, vlen, flags, timeout);
 
-    if (libcrecording || libcrecvmmsgrecording) {
-        tditrace("@I-recvmmsg() =%d", ret);
-    }
+  if (libcrecording || libcrecvmmsgrecording) {
+    tditrace("@I-recvmmsg() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
+extern "C" int select(int nfds, fd_set* readfds, fd_set* writefds,
+                      fd_set* exceptfds, struct timeval* timeout) {
+  static int (*__select)(int, fd_set*, fd_set*, fd_set*, struct timeval*) =
+      NULL;
 
-
-extern "C" int select(int nfds, fd_set *readfds, fd_set *writefds,
-                      fd_set *exceptfds, struct timeval *timeout) {
-    static int (*__select)(int, fd_set *, fd_set *, fd_set *,
-                           struct timeval *) = NULL;
-
-    if (__select == NULL) {
-        __select = (int (*)(int, fd_set *, fd_set *, fd_set *,
-                            struct timeval *))dlsym(RTLD_NEXT, "select");
-        if (NULL == __select) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__select == NULL) {
+    __select = (int (*)(int, fd_set*, fd_set*, fd_set*, struct timeval*))dlsym(
+        RTLD_NEXT, "select");
+    if (NULL == __select) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcselectrecording) {
-        tditrace("@I+select() %d %x %x %x", nfds, readfds, writefds, exceptfds);
-    }
+  if (libcselectrecording) {
+    tditrace("@I+select() %d %x %x %x", nfds, readfds, writefds, exceptfds);
+  }
 
-    int ret = __select(nfds, readfds, writefds, exceptfds, timeout);
+  int ret = __select(nfds, readfds, writefds, exceptfds, timeout);
 
-    if (libcselectrecording) {
-        tditrace("@I-select() =%d", ret);
-    }
+  if (libcselectrecording) {
+    tditrace("@I-select() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
-extern "C" int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
-    static int (*__poll)(struct pollfd *, nfds_t, int) = NULL;
+extern "C" int poll(struct pollfd* fds, nfds_t nfds, int timeout) {
+  static int (*__poll)(struct pollfd*, nfds_t, int) = NULL;
 
-    if (__poll == NULL) {
-        __poll =
-            (int (*)(struct pollfd *, nfds_t, int))dlsym(RTLD_NEXT, "poll");
-        if (NULL == __poll) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__poll == NULL) {
+    __poll = (int (*)(struct pollfd*, nfds_t, int))dlsym(RTLD_NEXT, "poll");
+    if (NULL == __poll) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcpollrecording) {
-        tditrace("@I+poll() %x %d %d", fds, nfds, timeout);
-    }
+  if (libcpollrecording) {
+    tditrace("@I+poll() %x %d %d", fds, nfds, timeout);
+  }
 
-    int ret = __poll(fds, nfds, timeout);
+  int ret = __poll(fds, nfds, timeout);
 
-    if (libcpollrecording) {
-        tditrace("@I-poll() =%d", ret);
-    }
+  if (libcpollrecording) {
+    tditrace("@I-poll() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
 extern "C" int ioctl(int d, int request, ...) {
-    static int (*__ioctl)(int d, int request, ...) = NULL;
+  static int (*__ioctl)(int d, int request, ...) = NULL;
 
-    if (__ioctl == NULL) {
-        __ioctl = (int (*)(int d, int request, ...))dlsym(RTLD_NEXT, "ioctl");
-        if (NULL == __ioctl) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__ioctl == NULL) {
+    __ioctl = (int (*)(int d, int request, ...))dlsym(RTLD_NEXT, "ioctl");
+    if (NULL == __ioctl) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    va_list args;
-    va_start(args, request);
-    int a1 = va_arg(args, int);
-    va_end(args);
+  va_list args;
+  va_start(args, request);
+  int a1 = va_arg(args, int);
+  va_end(args);
 
-    if (libcioctlrecording) {
-        tditrace("@I+ioctl() %d 0x%x", d, request);
-    }
+  if (libcioctlrecording) {
+    tditrace("@I+ioctl() %d 0x%x", d, request);
+  }
 
-    int ret = __ioctl(d, request, a1);
+  int ret = __ioctl(d, request, a1);
 
-    if (libcioctlrecording) {
-        tditrace("@I-ioctl() =%d", ret);
-    }
+  if (libcioctlrecording) {
+    tditrace("@I-ioctl() =%d", ret);
+  }
 
-    return ret;
+  return ret;
 }
 
 #if 0
@@ -881,67 +873,65 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
-
 static void mi(void) {
-    struct mallinfo mi;
-    mi = mallinfo();
-    static int prev_arena = 0;
-    static int prev_hblks = 0;
-    static int prev_hblkhd = 0;
-    if (mi.arena != prev_arena) {
-        tditrace("arena~%d", mi.arena);
-        prev_arena = mi.arena;
-    }
-    if (mi.hblks != prev_hblks) {
-        tditrace("hblks~%d", mi.hblks);
-        prev_hblks = mi.hblks;   
-    }
-    if (mi.hblkhd != prev_hblkhd) {
-        tditrace("hblkhd~%d", mi.hblkhd);
-        prev_hblkhd = mi.hblkhd;
-    }
+  struct mallinfo mi;
+  mi = mallinfo();
+  static int prev_arena = 0;
+  static int prev_hblks = 0;
+  static int prev_hblkhd = 0;
+  if (mi.arena != prev_arena) {
+    tditrace("arena~%d", mi.arena);
+    prev_arena = mi.arena;
+  }
+  if (mi.hblks != prev_hblks) {
+    tditrace("hblks~%d", mi.hblks);
+    prev_hblks = mi.hblks;
+  }
+  if (mi.hblkhd != prev_hblkhd) {
+    tditrace("hblkhd~%d", mi.hblkhd);
+    prev_hblkhd = mi.hblkhd;
+  }
 }
 
 static void ru(void) {
-    unsigned long vmsize = 0L;
-    static unsigned long prev_vmsize = 0L;
-    unsigned long rss = 0L;
-    static unsigned long prev_rss = 0L;
+  unsigned long vmsize = 0L;
+  static unsigned long prev_vmsize = 0L;
+  unsigned long rss = 0L;
+  static unsigned long prev_rss = 0L;
 
-    int fh = 0;
-    char buffer[65];
-    int gotten;
-    fh = open("/proc/self/statm", O_RDONLY);
-    gotten = read(fh, buffer, 64);
-    buffer[gotten] = '\0';
-    if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
-        if (vmsize != prev_vmsize) {
-            tditrace("vmsize~%d", (int)(vmsize * 4096));
-            prev_vmsize = vmsize;
-        }
-        if (rss != prev_rss) {
-            tditrace("rss~%d", (int)(rss * 4096));
-            prev_rss = rss;
-        }
+  int fh = 0;
+  char buffer[65];
+  int gotten;
+  fh = open("/proc/self/statm", O_RDONLY);
+  gotten = read(fh, buffer, 64);
+  buffer[gotten] = '\0';
+  if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
+    if (vmsize != prev_vmsize) {
+      tditrace("vmsize~%d", (int)(vmsize * 4096));
+      prev_vmsize = vmsize;
     }
-    close(fh);
+    if (rss != prev_rss) {
+      tditrace("rss~%d", (int)(rss * 4096));
+      prev_rss = rss;
+    }
+  }
+  close(fh);
 
-    //struct rusage resourceUsage;
-    //getrusage(RUSAGE_SELF, &resourceUsage);
-    //tditrace("maxrss~%d", resourceUsage.ru_maxrss);
+  // struct rusage resourceUsage;
+  // getrusage(RUSAGE_SELF, &resourceUsage);
+  // tditrace("maxrss~%d", resourceUsage.ru_maxrss);
 }
 
-
 #if 1
-extern "C" void *malloc(size_t size) {
-    static void *(*__malloc)(size_t) = NULL;
+extern "C" void* malloc(size_t size) {
+  static void* (*__malloc)(size_t) = NULL;
 
-    if (__malloc == NULL) {
-        __malloc = (void *(*)(size_t))dlsym(RTLD_NEXT, "malloc");
-        if (NULL == __malloc) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__malloc == NULL) {
+    __malloc = (void* (*)(size_t))dlsym(RTLD_NEXT, "malloc");
+    if (NULL == __malloc) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
 #if 0
     if (NULL == glsl) {
@@ -1032,20 +1022,20 @@ extern "C" void *malloc(size_t size) {
     }
 #endif
 
-    unsigned int ra = 0;
+  unsigned int ra = 0;
 #ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
+  asm volatile("move %0, $ra" : "=r"(ra));
 #endif
 
-    void *ret = __malloc(size);
+  void* ret = __malloc(size);
 
-    if (libcmalloc && (size >= libcmalloc)) {
+  if (libcmalloc && (size >= libcmalloc)) {
+    // tditrace("m =%x,ra=%x,sz=%d", ret, ra, size);
+    // tditrace("m %d", size);
+    tditrace("m %d,ra=%x", size, ra);
 
-        //tditrace("m =%x,ra=%x,sz=%d", ret, ra, size);
-        //tditrace("m %d", size);
-        tditrace("m %d,ra=%x", size, ra);
-
-        mi();ru();
+    mi();
+    ru();
 
 #if 0
         if (size == 420)
@@ -1077,77 +1067,79 @@ extern "C" void *malloc(size_t size) {
             }
         }
 #endif
-    }
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
 // our temporary calloc used until we get the address of libc provided
 // one in our interposed calloc
-static void *temporary_calloc(size_t x, size_t y) {
-    // printf("empty calloc called\n");
-    return NULL;
+static void* temporary_calloc(size_t x, size_t y) {
+  // printf("empty calloc called\n");
+  return NULL;
 }
 
 #if 1
-extern "C" void *calloc(size_t nmemb, size_t size) {
-    static void *(*__calloc)(size_t, size_t) = NULL;
+extern "C" void* calloc(size_t nmemb, size_t size) {
+  static void* (*__calloc)(size_t, size_t) = NULL;
 
-    if (__calloc == NULL) {
-        __calloc = temporary_calloc;
-        __calloc = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
-        if (NULL == __calloc) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__calloc == NULL) {
+    __calloc = temporary_calloc;
+    __calloc = (void* (*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
+    if (NULL == __calloc) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    unsigned int ra = 0;
+  unsigned int ra = 0;
 #ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
+  asm volatile("move %0, $ra" : "=r"(ra));
 #endif
 
-    void *ret = __calloc(nmemb, size);
+  void* ret = __calloc(nmemb, size);
 
-    if (libccalloc && (nmemb * size) >= libccalloc) {
-        //tditrace("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
-        //tditrace("c %d", nmemb * size);
-        tditrace("c %d,ra=%x", nmemb * size, ra);
+  if (libccalloc && (nmemb * size) >= libccalloc) {
+    // tditrace("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
+    // tditrace("c %d", nmemb * size);
+    tditrace("c %d,ra=%x", nmemb * size, ra);
 
-        mi();ru();
-    }
+    mi();
+    ru();
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" void *realloc(void *ptr, size_t size) {
-    static void *(*__realloc)(void *, size_t) = NULL;
+extern "C" void* realloc(void* ptr, size_t size) {
+  static void* (*__realloc)(void*, size_t) = NULL;
 
-    if (__realloc == NULL) {
-        __realloc = (void *(*)(void *, size_t))dlsym(RTLD_NEXT, "realloc");
-        if (NULL == __realloc) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__realloc == NULL) {
+    __realloc = (void* (*)(void*, size_t))dlsym(RTLD_NEXT, "realloc");
+    if (NULL == __realloc) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    unsigned int ra = 0;
+  unsigned int ra = 0;
 #ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
+  asm volatile("move %0, $ra" : "=r"(ra));
 #endif
 
-    void *ret = __realloc(ptr, size);
+  void* ret = __realloc(ptr, size);
 
-    if (libcrealloc && (size >= libcrealloc)) {
-        //tditrace("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-        //tditrace("r %d", size);
-        tditrace("r %d,ra=%x", size, ra);
+  if (libcrealloc && (size >= libcrealloc)) {
+    // tditrace("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
+    // tditrace("r %d", size);
+    tditrace("r %d,ra=%x", size, ra);
 
-        mi();ru();
-    }
+    mi();
+    ru();
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 
@@ -1180,119 +1172,119 @@ extern "C" void free(void *ptr) {
 }
 #endif
 
-extern "C" int brk(void *__addr) {
-    static int (*__brk)(void *) = NULL;
+extern "C" int brk(void* __addr) {
+  static int (*__brk)(void*) = NULL;
+  if (__brk == NULL) {
+    __brk = (int (*)(void*))dlsym(RTLD_NEXT, "brk");
     if (__brk == NULL) {
-        __brk = (int (*)(void *))dlsym(RTLD_NEXT, "brk");
-        if (__brk == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
-    tditrace("@I+brk()");
-    int ret = __brk(__addr);
-    tditrace("@I-brk()");
-    return ret;
+  }
+  tditrace("@I+brk()");
+  int ret = __brk(__addr);
+  tditrace("@I-brk()");
+  return ret;
 }
 
-extern "C" void *sbrk(intptr_t __delta) {
-    static void *(*__sbrk)(intptr_t) = NULL;
+extern "C" void* sbrk(intptr_t __delta) {
+  static void* (*__sbrk)(intptr_t) = NULL;
+  if (__sbrk == NULL) {
+    __sbrk = (void* (*)(intptr_t))dlsym(RTLD_NEXT, "sbrk");
     if (__sbrk == NULL) {
-        __sbrk = (void *(*)(intptr_t))dlsym(RTLD_NEXT, "sbrk");
-        if (__sbrk == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
-    tditrace("@I+sbrk()");
-    void *ret = __sbrk(__delta);
-    tditrace("@I-sbrk()");
-    return ret;
+  }
+  tditrace("@I+sbrk()");
+  void* ret = __sbrk(__delta);
+  tditrace("@I-sbrk()");
+  return ret;
 }
 
 #if 1
-extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
+extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
                       int __fd, __off_t __offset) {
-    static void *(*__mmap)(void *, size_t, int, int, int, __off_t) = NULL;
+  static void* (*__mmap)(void*, size_t, int, int, int, __off_t) = NULL;
+  if (__mmap == NULL) {
+    __mmap = (void* (*)(void*, size_t, int, int, int, __off_t))dlsym(RTLD_NEXT,
+                                                                     "mmap");
     if (__mmap == NULL) {
-        __mmap = (void *(*)(void *, size_t, int, int, int, __off_t))dlsym(
-            RTLD_NEXT, "mmap");
-        if (__mmap == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
+  }
 
-    void *ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
+  void* ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
 
-    if (libcmmap) {
+  if (libcmmap) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
 
-        unsigned int ra = 0;
-        #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-        #endif
+    // tditrace("mmap %d =%x,ra=%x", (int)__len, ret, ra);
+    tditrace("mmap %d,ra=%x", (int)__len, ra);
 
-        //tditrace("mmap %d =%x,ra=%x", (int)__len, ret, ra);
-        tditrace("mmap %d,ra=%x", (int)__len, ra);
+    mi();
+    ru();
+  }
 
-        mi();ru();
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" int munmap(void *__addr, size_t __len) {
-    static int (*__munmap)(void *, size_t) = NULL;
+extern "C" int munmap(void* __addr, size_t __len) {
+  static int (*__munmap)(void*, size_t) = NULL;
+  if (__munmap == NULL) {
+    __munmap = (int (*)(void*, size_t))dlsym(RTLD_NEXT, "munmap");
     if (__munmap == NULL) {
-        __munmap = (int (*)(void *, size_t))dlsym(RTLD_NEXT, "munmap");
-        if (__munmap == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
+  }
 
-    int ret = __munmap(__addr, __len);
+  int ret = __munmap(__addr, __len);
 
-    if (libcmunmap) {
+  if (libcmunmap) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
 
-        unsigned int ra = 0;
-        #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-        #endif
+    tditrace("munmap %d,ra=%x", __len, ra);
 
-        tditrace("munmap %d,ra=%x", __len, ra);
+    mi();
+    ru();
+  }
 
-        mi();ru();
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 
 #if 1
-extern "C" void *memalign(size_t __alignment, size_t __size) {
-    static void *(*__memalign)(size_t, size_t) = NULL;
+extern "C" void* memalign(size_t __alignment, size_t __size) {
+  static void* (*__memalign)(size_t, size_t) = NULL;
+  if (__memalign == NULL) {
+    __memalign = (void* (*)(size_t, size_t))dlsym(RTLD_NEXT, "memalign");
     if (__memalign == NULL) {
-        __memalign = (void *(*)(size_t, size_t))dlsym(RTLD_NEXT, "memalign");
-        if (__memalign == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
+  }
 
-    void *ret = __memalign(__alignment, __size);
+  void* ret = __memalign(__alignment, __size);
 
-    if (libcmemalign && (__size >= libcmemalign)) {
+  if (libcmemalign && (__size >= libcmemalign)) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
 
-        unsigned int ra = 0;
-        #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-        #endif
+    // tditrace("memalign %d =%x,ra=%x", __size, ret, ra);
+    tditrace("memalign %d,ra=%x", __size, ra);
 
-        //tditrace("memalign %d =%x,ra=%x", __size, ret, ra);
-        tditrace("memalign %d,ra=%x", __size, ra);
+    mi();
+    ru();
+  }
 
-        mi();ru();
-    }
-
-    return ret;
+  return ret;
 }
 #endif
 

@@ -7,7 +7,6 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-
 #if 0
 extern "C" int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                               void *(*start)(void *), void *arg) {
@@ -57,71 +56,71 @@ extern "C" int pthread_setschedparam(pthread_t thread, int policy, const struct 
 
 #if 1
 extern "C" int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-    static int (*__pthread_mutex_trylock)(pthread_mutex_t *) = NULL;
+  static int (*__pthread_mutex_trylock)(pthread_mutex_t *) = NULL;
 
-    if (!__pthread_mutex_trylock)
-        __pthread_mutex_trylock = (int (*)(pthread_mutex_t *))dlsym(
-            RTLD_NEXT, "pthread_mutex_trylock");
+  if (!__pthread_mutex_trylock)
+    __pthread_mutex_trylock =
+        (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_trylock");
 
-    if (pthreadrecording) {
-        tditrace("pthread_mutex_trylock() 0x%x", mutex);
-    }
+  if (pthreadrecording) {
+    tditrace("pthread_mutex_trylock() 0x%x", mutex);
+  }
 
-    return __pthread_mutex_trylock(mutex);
+  return __pthread_mutex_trylock(mutex);
 }
 #endif
 
 #if 1
 extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
-    static int (*__pthread_mutex_lock)(pthread_mutex_t *) = NULL;
+  static int (*__pthread_mutex_lock)(pthread_mutex_t *) = NULL;
 
-    if (!__pthread_mutex_lock)
-        __pthread_mutex_lock =
-            (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_lock");
+  if (!__pthread_mutex_lock)
+    __pthread_mutex_lock =
+        (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_lock");
 
-    if (pthreadrecording) {
-        tditrace("@T+pthread_mutex_lock() 0x%x", mutex);
-    }
+  if (pthreadrecording) {
+    tditrace("@T+pthread_mutex_lock() 0x%x", mutex);
+  }
 
-    // TDIPRINTF("[%ld]+pthread_mutex_lock(0x%x), %s\n", syscall(SYS_gettid),
-    // (int)mutex, addrinfo(__builtin_return_address(0)));
-    // print_stacktrace(MAXFRAMES);
+  // TDIPRINTF("[%ld]+pthread_mutex_lock(0x%x), %s\n", syscall(SYS_gettid),
+  // (int)mutex, addrinfo(__builtin_return_address(0)));
+  // print_stacktrace(MAXFRAMES);
 
-    int r = __pthread_mutex_lock(mutex);
+  int r = __pthread_mutex_lock(mutex);
 
-    // TDIPRINTF("[%ld]-pthread_mutex_lock()\n", syscall(SYS_gettid));
+  // TDIPRINTF("[%ld]-pthread_mutex_lock()\n", syscall(SYS_gettid));
 
-    if (pthreadrecording) {
-        tditrace("@T-pthread_mutex_lock() 0x%x", mutex);
-    }
+  if (pthreadrecording) {
+    tditrace("@T-pthread_mutex_lock() 0x%x", mutex);
+  }
 
-    return r;
+  return r;
 }
 #endif
 
 #if 1
 extern "C" int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-    static int (*__pthread_mutex_unlock)(pthread_mutex_t *) = NULL;
+  static int (*__pthread_mutex_unlock)(pthread_mutex_t *) = NULL;
 
-    if (!__pthread_mutex_unlock)
-        __pthread_mutex_unlock = (int (*)(pthread_mutex_t *))dlsym(
-            RTLD_NEXT, "pthread_mutex_unlock");
+  if (!__pthread_mutex_unlock)
+    __pthread_mutex_unlock =
+        (int (*)(pthread_mutex_t *))dlsym(RTLD_NEXT, "pthread_mutex_unlock");
 
-    if (pthreadrecording) {
-        tditrace("@T+pthread_mutex_unlock() 0x%x", mutex);
-    }
-    // TDIPRINTF("[%ld]+pthread_mutex_unlock(0x%x), %s\n", syscall(SYS_gettid),
-    // (int)mutex, addrinfo(__builtin_return_address(0)));
+  if (pthreadrecording) {
+    tditrace("@T+pthread_mutex_unlock() 0x%x", mutex);
+  }
+  // TDIPRINTF("[%ld]+pthread_mutex_unlock(0x%x), %s\n", syscall(SYS_gettid),
+  // (int)mutex, addrinfo(__builtin_return_address(0)));
 
-    int r = __pthread_mutex_unlock(mutex);
+  int r = __pthread_mutex_unlock(mutex);
 
-    // TDIPRINTF("[%ld]-pthread_mutex_unlock()\n", syscall(SYS_gettid));
+  // TDIPRINTF("[%ld]-pthread_mutex_unlock()\n", syscall(SYS_gettid));
 
-    if (pthreadrecording) {
-        tditrace("@T-pthread_mutex_unlock() 0x%x", mutex);
-    }
+  if (pthreadrecording) {
+    tditrace("@T-pthread_mutex_unlock() 0x%x", mutex);
+  }
 
-    return r;
+  return r;
 }
 #endif
 
@@ -195,4 +194,3 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
     return r;
 }
 #endif
-
