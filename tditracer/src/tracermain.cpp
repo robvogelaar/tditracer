@@ -1,12 +1,12 @@
 
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 
-#include <stdlib.h>
-#include <signal.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include "tdi.h"
 
@@ -14,9 +14,9 @@
 #include "tracerutils.h"
 
 extern "C" {
+#include "framecapture.h"
 #include "shadercapture.h"
 #include "texturecapture.h"
-#include "framecapture.h"
 }
 
 static void init(void);
@@ -65,6 +65,7 @@ unsigned int libcmalloc;
 unsigned int libccalloc;
 unsigned int libcrealloc;
 unsigned int libcmemalign;
+unsigned int libcoperatornew;
 unsigned int libcmmap;
 unsigned int libcmunmap;
 
@@ -142,6 +143,7 @@ static void init(void) {
       libccalloc = 0;
       libcrealloc = 0;
       libcmemalign = 0;
+      libcoperatornew = 0;
       libcmmap = 0;
       libcmunmap = 0;
 
@@ -182,10 +184,13 @@ static void init(void) {
     if (env = getenv("LIBCREALLOC")) {
       libcrealloc = atoi(env);
     }
-
     if (env = getenv("LIBCMEMALIGN")) {
       libcmemalign = atoi(env);
     }
+    if (env = getenv("LIBCOPERATORNEW")) {
+      libcoperatornew = atoi(env);
+    }
+
     if (env = getenv("LIBCMMAP")) {
       libcmmap = atoi(env);
     }

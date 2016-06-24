@@ -1,22 +1,22 @@
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <malloc.h>
-#include <stdarg.h>
-#include <string.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <syscall.h>
 #include <ctype.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <linux/futex.h>
+#include <malloc.h>
+#include <pthread.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
-#include <linux/futex.h>
-#include <errno.h>
-#include <limits.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <syscall.h>
+#include <unistd.h>
 
 #include <dirent.h>
 
@@ -903,9 +903,9 @@ static void dump_proc_self_maps(void) {
 
 static int gmask = 0xffffffff;
 
-static int do_mallinfo = 0;
-
-static int do_resourceusage = 0;
+static int do_vmsize = 0;
+static int do_rss = 0;
+static int do_heap = 0;
 
 static int allow_rewind = 0;
 
@@ -933,7 +933,7 @@ void *monitor_thread(void *param) {
       do_dump_proc_self_maps = 0;
     }
 
-    if (do_mallinfo) {
+    if (do_heap) {
       struct mallinfo mi;
 
       mi = mallinfo();
@@ -955,12 +955,12 @@ void *monitor_thread(void *param) {
       // printf("Topmost releasable block (keepcost):   %d\n",
       // mi.keepcost);
 
-      tditrace("arena~%d", mi.arena);
+      tditrace("HEAP~%d", mi.arena + mi.hblkhd);
       // tditrace("mi_ordblks~%d", mi.ordblks);
       // tditrace("mi_smblks~%d", mi.smblks);
 
-      tditrace("hblks~%d", mi.hblks);
-      tditrace("hblkhd~%d", mi.hblkhd);
+      // tditrace("hblks~%d", mi.hblks);
+      // tditrace("hblkhd~%d", mi.hblkhd);
 
       // tditrace("mi_usmblks~%d", mi.usmblks);
       // tditrace("mi_fsmblks~%d", mi.fsmblks);
@@ -969,7 +969,7 @@ void *monitor_thread(void *param) {
       // tditrace("mi_keepcost~%d", mi.keepcost);
     }
 
-    if (do_resourceusage) {
+    if (do_vmsize || do_rss) {
       unsigned long vmsize = 0L;
       unsigned long rss = 0L;
 
@@ -980,8 +980,8 @@ void *monitor_thread(void *param) {
       gotten = read(fh, buffer, 64);
       buffer[gotten] = '\0';
       if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
-        tditrace("vmsize~%d", (int)(vmsize * 4096));
-        tditrace("rss~%d", (int)(rss * 4096));
+        if (do_vmsize) tditrace("VMSIZE~%d", (int)(vmsize * 4096));
+        if (do_rss) tditrace("RSS~%d", (int)(rss * 4096));
       }
       close(fh);
 
@@ -1287,14 +1287,17 @@ int tditrace_init(void) {
     allow_rewind = (atoi(env) >= 1);
   }
 
-  do_mallinfo = 0;
-  if (env = getenv("MALLINFO")) {
-    do_mallinfo = (atoi(env) >= 1);
+  do_vmsize = 0;
+  if (env = getenv("VMSIZE")) {
+    do_vmsize = (atoi(env) >= 1);
   }
-
-  do_resourceusage = 0;
-  if (env = getenv("RESOURCEUSAGE")) {
-    do_resourceusage = (atoi(env) >= 1);
+  do_rss = 0;
+  if (env = getenv("RSS")) {
+    do_rss = (atoi(env) >= 1);
+  }
+  do_heap = 0;
+  if (env = getenv("HEAP")) {
+    do_heap = (atoi(env) >= 1);
   }
 
   do_offload = 0;

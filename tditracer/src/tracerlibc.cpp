@@ -1,18 +1,18 @@
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <malloc.h>
+#include <poll.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <sys/select.h>
 #include <sys/resource.h>
-#include <malloc.h>
-#include <poll.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-#include "tracermain.h"
 #include "tdi.h"
+#include "tracermain.h"
 
 #define MAXSTRLEN 512
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
@@ -282,7 +282,7 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
   static ssize_t (*__write)(int, const void*, size_t) = NULL;
 
   if (__write == NULL) {
-    __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
+    __write = (ssize_t(*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
     if (NULL == __write) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -343,7 +343,7 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
   static ssize_t (*__read)(int, void*, size_t) = NULL;
 
   if (__read == NULL) {
-    __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
+    __read = (ssize_t(*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
     if (NULL == __read) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -400,7 +400,7 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
 
   if (__send == NULL) {
     __send =
-        (ssize_t (*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
+        (ssize_t(*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
     if (NULL == __send) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -451,7 +451,7 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
   static ssize_t (*__recv)(int, void*, size_t, int) = NULL;
 
   if (__recv == NULL) {
-    __recv = (ssize_t (*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
+    __recv = (ssize_t(*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
     if (NULL == __recv) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -510,8 +510,8 @@ extern "C" ssize_t sendto(int sockfd, const void* buf, size_t len, int flags,
 
   if (__sendto == NULL) {
     __sendto =
-        (ssize_t (*)(int, const void*, size_t, int, const struct sockaddr*,
-                     socklen_t))dlsym(RTLD_NEXT, "sendto");
+        (ssize_t(*)(int, const void*, size_t, int, const struct sockaddr*,
+                    socklen_t))dlsym(RTLD_NEXT, "sendto");
     if (NULL == __sendto) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -544,8 +544,8 @@ extern "C" ssize_t recvfrom(int sockfd, void* buf, size_t len, int flags,
                                socklen_t*) = NULL;
 
   if (__recvfrom == NULL) {
-    __recvfrom = (ssize_t (*)(int, void*, size_t, int, struct sockaddr*,
-                              socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
+    __recvfrom = (ssize_t(*)(int, void*, size_t, int, struct sockaddr*,
+                             socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
     if (NULL == __recvfrom) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -584,8 +584,8 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr* msg, int flags) {
   static ssize_t (*__sendmsg)(int, const struct msghdr*, int) = NULL;
 
   if (__sendmsg == NULL) {
-    __sendmsg = (ssize_t (*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT,
-                                                                   "sendmsg");
+    __sendmsg =
+        (ssize_t(*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT, "sendmsg");
     if (NULL == __sendmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -612,7 +612,7 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags) {
 
   if (__recvmsg == NULL) {
     __recvmsg =
-        (ssize_t (*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
+        (ssize_t(*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
     if (NULL == __recvmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -876,20 +876,10 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 static void mi(void) {
   struct mallinfo mi;
   mi = mallinfo();
-  static int prev_arena = 0;
-  static int prev_hblks = 0;
-  static int prev_hblkhd = 0;
-  if (mi.arena != prev_arena) {
-    tditrace("arena~%d", mi.arena);
-    prev_arena = mi.arena;
-  }
-  if (mi.hblks != prev_hblks) {
-    tditrace("hblks~%d", mi.hblks);
-    prev_hblks = mi.hblks;
-  }
-  if (mi.hblkhd != prev_hblkhd) {
-    tditrace("hblkhd~%d", mi.hblkhd);
-    prev_hblkhd = mi.hblkhd;
+  static int prev_heap = 0;
+  if ((mi.arena + mi.hblkhd) != prev_heap) {
+    tditrace("HEAP~%d", mi.arena + mi.hblkhd);
+    prev_heap = mi.arena + mi.hblkhd;
   }
 }
 
@@ -907,11 +897,11 @@ static void ru(void) {
   buffer[gotten] = '\0';
   if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
     if (vmsize != prev_vmsize) {
-      tditrace("vmsize~%d", (int)(vmsize * 4096));
+      tditrace("VMSIZE~%d", (int)(vmsize * 4096));
       prev_vmsize = vmsize;
     }
     if (rss != prev_rss) {
-      tditrace("rss~%d", (int)(rss * 4096));
+      tditrace("RSS~%d", (int)(rss * 4096));
       prev_rss = rss;
     }
   }
@@ -1432,24 +1422,25 @@ void* operator new(std::size_t n) throw(std::bad_alloc)
 #endif
 
 //_Znwj
-#if 0
-void* operator new(unsigned int i){
+#if 1
+void* operator new(unsigned int i) {
+  unsigned int ra = 0;
 
-    unsigned int ra = 0;
 #ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
+  asm volatile("move %0, $ra" : "=r"(ra));
 #endif
 
-    void* ret = malloc(i);
+  void* ret = malloc(i);
 
-    if (i >= 128) {
-        //tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-        tditrace("operator_new %d,ra=%x", i, ra);
+  if (libcoperatornew && (i >= libcoperatornew)) {
+    // tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
+    tditrace("operator_new %d,ra=%x", i, ra);
 
-        mi();ru();
-    }
+    mi();
+    ru();
+  }
 
-    return ret;
+  return ret;
 }
 #endif
 

@@ -54,7 +54,7 @@ extern "C" int pthread_setschedparam(pthread_t thread, int policy, const struct 
 }
 #endif
 
-#if 1
+#if 0
 extern "C" int pthread_mutex_trylock(pthread_mutex_t *mutex) {
   static int (*__pthread_mutex_trylock)(pthread_mutex_t *) = NULL;
 
@@ -70,7 +70,7 @@ extern "C" int pthread_mutex_trylock(pthread_mutex_t *mutex) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
   static int (*__pthread_mutex_lock)(pthread_mutex_t *) = NULL;
 
@@ -98,7 +98,7 @@ extern "C" int pthread_mutex_lock(pthread_mutex_t *mutex) {
 }
 #endif
 
-#if 1
+#if 0
 extern "C" int pthread_mutex_unlock(pthread_mutex_t *mutex) {
   static int (*__pthread_mutex_unlock)(pthread_mutex_t *) = NULL;
 

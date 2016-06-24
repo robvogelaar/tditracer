@@ -1,18 +1,18 @@
-#include <stdio.h>
 #include <dlfcn.h>
-#include <stdlib.h>
 #include <malloc.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 extern "C" {
+#include "framecapture.h"
 #include "shadercapture.h"
 #include "texturecapture.h"
-#include "framecapture.h"
 }
 
-#include "tracermain.h"
-#include "tracerutils.h"
 #include "gldefs.h"
 #include "tdi.h"
+#include "tracermain.h"
+#include "tracerutils.h"
 
 extern "C" void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height,
                              GLenum format, GLenum type, GLvoid *data);
@@ -44,7 +44,7 @@ extern "C" EGLBoolean eglInitialize(EGLDisplay display, EGLint *major,
   static EGLBoolean (*__eglInitialize)(EGLDisplay, EGLint *, EGLint *) = NULL;
 
   if (__eglInitialize == NULL) {
-    __eglInitialize = (EGLBoolean (*)(EGLDisplay, EGLint *, EGLint *))dlsym(
+    __eglInitialize = (EGLBoolean(*)(EGLDisplay, EGLint *, EGLint *))dlsym(
         RTLD_NEXT, "eglInitialize");
     if (NULL == __eglInitialize) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -65,7 +65,7 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
                                         EGLSurface surface) = NULL;
 
   if (__eglSwapBuffers == NULL) {
-    __eglSwapBuffers = (EGLBoolean (*)(EGLDisplay, EGLSurface))dlsym(
+    __eglSwapBuffers = (EGLBoolean(*)(EGLDisplay, EGLSurface))dlsym(
         RTLD_NEXT, "eglSwapBuffers");
     if (NULL == __eglSwapBuffers) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -135,7 +135,7 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
 
   if (__eglMakeCurrent == NULL) {
     __eglMakeCurrent =
-        (EGLBoolean (*)(EGLDisplay, EGLSurface, EGLSurface, EGLContext))dlsym(
+        (EGLBoolean(*)(EGLDisplay, EGLSurface, EGLSurface, EGLContext))dlsym(
             RTLD_NEXT, "eglMakeCurrent");
     if (NULL == __eglMakeCurrent) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -343,9 +343,9 @@ extern "C" void glGenTextures(GLsizei n, GLuint *textures) {
     }
   }
 
-  if (gles2recording) tditrace("glGenTextures() %d", n);
-
   __glGenTextures(n, textures);
+
+  if (gles2recording) tditrace("glGenTextures() %d =%d", n, *textures);
 }
 
 extern "C" GLvoid glBindTexture(GLenum target, GLuint texture) {
@@ -724,9 +724,9 @@ extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {
     }
   }
 
-  if (gles2recording) tditrace("glGenFramebuffers() %d", n);
-
   __glGenFramebuffers(n, framebuffers);
+
+  if (gles2recording) tditrace("glGenFramebuffers() %d =%d", n, *framebuffers);
 }
 
 extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer) {
