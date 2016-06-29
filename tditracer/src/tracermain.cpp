@@ -65,6 +65,7 @@ unsigned int libcmalloc;
 unsigned int libccalloc;
 unsigned int libcrealloc;
 unsigned int libcmemalign;
+unsigned int libcfree;
 unsigned int libcoperatornew;
 unsigned int libcmmap;
 unsigned int libcmunmap;
@@ -90,18 +91,20 @@ extern "C" void *tdefl_write_image_to_png_file_in_memory_ex(
     const void *pImage, int w, int h, int num_chans, size_t *pLen_out,
     mz_uint level, mz_bool flip);
 
+#if 0
 static void signalhandler(int sig, siginfo_t *si, void *context) {
   switch (sig) {
     case SIGINT:
-      printf("tditracer: received SIGINT\n");
+      fprintf(stderr, "tditracer: received SIGINT\n");
       break;
 
     case SIGQUIT:
-      printf("tditracer: received SIGQUIT, rewinding tracebuffer\n");
+      fprintf(stderr, "tditracer: received SIGQUIT, rewinding tracebuffer\n");
       tditrace_rewind();
       break;
   }
 }
+#endif
 
 static void init(void) {
   static bool inited = false;
@@ -143,6 +146,7 @@ static void init(void) {
       libccalloc = 0;
       libcrealloc = 0;
       libcmemalign = 0;
+      libcfree = 0;
       libcoperatornew = 0;
       libcmmap = 0;
       libcmunmap = 0;
@@ -186,6 +190,9 @@ static void init(void) {
     }
     if (env = getenv("LIBCMEMALIGN")) {
       libcmemalign = atoi(env);
+    }
+    if (env = getenv("LIBCFREE")) {
+      libcfree = atoi(env);
     }
     if (env = getenv("LIBCOPERATORNEW")) {
       libcoperatornew = atoi(env);
@@ -255,7 +262,7 @@ static void init(void) {
       texturerecording = renderbufferrecording;
     }
 
-    printf(
+    fprintf(stderr,
         "tditracer: init[%d], libc:%s, pthread:%s, shaders:%s, "
         "textures:%s, "
         "renderbuffers:%s, frames:%d\n",

@@ -1,4 +1,3 @@
-
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -79,7 +78,6 @@ void simplefu_up(simplefu who) {
   }
 }
 
-pthread_spinlock_t spinlock;
 
 #define TASKS 0
 #define ISRS 1
@@ -906,6 +904,10 @@ static int gmask = 0xffffffff;
 static int do_vmsize = 0;
 static int do_rss = 0;
 static int do_heap = 0;
+static int do_maxrss = 0;
+static int do_majflt = 0;
+static int do_minflt = 0;
+static int do_persecond = 0;
 
 static int allow_rewind = 0;
 
@@ -984,7 +986,9 @@ void *monitor_thread(void *param) {
         if (do_rss) tditrace("RSS~%d", (int)(rss * 4096));
       }
       close(fh);
+    }
 
+    if (do_maxrss || do_minflt || do_majflt) {
       struct rusage resourceUsage;
       getrusage(RUSAGE_SELF, &resourceUsage);
 
@@ -1007,9 +1011,9 @@ void *monitor_thread(void *param) {
       //       long   ru_nivcsw;        /* involuntary context switches */
       //   };
 
-      // tditrace("maxrss~%d", resourceUsage.ru_maxrss);
-      // tditrace("ru_minflt~%d", resourceUsage.ru_minflt);
-      // tditrace("ru_majflt~%d", resourceUsage.ru_majflt);
+      if (do_maxrss) tditrace("MAXRSS~%d", resourceUsage.ru_maxrss);
+      if (do_minflt) tditrace("MINFLT~%d", resourceUsage.ru_minflt);
+      if (do_majflt) tditrace("MAJFLT~%d", resourceUsage.ru_majflt);
     }
 
     struct stat st;
@@ -1097,7 +1101,7 @@ void *monitor_thread(void *param) {
       }
     }
 
-    usleep(1 * 1000 * 1000);
+    usleep(1000 * 1000 / do_persecond);
   }
 
   pthread_exit(NULL);
@@ -1145,7 +1149,7 @@ void *delayed_init_thread(void *param) {
 
   else if (delay == -2) {
     /*
-     * wait until tracebuffer modification time is chaned.
+     * wait until tracebuffer modification time is changed.
      */
 
     while (1) {
@@ -1206,7 +1210,7 @@ void *delayed_init_thread(void *param) {
   stat(gtracebufferfilename, &gtrace_buffer_st);
 
   // for (i = 0; i < TRACEBUFFERSIZE; i++) {
-  //    gtrace_buffer[i] = 0;
+  //   gtrace_buffer[i] = 0;
   //}
 
   fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\"\n", gprocname, gpid,
@@ -1249,8 +1253,6 @@ int tditrace_init(void) {
     return 0;
   }
 
-  pthread_spin_init(&spinlock, 0);
-
   gpid = getpid();
   get_process_name_by_pid(gpid, gprocname);
 
@@ -1287,17 +1289,37 @@ int tditrace_init(void) {
     allow_rewind = (atoi(env) >= 1);
   }
 
+  do_persecond = 1;
+
   do_vmsize = 0;
   if (env = getenv("VMSIZE")) {
-    do_vmsize = (atoi(env) >= 1);
+    do_vmsize = atoi(env);
+    if (do_vmsize > do_persecond) do_persecond = do_vmsize;
   }
   do_rss = 0;
   if (env = getenv("RSS")) {
-    do_rss = (atoi(env) >= 1);
+    do_rss = atoi(env);
+    if (do_rss > do_persecond) do_persecond = do_rss;
   }
   do_heap = 0;
   if (env = getenv("HEAP")) {
-    do_heap = (atoi(env) >= 1);
+    do_heap = atoi(env);
+    if (do_heap > do_persecond) do_persecond = do_heap;
+  }
+  do_maxrss = 0;
+  if (env = getenv("MAXRSS")) {
+    do_maxrss = atoi(env);
+    if (do_maxrss > do_persecond) do_persecond = do_maxrss;
+  }
+  do_minflt = 0;
+  if (env = getenv("MINFLT")) {
+    do_minflt = atoi(env);
+    if (do_minflt > do_persecond) do_persecond = do_minflt;
+  }
+  do_majflt = 0;
+  if (env = getenv("MAJFLT")) {
+    do_majflt = atoi(env);
+    if (do_majflt > do_persecond) do_persecond = do_majflt;
   }
 
   do_offload = 0;
@@ -1876,7 +1898,7 @@ void tditrace_internal(va_list args, const char *format) {
       }
       trace_buffer_ptr = gtrace_buffer_rewind_ptr;
     } else {
-      fprintf(stderr, "tdi: [%d][%s], full\n", gpid, gprocname);
+      fprintf(stderr, "tdi: [%s][%d], full\n", gprocname, gpid);
       tditrace_inited = 0;
     }
   }

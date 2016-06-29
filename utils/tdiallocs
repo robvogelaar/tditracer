@@ -24,6 +24,8 @@ def main():
       matches = []
       iterations = []
       totals = []
+      maxes = []
+      mins = []
 
       stamp = 0.0;
 
@@ -38,19 +40,29 @@ def main():
 
             if (stamp > fro_sec) and (stamp < to_sec):
 
-               m = re.search(sys.argv[2], line)
+               #sys.stderr.write('line:\'%s\'' % line);
+               #sys.stderr.write('argv[2]:\'%s\'\n' % sys.argv[2]);
+
+               m = re.search(sys.argv[2]+'\d', line)
                if m:
+                  #sys.stderr.write('line:\'%s\'\n' % line);
                   s = line.split(sys.argv[2])[1].split(',')[0];
-                  l = re.split(r'<\d+>', line.split(sys.argv[2])[0])[1];
+                  l = (line.split(sys.argv[2])[0]).split()[3];
 
                   #print s;
                   if l not in matches:
                      matches.append(l);
                      iterations.append(1);
                      totals.append(int(s));
+                     maxes.append(int(s));
+                     mins.append(int(s));
                   else:
                      iterations[matches.index(l)] += 1;
                      totals[matches.index(l)] += int(s);
+                     if int(s) > maxes[matches.index(l)]:
+                        maxes[matches.index(l)] = int(s);
+                     if int(s) < mins[matches.index(l)]:
+                        mins[matches.index(l)] = int(s);
 
       f.close()
 
@@ -58,7 +70,7 @@ def main():
 
       i = 0;
       for m in matches:
-         results.append  ( str(totals[i]) + ' ' + str(iterations[i]) + 'x ' + m );
+         results.append  ( str(totals[i]) + ' ' + str(iterations[i]) + 'x ' + str(mins[i]) + '..' + str(maxes[i]) + ' ' + m );
          i = i + 1;
 
       results.sort(key = sortby, reverse=True);

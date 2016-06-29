@@ -14,8 +14,17 @@
 #include "tdi.h"
 #include "tracermain.h"
 
-#define MAXSTRLEN 512
+#define MAXSTRLEN 128
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+
+
+#ifdef __GNUC__
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#else
+#define likely(x)       (x)
+#define unlikely(x)     (x)
+#endif
 
 #if 0
 /*
@@ -694,6 +703,7 @@ extern "C" int recvmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen,
 }
 #endif
 
+#if 0
 extern "C" int select(int nfds, fd_set* readfds, fd_set* writefds,
                       fd_set* exceptfds, struct timeval* timeout) {
   static int (*__select)(int, fd_set*, fd_set*, fd_set*, struct timeval*) =
@@ -719,7 +729,9 @@ extern "C" int select(int nfds, fd_set* readfds, fd_set* writefds,
 
   return ret;
 }
+#endif
 
+#if 0
 extern "C" int poll(struct pollfd* fds, nfds_t nfds, int timeout) {
   static int (*__poll)(struct pollfd*, nfds_t, int) = NULL;
 
@@ -742,7 +754,9 @@ extern "C" int poll(struct pollfd* fds, nfds_t nfds, int timeout) {
 
   return ret;
 }
+#endif
 
+#if 0
 extern "C" int ioctl(int d, int request, ...) {
   static int (*__ioctl)(int d, int request, ...) = NULL;
 
@@ -770,6 +784,7 @@ extern "C" int ioctl(int d, int request, ...) {
 
   return ret;
 }
+#endif
 
 #if 0
 extern "C" void *memcpy(void *dest, const void *src, size_t n) {
@@ -896,10 +911,10 @@ static void ru(void) {
   gotten = read(fh, buffer, 64);
   buffer[gotten] = '\0';
   if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
-    if (vmsize != prev_vmsize) {
-      tditrace("VMSIZE~%d", (int)(vmsize * 4096));
-      prev_vmsize = vmsize;
-    }
+    // if (vmsize != prev_vmsize) {
+    //  tditrace("VMSIZE~%d", (int)(vmsize * 4096));
+    //  prev_vmsize = vmsize;
+    //}
     if (rss != prev_rss) {
       tditrace("RSS~%d", (int)(rss * 4096));
       prev_rss = rss;
@@ -916,7 +931,7 @@ static void ru(void) {
 extern "C" void* malloc(size_t size) {
   static void* (*__malloc)(size_t) = NULL;
 
-  if (__malloc == NULL) {
+  if (unlikely(__malloc == NULL)) {
     __malloc = (void* (*)(size_t))dlsym(RTLD_NEXT, "malloc");
     if (NULL == __malloc) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -1074,7 +1089,7 @@ static void* temporary_calloc(size_t x, size_t y) {
 extern "C" void* calloc(size_t nmemb, size_t size) {
   static void* (*__calloc)(size_t, size_t) = NULL;
 
-  if (__calloc == NULL) {
+  if (unlikely(__calloc == NULL)) {
     __calloc = temporary_calloc;
     __calloc = (void* (*)(size_t, size_t))dlsym(RTLD_NEXT, "calloc");
     if (NULL == __calloc) {
@@ -1106,7 +1121,7 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
 extern "C" void* realloc(void* ptr, size_t size) {
   static void* (*__realloc)(void*, size_t) = NULL;
 
-  if (__realloc == NULL) {
+  if (unlikely(__realloc == NULL)) {
     __realloc = (void* (*)(void*, size_t))dlsym(RTLD_NEXT, "realloc");
     if (NULL == __realloc) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
@@ -1133,32 +1148,27 @@ extern "C" void* realloc(void* ptr, size_t size) {
 }
 #endif
 
-#if 0
-extern "C" void free(void *ptr) {
-    static void (*__free)(void *) = NULL;
+#if 1
+extern "C" void free(void* ptr) {
+  static void (*__free)(void*) = NULL;
 
-    if (__free == NULL) {
-        __free = (void (*)(void *))dlsym(RTLD_NEXT, "free");
-        if (NULL == __free) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+  if (__free == NULL) {
+    __free = (void (*)(void*))dlsym(RTLD_NEXT, "free");
+    if (NULL == __free) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
+  }
 
-    if (libcrecording) {
-        unsigned int ra = 0;
+  unsigned int ra = 0;
 #ifdef __mips__
-        asm volatile("move %0, $ra" : "=r"(ra));
-#endif            
-        tditrace("f ra=%p", ra);
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
 
-        //tditrace("@I+free() 0x%x", ptr);
-    }
+  __free(ptr);
 
-    __free(ptr);
-
-    if (libcrecording) {
-        //tditrace("@I-free()");
-    }
+  if (libcfree) {
+    tditrace("f %x,ra=%x", ptr, ra);
+  }
 }
 #endif
 
@@ -1194,7 +1204,7 @@ extern "C" void* sbrk(intptr_t __delta) {
 extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
                       int __fd, __off_t __offset) {
   static void* (*__mmap)(void*, size_t, int, int, int, __off_t) = NULL;
-  if (__mmap == NULL) {
+  if (unlikely(__mmap == NULL)) {
     __mmap = (void* (*)(void*, size_t, int, int, int, __off_t))dlsym(RTLD_NEXT,
                                                                      "mmap");
     if (__mmap == NULL) {
@@ -1202,14 +1212,14 @@ extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
     }
   }
 
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
   void* ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
 
   if (libcmmap) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
     // tditrace("mmap %d =%x,ra=%x", (int)__len, ret, ra);
     tditrace("mmap %d,ra=%x", (int)__len, ra);
 
@@ -1224,21 +1234,21 @@ extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
 #if 1
 extern "C" int munmap(void* __addr, size_t __len) {
   static int (*__munmap)(void*, size_t) = NULL;
-  if (__munmap == NULL) {
+  if (unlikely(__munmap == NULL)) {
     __munmap = (int (*)(void*, size_t))dlsym(RTLD_NEXT, "munmap");
     if (__munmap == NULL) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
 
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
   int ret = __munmap(__addr, __len);
 
   if (libcmunmap) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
     tditrace("munmap %d,ra=%x", __len, ra);
 
     mi();
@@ -1252,23 +1262,53 @@ extern "C" int munmap(void* __addr, size_t __len) {
 #if 1
 extern "C" void* memalign(size_t __alignment, size_t __size) {
   static void* (*__memalign)(size_t, size_t) = NULL;
-  if (__memalign == NULL) {
+  if (unlikely(__memalign == NULL)) {
     __memalign = (void* (*)(size_t, size_t))dlsym(RTLD_NEXT, "memalign");
     if (__memalign == NULL) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
 
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
   void* ret = __memalign(__alignment, __size);
 
   if (libcmemalign && (__size >= libcmemalign)) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
     // tditrace("memalign %d =%x,ra=%x", __size, ret, ra);
     tditrace("memalign %d,ra=%x", __size, ra);
+
+    mi();
+    ru();
+  }
+
+  return ret;
+}
+#endif
+
+#if 0
+extern "C" int posix_memalign(void** __memptr, size_t __alignment,
+                              size_t __size) {
+  static int (*__posix_memalign)(void**, size_t, size_t) = NULL;
+  if (__posix_memalign == NULL) {
+    __posix_memalign =
+        (int (*)(void**, size_t, size_t))dlsym(RTLD_NEXT, "posix_memalign");
+    if (__posix_memalign == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  int ret = __posix_memalign(__memptr, __alignment, __size);
+
+  if (libcmemalign && (__size >= libcmemalign)) {
+    tditrace("posix_memalign %d,ra=%x", __size, ra);
 
     mi();
     ru();
@@ -1323,24 +1363,6 @@ extern "C" void *aligned_alloc(size_t __alignment, size_t __size) {
     tditrace("@I+aligned_alloc()");
     void *ret = __aligned_alloc(__alignment, __size);
     tditrace("@I-aligned_alloc()");
-    return ret;
-}
-#endif
-
-#if 0
-extern "C" int posix_memalign(void **__memptr, size_t __alignment,
-                              size_t __size) {
-    static int (*__posix_memalign)(void **, size_t, size_t) = NULL;
-    if (__posix_memalign == NULL) {
-        __posix_memalign = (int (*)(void **, size_t, size_t))dlsym(
-            RTLD_NEXT, "posix_memalign");
-        if (__posix_memalign == NULL) {
-            fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-        }
-    }
-    tditrace("@I+posix_memalign()");
-    int ret = __posix_memalign(__memptr, __alignment, __size);
-    tditrace("@I-posix_memalign()");
     return ret;
 }
 #endif
@@ -1434,7 +1456,7 @@ void* operator new(unsigned int i) {
 
   if (libcoperatornew && (i >= libcoperatornew)) {
     // tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    tditrace("operator_new %d,ra=%x", i, ra);
+    tditrace("n %d,ra=%x", i, ra);
 
     mi();
     ru();

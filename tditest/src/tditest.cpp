@@ -1,31 +1,160 @@
-
+#include <dirent.h>
+#include <limits.h>
+#include <linux/futex.h>
+#include <malloc.h>
+#include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <time.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <syscall.h>
+#include <time.h>
+#include <unistd.h>
 
 extern "C" void tditrace(const char *format, ...) __attribute__((weak));
 
-void run_1(void) {
-#if 0
-    for (i = 0; i < 150; i++) {
-        gettimeofday(&mytimeval, 0);
-        printf("gettimeofday() : %d,%d\n", (int)mytimeval.tv_sec, (int)mytimeval.tv_usec);
-        usleep(10000);
-    }
-#endif
+struct simplefu_semaphore {
+  int avail;
+  int waiters;
+};
+
+typedef struct simplefu_semaphore *simplefu;
+
+struct simplefu_mutex {
+  struct simplefu_semaphore sema;
+};
+
+typedef struct simplefu_mutex *simplemu;
+
+void simplefu_down(simplefu who);
+void simplefu_up(simplefu who);
+
+void simplefu_mutex_init(simplemu mx);
+void simplefu_mutex_lock(simplemu mx);
+void simplefu_mutex_unlock(simplemu mx);
+
+#define SIMPLEFU_MUTEX_INITIALIZER \
+  {                                \
+    { 1, 0 }                       \
+  }
+
+void simplefu_mutex_init(simplemu mx) {
+  mx->sema.avail = 1;
+  mx->sema.waiters = 0;
 }
 
-#if 0
-    for (i = 0; i < 150; i++) {
-        clock_gettime(CLOCK_MONOTONIC, &mytimespec);
-        printf("clock_gettime(CLOCK_MONOTONIC) : %d,%d\n", (int)mytimespec.tv_sec, (int)mytimespec.tv_nsec);
-        usleep(10000);
-    }
-#endif
+void simplefu_mutex_lock(simplemu mx) { simplefu_down(&mx->sema); }
+
+void simplefu_mutex_unlock(simplemu mx) { simplefu_up(&mx->sema); }
+
+void simplefu_down(simplefu who) {
+  int val;
+  do {
+    val = who->avail;
+    if (val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1))
+      return;
+    __sync_fetch_and_add(&who->waiters, 1);
+    syscall(__NR_futex, &who->avail, FUTEX_WAIT, val, NULL, 0, 0);
+    __sync_fetch_and_sub(&who->waiters, 1);
+  } while (1);
+}
+
+void simplefu_up(simplefu who) {
+  int nval = __sync_add_and_fetch(&who->avail, 1);
+  if (who->waiters > 0) {
+    syscall(__NR_futex, &who->avail, FUTEX_WAKE, nval, NULL, 0, 0);
+  }
+}
+
+void run_1(void) {
+  struct timeval mytimeval;
+  struct timespec mytimespec;
+  int i;
+
+  if (tditrace != NULL) tditrace("@T+CLOCK_REALTIMEx1000000");
+  for (i = 0; i < 1000000; i++) {
+    clock_gettime(CLOCK_REALTIME, &mytimespec);
+  }
+  if (tditrace != NULL) tditrace("@T-CLOCK_REALTIMEx1000000");
+
+  if (tditrace != NULL) tditrace("@T+CLOCK_MONOTONICx1000000");
+  for (i = 0; i < 1000000; i++) {
+    clock_gettime(CLOCK_MONOTONIC, &mytimespec);
+  }
+  if (tditrace != NULL) tditrace("@T-CLOCK_MONOTONICx1000000");
+
+  if (tditrace != NULL) tditrace("@T+CLOCK_PROCESS_CPUTIME_IDx1000000");
+  for (i = 0; i < 1000000; i++) {
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mytimespec);
+  }
+  if (tditrace != NULL) tditrace("@T-CLOCK_PROCESS_CPUTIME_IDx1000000");
+
+  if (tditrace != NULL) tditrace("@T+CLOCK_THREAD_CPUTIME_IDx1000000");
+  for (i = 0; i < 1000000; i++) {
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &mytimespec);
+  }
+  if (tditrace != NULL) tditrace("@T-CLOCK_THREAD_CPUTIME_IDx1000000");
+
+  if (tditrace != NULL) tditrace("@T+GETTIMEOFDAYx1000000");
+  for (i = 0; i < 1000000; i++) {
+    gettimeofday(&mytimeval, 0);
+  }
+  if (tditrace != NULL) tditrace("@T-GETTIMEOFDAYx1000000");
+}
 
 void run_2(void) {
+  struct simplefu_mutex myMutex;
+  int i;
+
+  if (tditrace != NULL) tditrace("@T+mutexx1000000");
+  for (i = 0; i < 1000000; i++) {
+    simplefu_mutex_lock(&myMutex);
+    simplefu_mutex_unlock(&myMutex);
+  }
+  if (tditrace != NULL) tditrace("@T-mutexx1000000");
+}
+
+void run_3(void) {
+  int i;
+  if (tditrace != NULL) tditrace("@T+tditrace_10x1000");
+  for (i = 0; i < 1000; i++) {
+    if (tditrace != NULL) tditrace("1234567890");
+  }
+  if (tditrace != NULL) tditrace("@T-tditrace_10x1000");
+
+  if (tditrace != NULL) tditrace("@T+tditrace_50x1000");
+  for (i = 0; i < 1000; i++) {
+    if (tditrace != NULL)
+      tditrace("12345678901234567890123456789012345678901234567890");
+  }
+  if (tditrace != NULL) tditrace("@T-tditrace_50x1000");
+
+  if (tditrace != NULL) tditrace("@T+tditrace_200x1000");
+  for (i = 0; i < 1000; i++) {
+    if (tditrace != NULL)
+      tditrace(
+          "12345678901234567890123456789012345678901234567890123456789012345678"
+          "90123456789012345678901234567890123456789012345678901234567890123456"
+          "7890123456789012345678901234567890123456789012345678901234567890");
+  }
+  if (tditrace != NULL) tditrace("@T-tditrace_200x1000");
+}
+
+void run_4(void) {
+  int i;
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  for (i = 0; i < 1000000; i++) {
+    unsigned int num = (int)syscall(SYS_gettid);
+  }
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+}
+
+void run_5(void) {
   int i;
   struct timeval mytimeval;
   struct timespec mytimespec;
@@ -230,7 +359,7 @@ int main(int argc, char **argv) {
 }
 #endif
 
-#if 1
+#if 0
 int main(int argc, char **argv) {
   if (tditrace) tditrace("START");
 
@@ -253,9 +382,12 @@ int main(int argc, char **argv) {
 }
 #endif
 
-#if 0
+#if 1
 int main(int argc, char **argv) {
-
-    run_2();
+ run_1();
+ run_2();
+ run_3();
+ run_4();
 }
+
 #endif

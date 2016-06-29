@@ -3,7 +3,14 @@
 import sys
 import re
 
+TASK = 0
+ISR = 1
+SEMA = 2
+QUEUE = 3
+EVENT = 4
 NOTE = 7
+AGENT = 8
+
 
 def main():
 
@@ -15,45 +22,57 @@ def main():
 
       f = open(sys.argv[1])
 
-      # find highest note id
+      # find highest note sema event id
       highestnoteid = 0
+      highestsemaid = 0
+      highesteventid = 0
       for line in f:
          if line.startswith('NAM') and int(line.split(' ')[1]) == NOTE:
             if int(line.split(' ')[2]) > highestnoteid:
                highestnoteid = int(line.split(' ')[2])
+         if line.startswith('NAM') and int(line.split(' ')[1]) == SEMA:
+            if int(line.split(' ')[2]) > highestsemaid:
+               highestsemaid = int(line.split(' ')[2])
+         if line.startswith('NAM') and int(line.split(' ')[1]) == EVENT:
+            if int(line.split(' ')[2]) > highesteventid:
+               highesteventid = int(line.split(' ')[2])
       if highestnoteid == 0:
          highestnoteid = NOTE * 1000
+      if highestsemaid == 0:
+         highestsemaid = SEMA * 1000
+      if highesteventid == 0:
+         highesteventid = EVENT * 1000
 
       sys.stderr.write('highest note id is:%d\n' % highestnoteid)
+      sys.stderr.write('highest sema id is:%d\n' % highestsemaid)
+      sys.stderr.write('highest event id is:%d\n' % highesteventid)
       nextnoteid = highestnoteid + 1
+      nextsemaid = highestsemaid + 1
+      nexteventid = highesteventid + 1
 
 
-      f.seek(0)
+      f.seek(0);
 
-      notenams = []
-      nams = []
-
+      notenams = [];
+      nams = [];
 
       for line in f:
 
-         if line.startswith('OCC') or line.startswith('STA'):
+         if line.startswith('OCC') or line.startswith('STA 0') or line.startswith('STA 1') or line.startswith('STA 8') :
+            line = f.next();
 
-            line = f.next()
-            dscwords = line.split()
+            dscwords = line.split();
 
-            for match in matches:
+            for m in matches:
 
                if re.compile(match).findall(dscwords[3]):
 
-                  #sys.stderr.write('match:%s\n' % match)
-                  #sys.stderr.write('in:%s\n' % dscwords[3])
-
                   if not match in notenams:
+
                      notenams.append(match)
-                     nams.append("NAM 7 %d %s" % ( (nextnoteid + matches.index(match)), match))
+                     nams.append("NAM %d %d %s" % (NOTE, (nextnoteid + matches.index(match)), match))
 
       f.seek(0)
-
 
       # pass 2
       first = True;
@@ -69,7 +88,7 @@ def main():
 
          print line,
 
-         if line.startswith('OCC') or line.startswith('STA'):
+         if line.startswith('OCC') or line.startswith('STA 0') or line.startswith('STA 1') or line.startswith('STA 8') :
             tstamp = line.split()[3]
 
             line = f.next()
@@ -81,13 +100,7 @@ def main():
                result = re.compile(match).findall(dscwords[3])
                if result:
 
-                  #sys.stderr.write('\n\nmatch:%s\n' % match)
-                  #sys.stderr.write('in:%s\n' % dscwords[3])
-
-                  #sys.stderr.write('result:%s\n' % result)
-                  #sys.stderr.write('OCC 7 %d %d\n' % (nextnoteid + matches.index(match), int(tstamp)))
-
-                  print 'OCC 7 %d' % (nextnoteid + matches.index(match)), tstamp
+                  print 'OCC %d %d' % (NOTE, nextnoteid + matches.index(match)), tstamp
                   print 'DSC 0 0', dscwords[3]
 
       f.close()
