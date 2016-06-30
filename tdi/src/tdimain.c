@@ -78,7 +78,6 @@ void simplefu_up(simplefu who) {
   }
 }
 
-
 #define TASKS 0
 #define ISRS 1
 #define SEMAS 2
@@ -87,7 +86,7 @@ void simplefu_up(simplefu who) {
 #define NOTES 7
 #define AGENTS 8
 
-#define TRACEBUFFERSIZE (16 * 1024 * 1024)
+static unsigned int gtracebuffersize = 16 * 1024 * 1024;
 
 char gtracebufferfilename[128];
 struct stat gtrace_buffer_st;
@@ -1041,7 +1040,7 @@ void *monitor_thread(void *param) {
       if (!offload_over50) {
         simplefu_mutex_lock(&myMutex);
         int check =
-            ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE / 2));
+            ((trace_buffer_ptr - gtrace_buffer) > (gtracebuffersize / 2));
         simplefu_mutex_unlock(&myMutex);
 
         if (check) {
@@ -1060,15 +1059,15 @@ void *monitor_thread(void *param) {
                     offloadfilename, errsv);
           }
 
-          (void)ftruncate(fileno(offload_file), TRACEBUFFERSIZE);
+          (void)ftruncate(fileno(offload_file), gtracebuffersize);
 
-          offload_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_WRITE,
+          offload_buffer = (char *)mmap(0, gtracebuffersize, PROT_WRITE,
                                         MAP_SHARED, fileno(offload_file), 0);
 
           fprintf(stderr, "tdi: [%d][%s], created offloadfile: \"%s\" \n", gpid,
                   gprocname, offloadfilename);
 
-          memcpy(offload_buffer, gtrace_buffer, TRACEBUFFERSIZE / 2);
+          memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
 
           fprintf(stderr,
                   "tdi: [%d][%s], copied 0..50%% to "
@@ -1079,7 +1078,7 @@ void *monitor_thread(void *param) {
       } else {
         simplefu_mutex_lock(&myMutex);
         int check =
-            ((trace_buffer_ptr - gtrace_buffer) < (TRACEBUFFERSIZE / 2));
+            ((trace_buffer_ptr - gtrace_buffer) < (gtracebuffersize / 2));
         simplefu_mutex_unlock(&myMutex);
 
         if (check) {
@@ -1088,9 +1087,9 @@ void *monitor_thread(void *param) {
           // fill remaining 50..100% data to existing file and close
           // file
 
-          memcpy(offload_buffer + TRACEBUFFERSIZE / 2,
-                 gtrace_buffer + TRACEBUFFERSIZE / 2, TRACEBUFFERSIZE / 2);
-          munmap(offload_buffer, TRACEBUFFERSIZE);
+          memcpy(offload_buffer + gtracebuffersize / 2,
+                 gtrace_buffer + gtracebuffersize / 2, gtracebuffersize / 2);
+          munmap(offload_buffer, gtracebuffersize);
           fclose(offload_file);
 
           fprintf(stderr,
@@ -1204,17 +1203,17 @@ void *delayed_init_thread(void *param) {
   if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
     fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
   }
-  int i = ftruncate(fileno(file), TRACEBUFFERSIZE);
-  gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE,
+  int i = ftruncate(fileno(file), gtracebuffersize);
+  gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
                                MAP_SHARED, fileno(file), 0);
   stat(gtracebufferfilename, &gtrace_buffer_st);
 
-  // for (i = 0; i < TRACEBUFFERSIZE; i++) {
+  // for (i = 0; i < gtracebuffersize; i++) {
   //   gtrace_buffer[i] = 0;
   //}
 
-  fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\"\n", gprocname, gpid,
-          gtracebufferfilename);
+  fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (%dMB)\n", gprocname,
+          gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
   trace_buffer_ptr = gtrace_buffer;
   // write one time start text
@@ -1278,6 +1277,10 @@ int tditrace_init(void) {
   }
 
   char *env;
+
+  if (env = getenv("TRACEBUFFERSIZE")) {
+    gtracebuffersize = atoi(env) * 1024 * 1024;
+  }
 
   gmask = 0xffffffff;
   if (env = getenv("MASK")) {
@@ -1396,15 +1399,15 @@ int tditrace_init(void) {
       fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
       return -1;
     }
-    i = ftruncate(fileno(file), TRACEBUFFERSIZE);
-    gtrace_buffer = (char *)mmap(0, TRACEBUFFERSIZE, PROT_READ | PROT_WRITE,
+    i = ftruncate(fileno(file), gtracebuffersize);
+    gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fileno(file), 0);
     stat(gtracebufferfilename, &gtrace_buffer_st);
-    for (i = 0; i < TRACEBUFFERSIZE; i++) {
+    for (i = 0; i < gtracebuffersize; i++) {
       gtrace_buffer[i] = 0;
     }
-    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (16MB)\n", gprocname,
-            gpid, gtracebufferfilename);
+    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (%dMB)\n", gprocname,
+            gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
     trace_buffer_ptr = gtrace_buffer;
     // write one time start text
@@ -1467,7 +1470,8 @@ void tditrace_rewind() {
       sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
   gtrace_buffer_rewind_ptr = trace_buffer_ptr;
 
-  for (i = gtrace_buffer_rewind_ptr - gtrace_buffer; i < TRACEBUFFERSIZE; i++) {
+  for (i = gtrace_buffer_rewind_ptr - gtrace_buffer; i < gtracebuffersize;
+       i++) {
     gtrace_buffer[i] = 0;
   }
 
@@ -1542,7 +1546,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
           fprintf(stderr, "bufpct=%d\n",
                   (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 /
-                        (TRACEBUFFERSIZE)));
+                        st.st_size));
 
           // token should hold "timeofday timestamp offset in nsecs"
           tracebuffers[buffers].timeofday_offset = (_u64)atoll(
@@ -1610,7 +1614,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
             fprintf(stderr, "bufpct=%d\n",
                     (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 /
-                          (TRACEBUFFERSIZE)));
+                          (st.st_size)));
 
             // token should hold "timeofday timestamp offset in
             // nsecs"
@@ -1888,12 +1892,12 @@ void tditrace_internal(va_list args, const char *format) {
   memcpy(trace_buffer_ptr, trace_text, trace_text_ptr - trace_text);
   trace_buffer_ptr += trace_text_ptr - trace_text;
 
-  if ((trace_buffer_ptr - gtrace_buffer) > (TRACEBUFFERSIZE - 1024)) {
+  if ((trace_buffer_ptr - gtrace_buffer) > (gtracebuffersize - 1024)) {
     if (do_offload) {
       // clear unused and rewind to rewind ptr
       fprintf(stderr, "tdi: [%d][%s], rewind for offload\n", gpid, gprocname);
       int i;
-      for (i = trace_buffer_ptr - gtrace_buffer; i < TRACEBUFFERSIZE; i++) {
+      for (i = trace_buffer_ptr - gtrace_buffer; i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
       trace_buffer_ptr = gtrace_buffer_rewind_ptr;

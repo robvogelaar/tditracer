@@ -44,10 +44,10 @@ int main(int argc, char *argv[]) {
         if ((file = fopen(filename, "r")) != NULL) {
           /* /tmp/.tditracebuffer-xxx-xxx */
 
-          fprintf(stderr, "Found \"%s\"\n", filename);
-
           struct stat st;
           stat(filename, &st);
+
+          fprintf(stderr, "Found \"%s\" (%lldMB)\n", filename, st.st_size / (1024 * 1024));
 
           bufmmapped = (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE,
                                     MAP_PRIVATE, fileno(file), 0);
