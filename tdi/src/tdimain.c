@@ -858,7 +858,7 @@ static void dump_proc_self_maps(void) {
   int fd;
   int bytes;
 
-  fprintf(stderr, "tdi: [%s][%d], dump maps\n", gprocname, gpid);
+  fprintf(stderr, "tdi: [%s][%d], maps...\n", gprocname, gpid);
 
   tditrace("MAPS [%s][%d] begin", gprocname, gpid);
 
@@ -898,7 +898,7 @@ static void dump_proc_self_maps(void) {
   tditrace("MAPS [%s][%d] end", gprocname, gpid);
 }
 
-static int gmask = 0xffffffff;
+static int gmask = 0x0;
 
 static int do_vmsize = 0;
 static int do_rss = 0;
@@ -1212,7 +1212,7 @@ void *delayed_init_thread(void *param) {
   //   gtrace_buffer[i] = 0;
   //}
 
-  fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (%dMB)\n", gprocname,
+  fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
           gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
   trace_buffer_ptr = gtrace_buffer;
@@ -1244,6 +1244,22 @@ void *delayed_init_thread(void *param) {
   pthread_exit(NULL);
 }
 
+const char *instruments[] = {"console",     // 0x00000001
+                             "render",      // 0x00000002
+                             "css",         // 0x00000004
+                             "dom",         // 0x00000008
+                             "canvas",      // 0x00000010
+                             "webgl",       // 0x00000020
+                             "image",       // 0x00000040
+                             "graphics",    // 0x00000080
+                             "graphicsqt",  // 0x00000100
+                             "texmap",      // 0x00000200
+                             "opengl",      // 0x00000400
+                             "qweb",        // 0x00000800
+                             "resource",    // 0x00001000
+                             "javascript",  // 0x00002000
+                             "allocator"};  // 0x00004000
+
 int tditrace_init(void) {
   struct timeval mytime;
   int i;
@@ -1273,7 +1289,7 @@ int tditrace_init(void) {
             gprocname, gpid);
     return 0;
   } else {
-    // printf("tdi: init[%s][%d]\n", gprocname, gpid);
+    // fprintf(stderr, "tdi: init[%s][%d]\n", gprocname, gpid);
   }
 
   char *env;
@@ -1282,10 +1298,18 @@ int tditrace_init(void) {
     gtracebuffersize = atoi(env) * 1024 * 1024;
   }
 
-  gmask = 0xffffffff;
+  gmask = 0x0;
   if (env = getenv("MASK")) {
-    gmask = strtoul(env, 0, 16);
+    for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
+      if (strstr(env, instruments[i])) gmask |= (1 << i);
+    }
+    if (gmask == 0x0) gmask = strtoul(env, 0, 16);
   }
+  fprintf(stderr, "tdi: init[%s][%d], mask = 0x%08x (", gprocname, gpid, gmask);
+  for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
+    if (gmask & (1 << i)) fprintf(stderr, "%s%s", i==0? "":",", instruments[i]);
+  }
+  fprintf(stderr, ")\n");
 
   allow_rewind = 0;
   if (env = getenv("REWIND")) {
@@ -1373,10 +1397,10 @@ int tditrace_init(void) {
 
           if (stat(procpid, &sts) == -1) {
             unlink(fullname);
-            fprintf(stderr, "tdi: init[%s][%d], removed: \"%s\"\n", gprocname,
+            fprintf(stderr, "tdi: init[%s][%d], removed \"%s\"\n", gprocname,
                     gpid, fullname);
           } else {
-            fprintf(stderr, "tdi: init[%s][%d], not removed: \"%s\"\n",
+            fprintf(stderr, "tdi: init[%s][%d], not removed \"%s\"\n",
                     gprocname, gpid, fullname);
           }
         }
@@ -1406,7 +1430,7 @@ int tditrace_init(void) {
     for (i = 0; i < gtracebuffersize; i++) {
       gtrace_buffer[i] = 0;
     }
-    fprintf(stderr, "tdi: init[%s][%d], allocated: \"%s\" (%dMB)\n", gprocname,
+    fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
             gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
     trace_buffer_ptr = gtrace_buffer;
@@ -1423,8 +1447,8 @@ int tditrace_init(void) {
         sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
     gtrace_buffer_rewind_ptr = trace_buffer_ptr;
     fprintf(stderr,
-            "tdi: init[%s][%d], timeofday_timestamp:%lld, "
-            "monotonic_timestamp:%lld\n",
+            "tdi: init[%s][%d], timeofday_timestamp = %lld, "
+            "monotonic_timestamp = %lld\n",
             gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
     reported_full = 0;
 
