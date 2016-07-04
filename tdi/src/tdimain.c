@@ -83,8 +83,11 @@ void simplefu_up(simplefu who) {
 #define SEMAS 2
 #define QUEUES 3
 #define EVENTS 4
+#define VALUES 5
+#define CYCLES 6
 #define NOTES 7
 #define AGENTS 8
+#define MEMORYCYCLES 9
 
 static unsigned int gtracebuffersize = 16 * 1024 * 1024;
 
@@ -103,32 +106,37 @@ typedef unsigned long long _u64;
 
 struct simplefu_mutex myMutex;
 
-// 100 tasks of 1000 chars each
+// 128 tasks of 1024 chars each
 static char tasks_array[1024][128];
 static int nr_tasks = 0;
 
-// 100 isrs of 1000 chars each
+// 128 isrs of 1024 chars each
 static char isrs_array[1024][128];
 static int nr_isrs = 0;
 
-// 100 semas of 1000 chars each
+// 128 semas of 1024 chars each
 static char semas_array[1024][128];
 static int nr_semas = 0;
 
-// 100 queues of 1000 chars each
+// 128 queues of 1024 chars each
 static char queues_array[1024][128];
 static int nr_queues = 0;
 static int prev_queues[128];
 
-// 100 events of 1000 chars each
+// 128 queues of 1024 chars each
+static char values_array[1024][128];
+static int nr_values = 0;
+static _u64 cum_values[128];
+
+// 128 events of 1024 chars each
 static char events_array[1024][128];
 static int nr_events = 0;
 
-// 100 notes of 1000 chars each
+// 128 notes of 1024 chars each
 static char notes_array[1024][128];
 static int nr_notes = 0;
 
-// 100 notes of 1000 agents each
+// 128 notes of 1000 agents each
 static char agents_array[1024][128];
 static int nr_agents = 0;
 
@@ -554,48 +562,111 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
         // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
       }
     }
+
+    if (strlen(name)) {
+      // check to see if we need to add this value entry (first occurrence)
+      entry = -1;
+
+      for (i = 0; i < nr_queues; i++) {
+        if (strcmp(queues_array[i], name) == 0) {
+          // found the entry
+          entry = i;
+          break;
+        }
+      }
+
+      // Do we need to add the entry?
+      if (entry == -1) {
+        strcpy(queues_array[nr_queues], name);
+        entry = nr_queues;
+        nr_queues++;
+
+        // Since we added a new entry we need to create a NAM
+        sprintf(fullentry, "NAM %d %d %s\n", QUEUES, QUEUES * 1000 + entry,
+                queues_array[entry]);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+        // reset the prev_value;
+        prev_queues[entry] = 0;
+      }
+
+      // fill in the value
+      // add a STA (with the delta) or a STO (with the delta) depending on
+      // whether the value went up or went down
+      if (value >= prev_queues[entry])
+        sprintf(fullentry, "STA %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+                timestamp, value - prev_queues[entry]);
+      else
+        sprintf(fullentry, "STO %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+                timestamp, prev_queues[entry] - value);
+      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      prev_queues[entry] = value;
+
+      return;
+    }
   }
 
-  if (strlen(name)) {
-    // check to see if we need to add this value entry (first occurrence)
-    entry = -1;
+  /*
+     * VALUES entry
+     *
+     * if text is of the form name#value then interpret this as a value and add
+     * a value entry for it.
+     * check whether '#' exists and pull out the name and value
+     */
 
-    for (i = 0; i < nr_queues; i++) {
-      if (strcmp(queues_array[i], name) == 0) {
-        // found the entry
-        entry = i;
-        break;
+  name[0] = 0;
+  char *v;
+  v = strchr(text, '#');
+  if (v && isdigit(v[1])) {
+    for (i = 0; i < (int)strlen(text); i++) {
+      if (text[i] == 32) break;
+      if (text[i] == 35) {
+        // fprintf(stderr, "text1=\"%s\"\n", text);
+
+        strncpy(name, text, i);
+        name[i] = 0;
+        value = atoi(text + i + 1);
+        text[i] = 32;  // create split marker
+
+        // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
       }
     }
 
-    // Do we need to add the entry?
-    if (entry == -1) {
-      strcpy(queues_array[nr_queues], name);
-      entry = nr_queues;
-      nr_queues++;
+    if (strlen(name)) {
+      // check to see if we need to add this value entry (first occurrence)
+      entry = -1;
 
-      // Since we added a new entry we need to create a NAM
-      sprintf(fullentry, "NAM %d %d %s\n", QUEUES, QUEUES * 1000 + entry,
-              queues_array[entry]);
+      for (i = 0; i < nr_values; i++) {
+        if (strcmp(values_array[i], name) == 0) {
+          // found the entry
+          entry = i;
+          break;
+        }
+      }
+
+      // Do we need to add the entry?
+      if (entry == -1) {
+        strcpy(values_array[nr_values], name);
+        entry = nr_values;
+        nr_values++;
+
+        // Since we added a new entry we need to create a NAM
+        sprintf(fullentry, "NAM %d %d %s\n", VALUES, VALUES * 1000 + entry,
+                values_array[entry]);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+        cum_values[entry] = 0;
+      }
+
+      // fill in the value
+      // add a TIM and a VAL
+      sprintf(fullentry, "TIM %lld\n", timestamp);
+      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      cum_values[entry] += value;
+      sprintf(fullentry, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry, cum_values[entry]);
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
-      // reset the prev_value;
-      prev_queues[entry] = 0;
+      return;
     }
-
-    // fill in the value
-    // add a STA (with the delta) or a STO (with the delta) depending on
-    // whether the value went up or went down
-    if (value >= prev_queues[entry])
-      sprintf(fullentry, "STA %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
-              timestamp, value - prev_queues[entry]);
-    else
-      sprintf(fullentry, "STO %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
-              timestamp, prev_queues[entry] - value);
-    fwrite(fullentry, strlen(fullentry), 1, stdout);
-    prev_queues[entry] = value;
-
-    return;
   }
 
   /*
@@ -1307,7 +1378,8 @@ int tditrace_init(void) {
   }
   fprintf(stderr, "tdi: init[%s][%d], mask = 0x%08x (", gprocname, gpid, gmask);
   for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
-    if (gmask & (1 << i)) fprintf(stderr, "%s%s", i==0? "":",", instruments[i]);
+    if (gmask & (1 << i))
+      fprintf(stderr, "%s%s", i == 0 ? "" : ",", instruments[i]);
   }
   fprintf(stderr, ")\n");
 

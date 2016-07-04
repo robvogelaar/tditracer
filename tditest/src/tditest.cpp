@@ -306,6 +306,8 @@ void run_5(void) {
 
     if (tditrace) tditrace("@A-Agent");
 
+    if (tditrace) tditrace("i#%d", i);
+
     usleep(50000);
   }
 
@@ -384,10 +386,13 @@ int main(int argc, char **argv) {
 
 #if 1
 int main(int argc, char **argv) {
- run_1();
- run_2();
- run_3();
- run_4();
+  //run_1();
+  //run_2();
+  //run_3();
+  //run_4();
+
+  run_5();
+
 }
 
 #endif
