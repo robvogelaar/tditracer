@@ -768,7 +768,7 @@ typedef struct {
 tracebuffer_t tracebuffers[10];
 
 static void parse(int bid) {
-  //fprintf(stderr, "parse %d, tracebuffers[bid].dword_ptr = 0x%08x\n", bid,
+  // fprintf(stderr, "parse %d, tracebuffers[bid].dword_ptr = 0x%08x\n", bid,
   //       (int)tracebuffers[bid].dword_ptr);
 
   tracebuffers[bid].valid = 0;
@@ -780,14 +780,15 @@ static void parse(int bid) {
 
   int tvsec = *p++;
   int tvnsec = *p++;
-  tracebuffers[bid].monotonic_timestamp = (_u64)tvsec * (_u64)1000000000 + (_u64)tvnsec;
+  tracebuffers[bid].monotonic_timestamp =
+      (_u64)tvsec * (_u64)1000000000 + (_u64)tvnsec;
 
   tracebuffers[bid].tid = 0;
   tracebuffers[bid].text = (char *)p;
   tracebuffers[bid].text_len = ((marker & 0xffff) - 3) * 4;
   tracebuffers[bid].valid = (marker != 0);
 
-  //fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
+  // fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
   //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
 }
 
@@ -1013,15 +1014,12 @@ void *monitor_thread(void *param) {
     stat(gtracebufferfilename, &st);
 
     if (allow_rewind) {
-      fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n",
-      gtracebufferfilename, st.st_atim.tv_sec,
-      gtrace_buffer_st.st_atim.tv_sec);
-      fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n",
-      gtracebufferfilename, st.st_mtim.tv_sec,
-      gtrace_buffer_st.st_mtim.tv_sec);
-      fprintf(stderr, "tdi-check: %s ctim=%d gctim=%d\n",
-      gtracebufferfilename, st.st_ctim.tv_sec,
-      gtrace_buffer_st.st_ctim.tv_sec);
+      fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n", gtracebufferfilename,
+              st.st_atim.tv_sec, gtrace_buffer_st.st_atim.tv_sec);
+      fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename,
+              st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
+      fprintf(stderr, "tdi-check: %s ctim=%d gctim=%d\n", gtracebufferfilename,
+              st.st_ctim.tv_sec, gtrace_buffer_st.st_ctim.tv_sec);
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
         stat(gtracebufferfilename, &gtrace_buffer_st);
@@ -1320,6 +1318,10 @@ int tditrace_init(void) {
     gtracebuffersize = atoi(env) * 1024 * 1024;
   }
 
+  if (env = getenv(gprocname)) {
+    gtracebuffersize = atoi(env) * 1024 * 1024;
+  }
+
   gmask = 0x0;
   if (env = getenv("MASK")) {
     for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
@@ -1488,78 +1490,74 @@ void tditrace_rewind() {
   simplefu_mutex_unlock(&myMutex);
 }
 
+void check_trace_buffer(int b) {
+  FILE *file;
+
+  if ((file = fopen(tracebuffers[b].filename, "r")) != NULL) {
+    /* /tmp/tditracebuffer@xxx@xxx */
+
+    struct stat st;
+    stat(tracebuffers[b].filename, &st);
+
+    fprintf(stderr, "\"%s\" (%lldMB) ...\n", tracebuffers[b].filename, st.st_size / (1024 * 1024));
+
+    char *s1 = strchr(tracebuffers[b].filename, '@');
+    char *s2 = strchr(s1 + 1, '@');
+
+    strncpy(tracebuffers[b].procname, s1 + 1, s2 - s1);
+    tracebuffers[b].procname[(s2 - s1) - 1] = 0;
+    tracebuffers[b].pid = atoi(s2 + 1);
+
+    if (st.st_size == 0) {
+      fprintf(stderr, "empty tracebuffer, skipping\n");
+      return;
+    }
+
+    tracebuffers[b].bufmmapped = (char *)mmap(
+        0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
+    tracebuffers[b].bufsize = st.st_size;
+    tracebuffers[b].ptr = tracebuffers[b].bufmmapped;
+    tracebuffers[b].dword_ptr = (unsigned int *)tracebuffers[b].bufmmapped;
+
+    // should hold "TDITRACE"
+    if (strncmp("TDITRACE", tracebuffers[b].ptr, 8) != 0) {
+      fprintf(stderr, "invalid tracebuffer, skipping\n");
+      return;
+    }
+
+    tracebuffers[b].dword_ptr += 2;
+    unsigned int *p = tracebuffers[b].dword_ptr;
+    tracebuffers[b].timeofday_offset =
+        (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
+    tracebuffers[b].monotonic_offset = (_u64)*p++ * (_u64)1000000000 + *p++;
+    // fprintf(stderr,
+    //        "timeofday_offset:%lld, "
+    //        "monotonic_offset:%lld\n",
+    //        tracebuffers[buffers].timeofday_offset,
+    //        tracebuffers[buffers].monotonic_offset);
+    tracebuffers[b].dword_ptr += 4;
+
+    fclose(file);
+  }
+}
+
 void tditrace_exit(int argc, char *argv[]) {
-  // Create the TDI file from the tracebuffer
-
-  int i;
-
+  int i, nr_entries;
   int buffers = 0;
 
   if (argc > 1) {
     int tracebufferid = argc;
 
     while (--tracebufferid) {
-      if (strstr(argv[tracebufferid], "tditracebuffer@") != 0) {
-        FILE *file;
-
-        sprintf(tracebuffers[buffers].filename, "%s", argv[tracebufferid]);
-
-        if ((file = fopen(tracebuffers[buffers].filename, "r")) != NULL) {
-          /* tditracebuffer@xxx@xxx */
-
-          fprintf(stderr, "Found \"%s\"\n", tracebuffers[buffers].filename);
-
-          char *s1 = strchr(tracebuffers[buffers].filename, '@');
-          char *s2 = strchr(s1 + 1, '@');
-
-          strncpy(tracebuffers[buffers].procname, s1 + 1, s2 - s1);
-          tracebuffers[buffers].procname[(s2 - s1) - 1] = 0;
-          tracebuffers[buffers].pid = atoi(s2 + 1);
-
-          struct stat st;
-          stat(tracebuffers[buffers].filename, &st);
-
-          if (st.st_size == 0) {
-            fprintf(stderr, "empty tracebuffer, skipping\n");
-            break;
-          }
-
-          tracebuffers[buffers].bufmmapped =
-              (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
-                           fileno(file), 0);
-          tracebuffers[buffers].bufsize = st.st_size;
-
-          tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
-          tracebuffers[buffers].dword_ptr =
-              (unsigned int *)tracebuffers[buffers].bufmmapped;
-
-          // should hold "TDITRACE"
-          if (strncmp("TDITRACE", tracebuffers[buffers].ptr, 8) != 0) {
-            fprintf(stderr, "invalid tracebuffer, skipping\n");
-            break;
-          }
-
-          tracebuffers[buffers].dword_ptr += 2;
-          unsigned int *p = tracebuffers[buffers].dword_ptr;
-          tracebuffers[buffers].timeofday_offset =
-              (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
-          tracebuffers[buffers].monotonic_offset =
-              (_u64)*p++ * (_u64)1000000000 + *p++;
-          fprintf(stderr,
-                  "timeofday_offset:%lld, "
-                  "monotonic_offset:%lld\n",
-                  tracebuffers[buffers].timeofday_offset,
-                  tracebuffers[buffers].monotonic_offset);
-          tracebuffers[buffers].dword_ptr += 4;
-
-          fclose(file);
-
-          buffers++;
-        }
+      if (strstr(argv[tracebufferid], "tditracebuffer@")) {
+        sprintf(tracebuffers[buffers].filename, argv[tracebufferid]);
+        check_trace_buffer(buffers);
+        buffers++;
       }
     }
+  }
 
-  } else {
+  else {
     DIR *dp;
     struct dirent *ep;
 
@@ -1567,66 +1565,13 @@ void tditrace_exit(int argc, char *argv[]) {
     if (dp != NULL) {
       while (ep = readdir(dp)) {
         if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
-          FILE *file;
-
           sprintf(tracebuffers[buffers].filename, "/tmp/%s", ep->d_name);
-
-          if ((file = fopen(tracebuffers[buffers].filename, "r")) != NULL) {
-            /* /tmp/tditracebuffer@xxx@xxx */
-
-            fprintf(stderr, "Found \"%s\"\n", tracebuffers[buffers].filename);
-
-            char *s1 = strchr(tracebuffers[buffers].filename, '@');
-            char *s2 = strchr(s1 + 1, '@');
-
-            strncpy(tracebuffers[buffers].procname, s1 + 1, s2 - s1);
-            tracebuffers[buffers].procname[(s2 - s1) - 1] = 0;
-            tracebuffers[buffers].pid = atoi(s2 + 1);
-
-            struct stat st;
-            stat(tracebuffers[buffers].filename, &st);
-
-            if (st.st_size == 0) {
-              fprintf(stderr, "empty tracebuffer, skipping\n");
-              break;
-            }
-
-            tracebuffers[buffers].bufmmapped =
-                (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
-                             fileno(file), 0);
-            tracebuffers[buffers].bufsize = st.st_size;
-            tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
-            tracebuffers[buffers].dword_ptr =
-                (unsigned int *)tracebuffers[buffers].bufmmapped;
-
-            // should hold "TDITRACE"
-            if (strncmp("TDITRACE", tracebuffers[buffers].ptr, 8) != 0) {
-              fprintf(stderr, "invalid tracebuffer, skipping\n");
-              break;
-            }
-
-            tracebuffers[buffers].dword_ptr += 2;
-            unsigned int *p = tracebuffers[buffers].dword_ptr;
-            tracebuffers[buffers].timeofday_offset =
-                (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
-            tracebuffers[buffers].monotonic_offset =
-                (_u64)*p++ * (_u64)1000000000 + *p++;
-            fprintf(stderr,
-                    "timeofday_offset:%lld, "
-                    "monotonic_offset:%lld\n",
-                    tracebuffers[buffers].timeofday_offset,
-                    tracebuffers[buffers].monotonic_offset);
-            tracebuffers[buffers].dword_ptr += 4;
-
-            fclose(file);
-
-            buffers++;
-          }
+          check_trace_buffer(buffers);
+          buffers++;
         }
       }
-
-      closedir(dp);
     }
+    closedir(dp);
   }
 
   if (buffers == 0) {
@@ -1650,6 +1595,7 @@ void tditrace_exit(int argc, char *argv[]) {
   fprintf(stdout, "TIME %d\n", 1000000000);
   fprintf(stdout, "SPEED %d\n", 1000000000);
 
+  nr_entries = 0;
   while (1) {
     int pctused;
     int d = -1;
@@ -1689,6 +1635,8 @@ void tditrace_exit(int argc, char *argv[]) {
                tracebuffers[d].bufsize) +
               1;
 
+    nr_entries++;
+
     last_timestamp = tracebuffers[d].timeofday_offset - abs_timeofday +
                      tracebuffers[d].monotonic_timestamp -
                      tracebuffers[d].monotonic_offset;
@@ -1696,8 +1644,8 @@ void tditrace_exit(int argc, char *argv[]) {
     parse(d);
 
     if (!tracebuffers[d].valid) {
-      fprintf(stderr, "\"%s\" final entry (%d%% used)\n",
-              tracebuffers[d].filename, pctused);
+      fprintf(stderr, "\"%s\" %d%% (%d)\n",
+              tracebuffers[d].filename, pctused, nr_entries);
     }
   }
 
