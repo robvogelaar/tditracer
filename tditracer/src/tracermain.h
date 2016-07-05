@@ -9,6 +9,7 @@ extern bool libcopenrecording;
 extern bool libcfopenrecording;
 extern bool libcfdopenrecording;
 extern bool libcfreopenrecording;
+extern bool libcfd;
 extern bool libcreadrecording;
 extern bool libcwriterecording;
 extern bool libcsocketrecording;

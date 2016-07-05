@@ -17,13 +17,12 @@
 #define MAXSTRLEN 128
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
-
 #ifdef __GNUC__
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 #else
-#define likely(x)       (x)
-#define unlikely(x)     (x)
+#define likely(x) (x)
+#define unlikely(x) (x)
 #endif
 
 #if 0
@@ -177,14 +176,20 @@ extern "C" int open(const char* pathname, int flags, ...) {
   int a1 = va_arg(args, int);
   va_end(args);
 
-  if (libcrecording || libcopenrecording) {
-    tditrace("@I+open() %s", pathname);
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcopenrecording) {
+    // tditrace("@I+open() %s", pathname);
+    tditrace("@E+open() %s,ra=%x", pathname, ra);
   }
 
   int ret = __open(pathname, flags, a1);
 
-  if (libcrecording || libcopenrecording) {
-    tditrace("@I-open() =%d", pathname, ret);
+  if (libcopenrecording) {
+    // tditrace("@I-open() =%d", pathname, ret);
   }
 
   return ret;
@@ -201,14 +206,20 @@ extern "C" FILE* fopen(const char* path, const char* mode) {
     }
   }
 
-  if (libcrecording || libcfopenrecording) {
-    tditrace("@I+fopen() %s", path);
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcfopenrecording) {
+    // tditrace("@I+fopen() %s", path);
+    tditrace("@E+fopen() %s,ra=%x", path, ra);
   }
 
   FILE* ret = __fopen(path, mode);
 
-  if (libcrecording || libcfopenrecording) {
-    tditrace("@I-fopen() =%d", ret);
+  if (libcfopenrecording) {
+    // tditrace("@I-fopen() =%d", ret);
   }
 
   return ret;
@@ -224,14 +235,20 @@ extern "C" FILE* fdopen(int fd, const char* mode) {
     }
   }
 
-  if (libcrecording || libcfdopenrecording) {
-    tditrace("@I+fdopen() %d", fd);
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcfdopenrecording) {
+    // tditrace("@I+fdopen() %d", fd);
+    tditrace("@E+fdopen() %d,ra=%x", fd, ra);
   }
 
   FILE* ret = __fdopen(fd, mode);
 
-  if (libcrecording || libcfdopenrecording) {
-    tditrace("@I-fdopen() =%d", ret);
+  if (libcfdopenrecording) {
+    // tditrace("@I-fdopen() =%d", ret);
   }
 
   return ret;
@@ -248,14 +265,20 @@ extern "C" FILE* freopen(const char* path, const char* mode, FILE* stream) {
     }
   }
 
-  if (libcrecording || libcfreopenrecording) {
-    tditrace("@I+freopen() %s", path);
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+  if (libcfreopenrecording) {
+    // tditrace("@I+freopen() %s", path);
+    tditrace("@E+freopen() %s,ra=%x", path, ra);
   }
 
   FILE* ret = __freopen(path, mode, stream);
 
-  if (libcrecording || libcfreopenrecording) {
-    tditrace("@I-freopen() =%d", ret);
+  if (libcfreopenrecording) {
+    // tditrace("@I-freopen() =%d", ret);
   }
 
   return ret;
@@ -278,7 +301,7 @@ extern "C" int socket(int domain, int type, int protocol) {
 
   int ret = __socket(domain, type, protocol);
 
-  if (libcrecording || libcsocketrecording) {
+  if (libcsocketrecording) {
     tditrace("@I-socket() =%d", ret);
   }
 
@@ -311,25 +334,48 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
         strncpy(s, (const char*)buf, MIN(MAXSTRLEN, count));
         s[MIN(MAXSTRLEN, count)] = '\0';
 
-        if (strncmp((const char*)buf, "GET", 3) == 0)
-          tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
-        else if (strncmp((const char*)buf, "PUT", 3) == 0)
-          tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
-        else if (strncmp((const char*)buf, "POST", 4) == 0)
-          tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
-        else if (strncmp((const char*)buf, "{\"", 2) == 0)
-          tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
-        else if (strncmp((const char*)buf + 2, "xml", 3) == 0)
-          tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
-        else {
+        if (strncmp((const char*)buf, "GET", 3) == 0) {
+          if (libcfd)
+            tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
+          else
+            tditrace("@E+write()_GET %d %d ra=%x \"%s\"", fd, count, ra, s);
+
+        } else if (strncmp((const char*)buf, "PUT", 3) == 0) {
+          if (libcfd)
+            tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
+          else
+            tditrace("@E+write()_PUT %d %d ra=%x \"%s\"", fd, count, ra, s);
+        } else if (strncmp((const char*)buf, "POST", 4) == 0) {
+          if (libcfd)
+            tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
+          else
+            tditrace("@E+write()_POST %d %d ra=%x \"%s\"", fd, count, ra, s);
+        } else if (strncmp((const char*)buf, "{\"", 2) == 0) {
+          if (libcfd)
+            tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
+          else
+            tditrace("@E+write()_{ %d %d ra=%x \"%s\"", fd, count, ra, s);
+        } else if (strncmp((const char*)buf + 2, "xml", 3) == 0) {
+          if (libcfd)
+            tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
+          else
+            tditrace("@E+write()_xml %d %d ra=%x \"%s\"", fd, count, ra, s);
+        } else {
           s[MIN(1, count)] = '\0';
-          tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra,
-                   (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+          if (libcfd)
+            tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra,
+                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+          else
+            tditrace("@E+write() %d %d ra=%x \"%s...\"", fd, count, ra,
+                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
           // tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
         }
 
       } else {
-        tditrace("@E+write()_%d %d", fd, count);
+        if (libcfd)
+          tditrace("@E+write()_%d %d", fd, count);
+        else
+          tditrace("@E+write() %d %d", fd, count);
       }
 
     } else {
@@ -372,10 +418,16 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
   if (libcreadrecording) {
     if (ret == -1) {
       // tditrace("@I-read()) =-1");
-      tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
+      if (libcfd)
+        tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
+      else
+        tditrace("@E+read() %d %d =-1 ra=%x", fd, count, ra);
     } else if (ret == 0) {
       // tditrace("@I-read() =0");
-      tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
+      if (libcfd)
+        tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
+      else
+        tditrace("@E+read() %d %d =0 ra=%x", fd, count, ra);
     } else if (count == 64) {
       // ignore the read from /proc/pid/statm
     } else {
@@ -385,13 +437,21 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
           strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
           s[MIN(MAXSTRLEN, ret)] = '\0';
 
-          if (strncmp((const char*)buf, "HTTP", 4) == 0)
-            tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret,
-                     ra, s);
-          else {
+          if (strncmp((const char*)buf, "HTTP", 4) == 0) {
+            if (libcfd)
+              tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret,
+                       ra, s);
+            else
+              tditrace("@E+read()_HTTP %d %d =%d ra=%x \"%s\"", fd, count, ret,
+                       ra, s);
+          } else {
             s[MIN(1, ret)] = '\0';
-            tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret, ra,
-                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+            if (libcfd)
+              tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret,
+                       ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+            else
+              tditrace("@E+read() %d %d =%d ra=%x \"%s...\"", fd, count, ret,
+                       ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
           }
         }
       }
@@ -416,7 +476,7 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
   }
 
   if (libcrecording || libcsendrecording) {
-    tditrace("@I+send() %d %d", sockfd, len);
+    // tditrace("@I+send() %d %d", sockfd, len);
 
     if (MAXSTRLEN) {
       if (buf) {
@@ -424,33 +484,54 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
         strncpy(s, (const char*)buf, MIN(MAXSTRLEN, len));
         s[MIN(MAXSTRLEN, len)] = '\0';
 
-        if (strncmp((const char*)buf, "GET", 3) == 0)
-          tditrace("@E+send()_%d_GET %d \"%s\"", sockfd, len, s);
-        else if (strncmp((const char*)buf, "PUT", 3) == 0)
-          tditrace("@E+send()_%d_PUT %d \"%s\"", sockfd, len, s);
-        else if (strncmp((const char*)buf, "POST", 4) == 0)
-          tditrace("@E+send()_%d_POST %d \"%s\"", sockfd, len, s);
-        else if (strncmp((const char*)buf, "{\"", 2) == 0)
-          tditrace("@E+send()_%d_{ %d \"%s\"", sockfd, len, s);
-        else {
+        if (strncmp((const char*)buf, "GET", 3) == 0) {
+          if (libcfd)
+            tditrace("@E+send()_%d_GET %d \"%s\"", sockfd, len, s);
+          else
+            tditrace("@E+send()_GET %d %d \"%s\"", sockfd, len, s);
+        } else if (strncmp((const char*)buf, "PUT", 3) == 0) {
+          if (libcfd)
+            tditrace("@E+send()_%d_PUT %d \"%s\"", sockfd, len, s);
+          else
+            tditrace("@E+send()_PUT %d %d \"%s\"", sockfd, len, s);
+        } else if (strncmp((const char*)buf, "POST", 4) == 0) {
+          if (libcfd)
+            tditrace("@E+send()_%d_POST %d \"%s\"", sockfd, len, s);
+          else
+            tditrace("@E+send()_POST %d %d \"%s\"", sockfd, len, s);
+        } else if (strncmp((const char*)buf, "{\"", 2) == 0) {
+          if (libcfd)
+            tditrace("@E+send()_%d_{ %d \"%s\"", sockfd, len, s);
+          else
+            tditrace("@E+send()_{ %d %d \"%s\"", sockfd, len, s);
+        } else {
           // s[MIN(4, len)] = '\0';
           // tditrace("@E+send()_%d_? %d \"%s...\"", sockfd, len, s);
-          tditrace("@E+send()_%d %d \"...\"", sockfd, len);
+          if (libcfd)
+            tditrace("@E+send()_%d %d \"...\"", sockfd, len);
+          else
+            tditrace("@E+send() %d %d \"...\"", sockfd, len);
         }
 
       } else {
-        tditrace("@E+send()_%d %d", sockfd, len);
+        if (libcfd)
+          tditrace("@E+send()_%d %d", sockfd, len);
+        else
+          tditrace("@E+send() %d %d", sockfd, len);
       }
 
     } else {
-      tditrace("@E+send()_%d %d", sockfd, len);
+      if (libcfd)
+        tditrace("@E+send()_%d %d", sockfd, len);
+      else
+        tditrace("@E+send() %d %d", sockfd, len);
     }
   }
 
   ssize_t ret = __send(sockfd, buf, len, flags);
 
   if (libcrecording || libcsendrecording) {
-    tditrace("@I-send() =%d", ret);
+    // tditrace("@I-send() =%d", ret);
   }
 
   return ret;
@@ -467,18 +548,24 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
   }
 
   if (libcrecording || libcrecvrecording) {
-    tditrace("@I+recv() %d %d", sockfd, len);
+    // tditrace("@I+recv() %d %d", sockfd, len);
   }
 
   ssize_t ret = __recv(sockfd, buf, len, flags);
 
   if (libcrecording || libcrecvrecording) {
     if (ret == -1) {
-      tditrace("@I-recv() =-1");
-      tditrace("@E+recv()_%d =-1", sockfd);
+      // tditrace("@I-recv() =-1");
+      if (libcfd)
+        tditrace("@E+recv()_%d %d =-1", sockfd, len);
+      else
+        tditrace("@E+recv() %d %d =-1", sockfd, len);
     } else if (ret == 0) {
-      tditrace("@I-recv() =0");
-      tditrace("@E+recv()_%d =0", sockfd);
+      // tditrace("@I-recv() =0");
+      if (libcfd)
+        tditrace("@E+recv()_%d %d =0", sockfd, len);
+      else
+        tditrace("@E+recv() %d %d =0", sockfd, len);
     } else {
       if (MAXSTRLEN) {
         if (buf) {
@@ -486,25 +573,26 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
           strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
           s[MIN(MAXSTRLEN, ret)] = '\0';
 
-          if (strncmp((const char*)buf, "HTTP", 4) == 0)
-            tditrace("@E+recv()_%d_HTTP =%d \"%s\"", sockfd, ret, s);
+          if (strncmp((const char*)buf, "HTTP", 4) == 0) {
+            if (libcfd)
+              tditrace("@E+recv()_%d_HTTP %d =%d \"%s\"", sockfd, len, ret, s);
+            else
+              tditrace("@E+recv()_HTTP %d %d =%d \"%s\"", sockfd, len, ret, s);
+          }
 
-          //    strncmp((const char *)buf, "PUT", 3) == 0 ||
-          //    strncmp((const char *)buf, "GET", 3) == 0 ||
-          //    strncmp((const char *)buf, "{\"result", 8) == 0 ||
-          //    strncmp((const char *)buf, "{\"method", 8) == 0 ||
-          //    strncmp((const char *)buf, "data:", 5) == 0 || ret == 1) {
-          //    tditrace("@E+recv()_%d =%d \"%s\"", sockfd, ret, s);
           else {
             // s[MIN(4, ret)] = '\0';
             // tditrace("@E+recv()_%d_? =%d \"%s\"...", sockfd, ret, s);
 
-            tditrace("@E+recv()_%d =%d \"...\"", sockfd, ret);
+            if (libcfd)
+              tditrace("@E+recv()_%d %d =%d \"...\"", sockfd, len, ret);
+            else
+              tditrace("@E+recv() %d %d =%d \"...\"", sockfd, len, ret);
           }
         }
       }
     }
-    tditrace("@I-recv() =%d", ret);
+    // tditrace("@I-recv() =%d", ret);
   }
 
   return ret;
@@ -527,21 +615,22 @@ extern "C" ssize_t sendto(int sockfd, const void* buf, size_t len, int flags,
   }
 
   if (libcrecording || libcsendtorecording) {
-    if (MAXSTRLEN) {
+    if (0 /*MAXSTRLEN*/) {
       char s[MAXSTRLEN + 1];
       strncpy(s, (const char*)buf, MIN(MAXSTRLEN, len));
       s[MIN(MAXSTRLEN, len)] = '\0';
-      tditrace("@I+sendto() %d %d", sockfd, len);
+      // tditrace("@I+sendto() %d %d", sockfd, len);
       tditrace("@E+sendto()_%d =%d \"%s\"", sockfd, len, s);
     } else {
-      tditrace("@I+sendto() %d %d ", sockfd, len);
+      tditrace("@E+sendto() %d %d ", sockfd, len);
+      // tditrace("@I+sendto() %d %d ", sockfd, len);
     }
   }
 
   ssize_t ret = __sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 
   if (libcrecording || libcsendtorecording) {
-    tditrace("@I-sendto() =%d", ret);
+    // tditrace("@I-sendto() =%d", ret);
   }
 
   return ret;
@@ -561,25 +650,28 @@ extern "C" ssize_t recvfrom(int sockfd, void* buf, size_t len, int flags,
   }
 
   if (libcrecording || libcrecvfromrecording) {
-    tditrace("@I+recvfrom() %d %d 0x%x", sockfd, len, flags);
+    // tditrace("@I+recvfrom() %d %d 0x%x", sockfd, len, flags);
   }
 
   ssize_t ret = __recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 
   if (libcrecording || libcrecvfromrecording) {
     if (ret == -1) {
-      tditrace("@I-recvfrom() =-1");
+      tditrace("@E+recvfrom() =-1");
+      // tditrace("@I-recvfrom() =-1");
     } else if (ret == 0) {
-      tditrace("@I-recvfrom() =0");
+      tditrace("@E+recvfrom() =0");
+      // tditrace("@I-recvfrom() =0");
     } else {
       if (0 /*MAXSTRLEN*/) {
         char s[MAXSTRLEN + 1];
         strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
         s[MIN(MAXSTRLEN, ret)] = '\0';
-        tditrace("@I-recvfrom() =%d", ret);
+        // tditrace("@I-recvfrom() =%d", ret);
         tditrace("@E+recvfrom()_%d =%d \"%s\"", sockfd, ret, s);
       } else {
-        tditrace("@I-recvfrom() =%d", ret);
+        tditrace("@E+recvfrom() =%d", ret);
+        // tditrace("@I-recvfrom() =%d", ret);
       }
     }
   }
@@ -601,16 +693,21 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr* msg, int flags) {
   }
 
   if (libcrecording || libcsendmsgrecording) {
-    tditrace("@I+sendmsg() %d", sockfd);
-    tditrace("@E+sendmsg()_%d [%d]-%d-%d", sockfd, msg->msg_iovlen,
-             msg->msg_iov[0].iov_len,
-             msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
+    // tditrace("@I+sendmsg() %d", sockfd);
+    if (libcfd)
+      tditrace("@E+sendmsg()_%d [%d]-%d-%d", sockfd, msg->msg_iovlen,
+               msg->msg_iov[0].iov_len,
+               msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
+    else
+      tditrace("@E+sendmsg() %d [%d]-%d-%d", sockfd, msg->msg_iovlen,
+               msg->msg_iov[0].iov_len,
+               msg->msg_iovlen > 1 ? msg->msg_iov[1].iov_len : 0);
   }
 
   ssize_t ret = __sendmsg(sockfd, msg, flags);
 
   if (libcrecording || libcsendmsgrecording) {
-    tditrace("@I-sendmsg() =%d", ret);
+    // tditrace("@I-sendmsg() =%d", ret);
   }
 
   return ret;
@@ -628,15 +725,19 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags) {
   }
 
   if (libcrecording || libcrecvmsgrecording) {
-    tditrace("@I+recvmsg() %d", sockfd);
+    // tditrace("@I+recvmsg() %d", sockfd);
   }
 
   ssize_t ret = __recvmsg(sockfd, msg, flags);
 
   if (libcrecording || libcrecvmsgrecording) {
-    tditrace("@I-recvmsg() =%d", ret);
-    tditrace("@E+recvmsg()_%d [%d]-%d=%d", sockfd, msg->msg_iovlen,
-             msg->msg_iov[0].iov_len, ret);
+    // tditrace("@I-recvmsg() =%d", ret);
+    if (libcfd)
+      tditrace("@E+recvmsg()_%d [%d]-%d=%d", sockfd, msg->msg_iovlen,
+               msg->msg_iov[0].iov_len, ret);
+    else
+      tditrace("@E+recvmsg() %d [%d]-%d=%d", sockfd, msg->msg_iovlen,
+               msg->msg_iov[0].iov_len, ret);
   }
 
   return ret;

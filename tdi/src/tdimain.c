@@ -1014,12 +1014,15 @@ void *monitor_thread(void *param) {
     stat(gtracebufferfilename, &st);
 
     if (allow_rewind) {
-      fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n", gtracebufferfilename,
-              st.st_atim.tv_sec, gtrace_buffer_st.st_atim.tv_sec);
-      fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n", gtracebufferfilename,
-              st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
-      fprintf(stderr, "tdi-check: %s ctim=%d gctim=%d\n", gtracebufferfilename,
-              st.st_ctim.tv_sec, gtrace_buffer_st.st_ctim.tv_sec);
+      // fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n",
+      // gtracebufferfilename,
+      //        st.st_atim.tv_sec, gtrace_buffer_st.st_atim.tv_sec);
+      // fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n",
+      // gtracebufferfilename,
+      //        st.st_mtim.tv_sec, gtrace_buffer_st.st_mtim.tv_sec);
+      // fprintf(stderr, "tdi-check: %s ctim=%d gctim=%d\n",
+      // gtracebufferfilename,
+      //        st.st_ctim.tv_sec, gtrace_buffer_st.st_ctim.tv_sec);
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
         stat(gtracebufferfilename, &gtrace_buffer_st);
@@ -1135,8 +1138,8 @@ void create_trace_buffer(void) {
     gtrace_buffer[i] = 0;
   }
 
-  fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
-          gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
+  fprintf(stderr, "tdi: [%s][%d], allocated \"%s\" (%dMB)\n", gprocname, gpid,
+          gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
   trace_buffer_byte_ptr = gtrace_buffer;
   trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
@@ -1159,7 +1162,7 @@ void create_trace_buffer(void) {
   _u64 amonotonic_offset = (_u64)*p++ * (_u64)1000000000 + *p++;
 
   fprintf(stderr,
-          "tdi: init[%s][%d], timeofday_timestamp:%lld, "
+          "tdi: [%s][%d], timeofday_timestamp:%lld, "
           "monotonic_timestamp:%lld\n",
           gprocname, gpid, atimeofday_offset, amonotonic_offset);
 
@@ -1181,7 +1184,7 @@ void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
   int delay = *pdelay;
 
-  fprintf(stderr, "tdi: init[%s][%d], delay is %d\n", gprocname, gpid, delay);
+  fprintf(stderr, "tdi: [%s][%d], delay is %d\n", gprocname, gpid, delay);
 
   if (delay == -1) {
     /*
@@ -1197,7 +1200,7 @@ void *delayed_init_thread(void *param) {
 
       if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
         fprintf(stderr,
-                "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
+                "tdi: [%s][%d], delay until timeofday is set, \"%s\", "
                 "timeofday is set\n",
                 gprocname, gpid, time_string);
         break;
@@ -1206,7 +1209,7 @@ void *delayed_init_thread(void *param) {
       ptm = localtime(&tv.tv_sec);
       strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", ptm);
       fprintf(stderr,
-              "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
+              "tdi: [%s][%d], delay until timeofday is set, \"%s\", "
               "timeofday "
               "is not set\n",
               gprocname, gpid, time_string);
@@ -1221,7 +1224,7 @@ void *delayed_init_thread(void *param) {
      */
 
     while (1) {
-      fprintf(stderr, "tdi: init[%s][%d], paused...\n", gprocname, gpid);
+      fprintf(stderr, "tdi: [%s][%d], paused...\n", gprocname, gpid);
       usleep(1 * 1000000);
 
       struct stat st;
@@ -1237,7 +1240,7 @@ void *delayed_init_thread(void *param) {
       */
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-        fprintf(stderr, "tdi: init[%s][%d], started...\n", gprocname, gpid);
+        fprintf(stderr, "tdi: [%s][%d], started...\n", gprocname, gpid);
 
         stat(gtracebufferfilename, &gtrace_buffer_st);
         break;
@@ -1246,15 +1249,15 @@ void *delayed_init_thread(void *param) {
 
   } else {
     while (delay > 0) {
-      fprintf(stderr, "tdi: init[%s][%d], delay %d second(s)...\n", gprocname,
-              gpid, delay);
+      fprintf(stderr, "tdi: [%s][%d], delay %d second(s)...\n", gprocname, gpid,
+              delay);
       usleep(1 * 1000000);
 
       delay--;
     }
   }
 
-  fprintf(stderr, "tdi: init[%s][%d], delay finished...\n", gprocname, gpid);
+  fprintf(stderr, "tdi: [%s][%d], delay finished...\n", gprocname, gpid);
 
   create_trace_buffer();
 
@@ -1292,24 +1295,23 @@ int tditrace_init(void) {
   get_process_name_by_pid(gpid, gprocname);
 
   if (strcmp(gprocname, "mkdir") == 0) {
-    fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
+    fprintf(stderr, "tdi: [%s][%d], procname is \"mkdir\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strncmp(gprocname, "sh", 2) == 0) {
-    fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
+    fprintf(stderr, "tdi: [%s][%d], procname is \"sh*\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "strace") == 0) {
-    fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
+    fprintf(stderr, "tdi: [%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "gdbserver") == 0) {
-    fprintf(stderr,
-            "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
+    fprintf(stderr, "tdi: [%s][%d], procname is \"gdbserver\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else {
-    // fprintf(stderr, "tdi: init[%s][%d]\n", gprocname, gpid);
+    // fprintf(stderr, "tdi: [%s][%d]\n", gprocname, gpid);
   }
 
   char *env;
@@ -1329,7 +1331,7 @@ int tditrace_init(void) {
     }
     if (gmask == 0x0) gmask = strtoul(env, 0, 16);
   }
-  fprintf(stderr, "tdi: init[%s][%d], mask = 0x%08x (", gprocname, gpid, gmask);
+  fprintf(stderr, "tdi: [%s][%d], mask = 0x%08x (", gprocname, gpid, gmask);
   for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
     if (gmask & (1 << i))
       fprintf(stderr, "%s%s", i == 0 ? "" : ",", instruments[i]);
@@ -1422,11 +1424,11 @@ int tditrace_init(void) {
 
           if (stat(procpid, &sts) == -1) {
             unlink(fullname);
-            fprintf(stderr, "tdi: init[%s][%d], removed \"%s\"\n", gprocname,
-                    gpid, fullname);
+            fprintf(stderr, "tdi: [%s][%d], removed \"%s\"\n", gprocname, gpid,
+                    fullname);
           } else {
-            fprintf(stderr, "tdi: init[%s][%d], not removed \"%s\"\n",
-                    gprocname, gpid, fullname);
+            fprintf(stderr, "tdi: [%s][%d], not removed \"%s\"\n", gprocname,
+                    gpid, fullname);
           }
         }
       }
@@ -1499,7 +1501,8 @@ void check_trace_buffer(int b) {
     struct stat st;
     stat(tracebuffers[b].filename, &st);
 
-    fprintf(stderr, "\"%s\" (%lldMB) ...\n", tracebuffers[b].filename, st.st_size / (1024 * 1024));
+    fprintf(stderr, "\"%s\" (%lldMB) ...\n", tracebuffers[b].filename,
+            st.st_size / (1024 * 1024));
 
     char *s1 = strchr(tracebuffers[b].filename, '@');
     char *s2 = strchr(s1 + 1, '@');
@@ -1644,8 +1647,8 @@ void tditrace_exit(int argc, char *argv[]) {
     parse(d);
 
     if (!tracebuffers[d].valid) {
-      fprintf(stderr, "\"%s\" %d%% (%d)\n",
-              tracebuffers[d].filename, pctused, nr_entries);
+      fprintf(stderr, "\"%s\" %d%% (%d)\n", tracebuffers[d].filename, pctused,
+              nr_entries);
     }
   }
 
@@ -1815,12 +1818,11 @@ void tditrace_internal(va_list args, const char *format) {
 
   while ((unsigned int)trace_text_ptr & 0x3) *trace_text_ptr++ = 0;
 
-  int i = ((char *)trace_text_ptr - (char *)trace_text) >> 2;
+  int i = (trace_text_ptr - (char *)trace_text) >> 2;
 
   /*
    * store into tracebuffer
    */
-
   simplefu_mutex_lock(&myMutex);
 
   *trace_buffer_dword_ptr++ = 0x0003 + i;
@@ -1831,6 +1833,10 @@ void tditrace_internal(va_list args, const char *format) {
     // fprintf(stderr, "[%08x] i=%d\n", *trace_text_dword_ptr, i);
     *trace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
   }
+  /*
+   * mark the next marker as invalid
+   */
+  *trace_buffer_dword_ptr = 0;
 
   if (((char *)trace_buffer_dword_ptr - gtrace_buffer) >
       (gtracebuffersize - 1024)) {

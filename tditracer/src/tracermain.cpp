@@ -45,6 +45,7 @@ bool libcopenrecording;
 bool libcfopenrecording;
 bool libcfdopenrecording;
 bool libcfreopenrecording;
+bool libcfd;
 bool libcreadrecording;
 bool libcwriterecording;
 bool libcsocketrecording;
@@ -76,10 +77,10 @@ bool gles2recording;
 bool gldrawrecording;
 bool gltexturerecording;
 
-int shaders_captured = 0;
-int textures_captured = 0;
-int texturebytes_captured = 0;
-int frames_captured = 0;
+int shaders_captured;
+int textures_captured;
+int texturebytes_captured;
+int frames_captured;
 
 typedef unsigned int mz_uint;
 typedef int mz_bool;
@@ -123,42 +124,29 @@ static void init(void) {
     char *env;
     if (env = getenv("LIBC")) {
       libcrecording = (atoi(env) >= 1);
-      libcopenrecording = true;
-      libcfopenrecording = true;
-      libcfdopenrecording = true;
-      libcfreopenrecording = true;
-      libcreadrecording = false;
-      libcwriterecording = false;
-      libcsocketrecording = false;
-      libcsendrecording = true;
-      libcsendtorecording = true;
-      libcsendmsgrecording = true;
-      libcsendmmsgrecording = true;
-      libcrecvrecording = true;
-      libcrecvfromrecording = true;
-      libcrecvmsgrecording = true;
-      libcrecvmmsgrecording = true;
-      libcselectrecording = false;
-      libcpollrecording = false;
-      libcioctlrecording = false;
-      libcsyslogrecording = true;
-      libcmalloc = 0;
-      libccalloc = 0;
-      libcrealloc = 0;
-      libcmemalign = 0;
-      libcfree = 0;
-      libcoperatornew = 0;
-      libcmmap = 0;
-      libcmunmap = 0;
 
-    } else {
-      libcrecording = false;
-      libcioctlrecording = false;
+      libcreadrecording = true;
+      libcwriterecording = true;
+
+      libcsendrecording = true;
+      libcrecvrecording = true;
+
+      libcsendtorecording = true;
+      libcrecvfromrecording = true;
+
+      libcsendmsgrecording = true;
+      libcrecvmsgrecording = true;
+
+      libcsendmmsgrecording = true;
+      libcrecvmmsgrecording = true;
     }
 
     if (env = getenv("LIBCOPEN")) {
       libcopenrecording = libcfopenrecording = libcfdopenrecording =
           libcfreopenrecording = (atoi(env) >= 1);
+    }
+    if (env = getenv("LIBCFD")) {
+      libcfd = (atoi(env) >= 1);
     }
     if (env = getenv("LIBCREAD")) {
       libcreadrecording = (atoi(env) >= 1);
@@ -263,12 +251,13 @@ static void init(void) {
     }
 
     fprintf(stderr,
-        "tditracer: init[%d], libc:%s, pthread:%s, shaders:%s, "
-        "textures:%s, "
-        "renderbuffers:%s, frames:%d\n",
-        getpid(), libcrecording ? "yes" : "no", pthreadrecording ? "yes" : "no",
-        shaderrecording ? "yes" : "no", texturerecording ? "yes" : "no",
-        renderbufferrecording ? "yes" : "no", framerecording);
+            "tditracer: [%d], libc:%s, pthread:%s, shaders:%s, "
+            "textures:%s, "
+            "renderbuffers:%s, frames:%d\n",
+            getpid(), libcrecording ? "yes" : "no",
+            pthreadrecording ? "yes" : "no", shaderrecording ? "yes" : "no",
+            texturerecording ? "yes" : "no",
+            renderbufferrecording ? "yes" : "no", framerecording);
 
     inited = true;
   }
