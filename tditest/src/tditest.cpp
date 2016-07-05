@@ -384,15 +384,43 @@ int main(int argc, char **argv) {
 }
 #endif
 
+void run_6(void) {
+#if 0
+  usleep(2 * 1000 * 1000);
+
+  if (tditrace) tditrace("1");
+  if (tditrace) tditrace("12");
+  if (tditrace) tditrace("123");
+  if (tditrace) tditrace("1234");
+  if (tditrace) tditrace("12345");
+  if (tditrace) tditrace("123456");
+  if (tditrace) tditrace("1234567");
+  if (tditrace) tditrace("12345678");
+  if (tditrace) tditrace("123456789");
+  if (tditrace) tditrace("1234567890");
+
+  usleep(1 * 1000);
+#endif
+
+  int i;
+//  for (i = 0; i < 50000; i++) {
+  while(1) {
+    if (tditrace) tditrace("@T+HELLO012345678901234567890123456789");
+    usleep(500);
+    if (tditrace) tditrace("@T-HELLO012345678901234567890123456789");
+    usleep(500);
+  }
+}
+
 #if 1
 int main(int argc, char **argv) {
-  //run_1();
-  //run_2();
-  //run_3();
-  //run_4();
+  run_1();
+  run_2();
+  run_3();
+  run_4();
 
-  run_5();
-
+  //run_5();
+  //run_6();
 }
 
 #endif

@@ -95,8 +95,9 @@ char gtracebufferfilename[128];
 struct stat gtrace_buffer_st;
 
 static char *gtrace_buffer;
-static char *trace_buffer_ptr;
-static char *gtrace_buffer_rewind_ptr;
+static char *trace_buffer_byte_ptr;
+static unsigned int *trace_buffer_dword_ptr;
+static unsigned int *gtrace_buffer_rewind_ptr;
 
 static int tditrace_inited;
 static int reported_full;
@@ -158,7 +159,7 @@ static _u64 timestamp_monotonic_nsec(void) {
 
 void tditrace_rewind();
 
-static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
+static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
                      char *procname, int pid, int tid) {
   int i;
   int entry;
@@ -167,24 +168,37 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
   char name[1024];
   int value = 0;
 
+  // fprintf(stderr, "text_in=\"%s\" (%d)\n", text_in, text_len);
+  // for (i=0;i<30;i++)
+  //  fprintf(stderr, "%02x ", text_in[i]);
+  // fprintf(stderr,"\n");
+
+  // fprintf(stderr, "addentry:[%s][%d][%lld]\n", text_in, text_len, timestamp);
+
   char text_in1[1024];
   char *text = text_in1;
 
   sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
   int procpidtidlen = strlen(text_in1);
 
-  // fprintf(stderr, "addentry:[%s]\n", text_in);
-
   if ((strncmp(text_in, "@T+", 3) == 0) || (strncmp(text_in, "@T-", 3) == 0) ||
       (strncmp(text_in, "@I+", 3) == 0) || (strncmp(text_in, "@I-", 3) == 0) ||
       (strncmp(text_in, "@A+", 3) == 0) || (strncmp(text_in, "@A-", 3) == 0) ||
       (strncmp(text_in, "@S+", 3) == 0) || (strncmp(text_in, "@E+", 3) == 0)) {
     strncpy(text_in1, text_in, 3);
-    sprintf(&text_in1[3], "[%s][%d][%d]%s", procname, pid, tid, &text_in[3]);
+
+    snprintf(&text_in1[3], procpidtidlen + text_len + 1 - 3, "[%s][%d][%d]%s",
+             procname, pid, tid, &text_in[3]);
 
   } else {
-    sprintf(text_in1, "[%s][%d][%d]%s", procname, pid, tid, text_in);
+    snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s", procname,
+             pid, tid, text_in);
   }
+
+  // fprintf(stderr, "text=\"%s\"\n", text);
+  // for (i=0;i<30;i++)
+  //  fprintf(stderr, "%02x ", text[i]);
+  // fprintf(stderr,"\n");
 
   // get rid of any '\n', replace with '_'
   for (i = 0; i < (int)strlen(text); i++) {
@@ -662,7 +676,8 @@ static void addentry(FILE *stdout, char *text_in, _u64 timestamp,
       sprintf(fullentry, "TIM %lld\n", timestamp);
       fwrite(fullentry, strlen(fullentry), 1, stdout);
       cum_values[entry] += value;
-      sprintf(fullentry, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry, cum_values[entry]);
+      sprintf(fullentry, "VAL %d %d %lld\n", VALUES, VALUES * 1000 + entry,
+              cum_values[entry]);
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       return;
@@ -740,11 +755,12 @@ typedef struct {
   char *bufmmapped;
   int bufsize;
   char *ptr;
-  char *saveptr;
+  unsigned int *dword_ptr;
   _u64 timeofday_offset;
   _u64 monotonic_offset;
   _u64 monotonic_timestamp;
   char *text;
+  int text_len;
   int tid;
   int valid;
 } tracebuffer_t;
@@ -752,116 +768,27 @@ typedef struct {
 tracebuffer_t tracebuffers[10];
 
 static void parse(int bid) {
-  const char *search = "\f";
-  char *token;
-
-  int timestamp_sec;
-  int timestamp_nsec;
-
-  // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
+  //fprintf(stderr, "parse %d, tracebuffers[bid].dword_ptr = 0x%08x\n", bid,
+  //       (int)tracebuffers[bid].dword_ptr);
 
   tracebuffers[bid].valid = 0;
 
-#if 0
-    char buf[100];
-    snprintf(buf, 79, tracebuffers[bid].saveptr);
-    int i;
-    for (i = 0 ; i < 79 ; i++)
-    {
-        fprintf(stderr, "%c", buf[i] == 0x0c ? '|' : buf[i]); 
-    }
-    fprintf(stderr, "\n");
-#endif
+  unsigned int *p = tracebuffers[bid].dword_ptr;
+  unsigned int marker = *p++;
 
-  char *endptr;
-  long int val;
+  tracebuffers[bid].dword_ptr += marker & 0xffff;
 
-  token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
-  if (token) {
-    // token is timestamp_sec
-    val = strtol(token, &endptr, 10);
-    if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
-        (errno != 0 && val == 0)) {
-      fprintf(stderr, "strtol error\n");
-      return;
-    }
-    if (endptr == token) {
-      fprintf(stderr, "No digits were found[%s]\n", token);
-#if 1
-      char buf[100];
-      snprintf(buf, 79, tracebuffers[bid].saveptr);
-      int i;
-      for (i = 0; i < 79; i++) {
-        fprintf(stderr, "%c", buf[i] == 0x0c ? '|' : buf[i]);
-      }
-      fprintf(stderr, "\n");
-#endif
-      return;
-    }
-    timestamp_sec = val;
+  int tvsec = *p++;
+  int tvnsec = *p++;
+  tracebuffers[bid].monotonic_timestamp = (_u64)tvsec * (_u64)1000000000 + (_u64)tvnsec;
 
-    token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
-    if (token) {
-      // token is timestamp_nsec
-      long int val = strtol(token, &endptr, 10);
-      if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
-          (errno != 0 && val == 0)) {
-        fprintf(stderr, "strtol error\n");
-        return;
-      }
-      if (endptr == token) {
-        fprintf(stderr, "No digits were found[%s]\n", token);
-#if 1
-        char buf[100];
-        snprintf(buf, 79, tracebuffers[bid].saveptr);
-        int i;
-        for (i = 0; i < 79; i++) {
-          fprintf(stderr, "%c", buf[i] == 0x0c ? '|' : buf[i]);
-        }
-        fprintf(stderr, "\n");
-#endif
-        return;
-      }
-      timestamp_nsec = val;
+  tracebuffers[bid].tid = 0;
+  tracebuffers[bid].text = (char *)p;
+  tracebuffers[bid].text_len = ((marker & 0xffff) - 3) * 4;
+  tracebuffers[bid].valid = (marker != 0);
 
-      tracebuffers[bid].monotonic_timestamp =
-          (_u64)timestamp_nsec + (_u64)timestamp_sec * (_u64)1000000000;
-
-      token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
-      if (token) {
-        // token is tid
-
-        long int val = strtol(token, &endptr, 10);
-        if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
-            (errno != 0 && val == 0)) {
-          fprintf(stderr, "strtol error\n");
-          return;
-        }
-        if (endptr == token) {
-          fprintf(stderr, "No digits were found[%s]\n", token);
-#if 1
-          char buf[100];
-          snprintf(buf, 79, tracebuffers[bid].saveptr);
-          int i;
-          for (i = 0; i < 79; i++) {
-            fprintf(stderr, "%c", buf[i] == 0x0c ? '|' : buf[i]);
-          }
-          fprintf(stderr, "\n");
-#endif
-          return;
-        }
-
-        tracebuffers[bid].tid = val;
-
-        token = strtok_r(NULL, search, &tracebuffers[bid].saveptr);
-        if (token) {
-          // token is tid
-          tracebuffers[bid].text = token;
-          tracebuffers[bid].valid = 1;
-        }
-      }
-    }
-  }
+  //fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
+  //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
 }
 
 static unsigned int find_process_name(char *p_processname) {
@@ -945,17 +872,13 @@ static void dump_proc_self_maps(void) {
       /* keep trying */;
     else if (bytes > 0) {
       proc_self_maps[bytes] = '\0';
-      // fprintf(stderr, "bytes=%d[%s]\n", bytes, proc_self_maps);
 
       char *saveptr;
       char *line = strtok_r(proc_self_maps, "\n", &saveptr);
 
       while (line) {
         if (strlen(line) > 50) {
-          // fprintf(stderr, "+%d[%s]\n", strlen(line), line);
           tditrace("MAPS [%s][%d] %s", gprocname, gpid, line);
-          // fprintf(stderr, "=%d\n", trace_buffer_ptr -
-          // gtrace_buffer);
         }
         line = strtok_r(NULL, "\n", &saveptr);
       }
@@ -1090,9 +1013,15 @@ void *monitor_thread(void *param) {
     stat(gtracebufferfilename, &st);
 
     if (allow_rewind) {
-      // fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n",
-      // gtracebufferfilename, st.st_mtim.tv_sec,
-      // gtrace_buffer_st.st_mtim.tv_sec);
+      fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n",
+      gtracebufferfilename, st.st_atim.tv_sec,
+      gtrace_buffer_st.st_atim.tv_sec);
+      fprintf(stderr, "tdi-check: %s mtim=%d gmtim=%d\n",
+      gtracebufferfilename, st.st_mtim.tv_sec,
+      gtrace_buffer_st.st_mtim.tv_sec);
+      fprintf(stderr, "tdi-check: %s ctim=%d gctim=%d\n",
+      gtracebufferfilename, st.st_ctim.tv_sec,
+      gtrace_buffer_st.st_ctim.tv_sec);
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
         stat(gtracebufferfilename, &gtrace_buffer_st);
@@ -1111,7 +1040,7 @@ void *monitor_thread(void *param) {
       if (!offload_over50) {
         simplefu_mutex_lock(&myMutex);
         int check =
-            ((trace_buffer_ptr - gtrace_buffer) > (gtracebuffersize / 2));
+            ((trace_buffer_byte_ptr - gtrace_buffer) > (gtracebuffersize / 2));
         simplefu_mutex_unlock(&myMutex);
 
         if (check) {
@@ -1149,7 +1078,7 @@ void *monitor_thread(void *param) {
       } else {
         simplefu_mutex_lock(&myMutex);
         int check =
-            ((trace_buffer_ptr - gtrace_buffer) < (gtracebuffersize / 2));
+            ((trace_buffer_byte_ptr - gtrace_buffer) < (gtracebuffersize / 2));
         simplefu_mutex_unlock(&myMutex);
 
         if (check) {
@@ -1175,6 +1104,77 @@ void *monitor_thread(void *param) {
   }
 
   pthread_exit(NULL);
+}
+
+void create_trace_buffer(void) {
+  /*
+   * [TDIT]
+   * [RACE]
+   * [    ]timeofday_offset.tv_usec
+   * [    ]timeofday_offset.tv_sec
+   * [    ]clock_monotonic_offset.tv_nsec
+   * [    ]clock_monotonic_offset.tv_sec
+   * ------
+   * [    ]marker, lower 2 bytes is length in dwords
+   * [    ]clock_monotonic_timestamp.tv_nsec
+   * [    ]clock_monotonic_timestamp.tv_sec
+   * [    ]text, padded with 0 to multiple of 4 bytes
+   * ...
+   * ------
+   */
+  sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer@%s@%d", gprocname,
+          gpid);
+  FILE *file;
+  if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
+    fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
+  }
+  int i = ftruncate(fileno(file), gtracebuffersize);
+  gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
+                               MAP_SHARED, fileno(file), 0);
+  stat(gtracebufferfilename, &gtrace_buffer_st);
+
+  for (i = 0; i < gtracebuffersize; i++) {
+    gtrace_buffer[i] = 0;
+  }
+
+  fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
+          gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
+
+  trace_buffer_byte_ptr = gtrace_buffer;
+  trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
+
+  /*
+   * write one time start text
+   */
+  sprintf((char *)trace_buffer_dword_ptr, (char *)"TDITRACE");
+  trace_buffer_dword_ptr += 2;
+
+  unsigned int *p = trace_buffer_dword_ptr;
+
+  gettimeofday((struct timeval *)trace_buffer_dword_ptr, 0);
+  trace_buffer_dword_ptr += 2;
+
+  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
+  trace_buffer_dword_ptr += 2;
+
+  _u64 atimeofday_offset = (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
+  _u64 amonotonic_offset = (_u64)*p++ * (_u64)1000000000 + *p++;
+
+  fprintf(stderr,
+          "tdi: init[%s][%d], timeofday_timestamp:%lld, "
+          "monotonic_timestamp:%lld\n",
+          gprocname, gpid, atimeofday_offset, amonotonic_offset);
+
+  /*
+   * rewind ptr is used for offloading set to after
+   */
+  gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
+
+  reported_full = 0;
+
+  simplefu_mutex_lock(&myMutex);
+  tditrace_inited = 1;
+  simplefu_mutex_unlock(&myMutex);
 }
 
 static int thedelay;
@@ -1252,62 +1252,13 @@ void *delayed_init_thread(void *param) {
               gpid, delay);
       usleep(1 * 1000000);
 
-#if 0
-            struct stat st;
-            stat(gtracebufferfilename, &st);
-            if (st.st_atim.tv_sec != gtrace_buffer_st.st_atim.tv_sec) {
-            }
-#endif
       delay--;
     }
   }
 
-  fprintf(stderr, "tdi: init[%s][%d], delay finished...\n", gprocname, gpid,
-          delay);
+  fprintf(stderr, "tdi: init[%s][%d], delay finished...\n", gprocname, gpid);
 
-  /*
-   * Create tracebuffer
-   */
-  sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer@%s@%d", gprocname,
-          gpid);
-  FILE *file;
-  if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
-    fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
-  }
-  int i = ftruncate(fileno(file), gtracebuffersize);
-  gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
-                               MAP_SHARED, fileno(file), 0);
-  stat(gtracebufferfilename, &gtrace_buffer_st);
-
-  // for (i = 0; i < gtracebuffersize; i++) {
-  //   gtrace_buffer[i] = 0;
-  //}
-
-  fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
-          gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
-
-  trace_buffer_ptr = gtrace_buffer;
-  // write one time start text
-  trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
-  // obtain timeofday timestamp and write to buffer
-  _u64 timeofday_timestamp = timestamp_timeofday_nsec();
-  // obtain monotonic timestamp and write to buffer
-  _u64 monotonic_timestamp = timestamp_monotonic_nsec();
-  trace_buffer_ptr +=
-      sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
-  // obtain monotonic timestamp and write to buffer
-  trace_buffer_ptr +=
-      sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
-  gtrace_buffer_rewind_ptr = trace_buffer_ptr;
-  fprintf(stderr,
-          "tdi: init[%s][%d], timeofday_timestamp:%lld, "
-          "monotonic_timestamp:%lld\n",
-          gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
-  reported_full = 0;
-
-  simplefu_mutex_lock(&myMutex);
-  tditrace_inited = 1;
-  simplefu_mutex_unlock(&myMutex);
+  create_trace_buffer();
 
   pthread_t monitor_thread_id;
   pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
@@ -1485,48 +1436,7 @@ int tditrace_init(void) {
   simplefu_mutex_init(&myMutex);
 
   if (thedelay == 0) {
-    /*
-     * Create tracebuffer
-     */
-    sprintf(gtracebufferfilename, (char *)"/tmp/tditracebuffer@%s@%d",
-            gprocname, gpid);
-    FILE *file;
-    if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
-      fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
-      return -1;
-    }
-    i = ftruncate(fileno(file), gtracebuffersize);
-    gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
-                                 MAP_SHARED, fileno(file), 0);
-    stat(gtracebufferfilename, &gtrace_buffer_st);
-    for (i = 0; i < gtracebuffersize; i++) {
-      gtrace_buffer[i] = 0;
-    }
-    fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
-            gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
-
-    trace_buffer_ptr = gtrace_buffer;
-    // write one time start text
-    trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
-    // obtain timeofday timestamp and write to buffer
-    _u64 timeofday_timestamp = timestamp_timeofday_nsec();
-    // obtain monotonic timestamp and write to buffer
-    _u64 monotonic_timestamp = timestamp_monotonic_nsec();
-    trace_buffer_ptr +=
-        sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
-    // obtain monotonic timestamp and write to buffer
-    trace_buffer_ptr +=
-        sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
-    gtrace_buffer_rewind_ptr = trace_buffer_ptr;
-    fprintf(stderr,
-            "tdi: init[%s][%d], timeofday_timestamp = %lld, "
-            "monotonic_timestamp = %lld\n",
-            gprocname, gpid, timeofday_timestamp, monotonic_timestamp);
-    reported_full = 0;
-
-    simplefu_mutex_lock(&myMutex);
-    tditrace_inited = 1;
-    simplefu_mutex_unlock(&myMutex);
+    create_trace_buffer();
 
     pthread_t monitor_thread_id;
     pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
@@ -1552,26 +1462,24 @@ void tditrace_rewind() {
   tditrace_inited = 0;
   simplefu_mutex_unlock(&myMutex);
 
-  trace_buffer_ptr = gtrace_buffer;
-  // write one time start text
-  trace_buffer_ptr += sprintf(trace_buffer_ptr, (char *)"TDITRACEBUFFER\f");
-  // obtain timeofday timestamp and write to buffer
-  _u64 timeofday_timestamp = timestamp_timeofday_nsec();
-  // obtain monotonic timestamp and write to buffer
-  _u64 monotonic_timestamp = timestamp_monotonic_nsec();
-  trace_buffer_ptr +=
-      sprintf(trace_buffer_ptr, (char *)"%lld\f", timeofday_timestamp);
-  // obtain monotonic timestamp and write to buffer
-  trace_buffer_ptr +=
-      sprintf(trace_buffer_ptr, (char *)"%lld\f", monotonic_timestamp);
-  gtrace_buffer_rewind_ptr = trace_buffer_ptr;
+  trace_buffer_byte_ptr = gtrace_buffer;
+  trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
 
-  for (i = gtrace_buffer_rewind_ptr - gtrace_buffer; i < gtracebuffersize;
-       i++) {
-    gtrace_buffer[i] = 0;
-  }
+  /*
+   * write one time start text
+   */
+  sprintf((char *)trace_buffer_dword_ptr, (char *)"TDITRACE");
+  trace_buffer_dword_ptr += 2;
 
-  trace_buffer_ptr = gtrace_buffer_rewind_ptr;
+  unsigned int *p = trace_buffer_dword_ptr;
+
+  gettimeofday((struct timeval *)trace_buffer_dword_ptr, 0);
+  trace_buffer_dword_ptr += 2;
+
+  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
+  trace_buffer_dword_ptr += 2;
+
+  gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
 
   reported_full = 0;
 
@@ -1581,13 +1489,9 @@ void tditrace_rewind() {
 }
 
 void tditrace_exit(int argc, char *argv[]) {
-  // Create the TDI file from the rough traces
+  // Create the TDI file from the tracebuffer
 
   int i;
-  const char *search = "\f";
-
-  char *ptr;
-  char *ptr1;
 
   int buffers = 0;
 
@@ -1612,10 +1516,6 @@ void tditrace_exit(int argc, char *argv[]) {
           tracebuffers[buffers].procname[(s2 - s1) - 1] = 0;
           tracebuffers[buffers].pid = atoi(s2 + 1);
 
-          // fprintf(stderr, "[%s] [%d]\n",
-          // tracebuffers[buffers].procname,
-          // tracebuffers[buffers].pid);
-
           struct stat st;
           stat(tracebuffers[buffers].filename, &st);
 
@@ -1630,26 +1530,27 @@ void tditrace_exit(int argc, char *argv[]) {
           tracebuffers[buffers].bufsize = st.st_size;
 
           tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
+          tracebuffers[buffers].dword_ptr =
+              (unsigned int *)tracebuffers[buffers].bufmmapped;
 
-          // token should hold "TDITRACEBUFFER"
-          if (strncmp("TDITRACEBUFFER",
-                      strtok_r(tracebuffers[buffers].ptr, search,
-                               &tracebuffers[buffers].saveptr),
-                      14) != 0) {
+          // should hold "TDITRACE"
+          if (strncmp("TDITRACE", tracebuffers[buffers].ptr, 8) != 0) {
             fprintf(stderr, "invalid tracebuffer, skipping\n");
             break;
           }
 
-          fprintf(stderr, "bufpct=%d\n",
-                  (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 /
-                        st.st_size));
-
-          // token should hold "timeofday timestamp offset in nsecs"
-          tracebuffers[buffers].timeofday_offset = (_u64)atoll(
-              strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
-
-          tracebuffers[buffers].monotonic_offset = (_u64)atoll(
-              strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+          tracebuffers[buffers].dword_ptr += 2;
+          unsigned int *p = tracebuffers[buffers].dword_ptr;
+          tracebuffers[buffers].timeofday_offset =
+              (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
+          tracebuffers[buffers].monotonic_offset =
+              (_u64)*p++ * (_u64)1000000000 + *p++;
+          fprintf(stderr,
+                  "timeofday_offset:%lld, "
+                  "monotonic_offset:%lld\n",
+                  tracebuffers[buffers].timeofday_offset,
+                  tracebuffers[buffers].monotonic_offset);
+          tracebuffers[buffers].dword_ptr += 4;
 
           fclose(file);
 
@@ -1695,30 +1596,27 @@ void tditrace_exit(int argc, char *argv[]) {
                              fileno(file), 0);
             tracebuffers[buffers].bufsize = st.st_size;
             tracebuffers[buffers].ptr = tracebuffers[buffers].bufmmapped;
+            tracebuffers[buffers].dword_ptr =
+                (unsigned int *)tracebuffers[buffers].bufmmapped;
 
-            // token should hold "TDITRACEBUFFER"
-            if (strncmp("TDITRACEBUFFER",
-                        strtok_r(tracebuffers[buffers].ptr, search,
-                                 &tracebuffers[buffers].saveptr),
-                        14) != 0) {
-              fprintf(stderr,
-                      "tdi: init[%s][%d], invalid "
-                      "tracebuffer, skipping\n",
-                      gprocname, gpid);
+            // should hold "TDITRACE"
+            if (strncmp("TDITRACE", tracebuffers[buffers].ptr, 8) != 0) {
+              fprintf(stderr, "invalid tracebuffer, skipping\n");
               break;
             }
 
-            fprintf(stderr, "bufpct=%d\n",
-                    (int)(strlen(tracebuffers[buffers].saveptr) * 100.0 /
-                          (st.st_size)));
-
-            // token should hold "timeofday timestamp offset in
-            // nsecs"
-            tracebuffers[buffers].timeofday_offset = (_u64)atoll(
-                strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
-
-            tracebuffers[buffers].monotonic_offset = (_u64)atoll(
-                strtok_r(NULL, search, &tracebuffers[buffers].saveptr));
+            tracebuffers[buffers].dword_ptr += 2;
+            unsigned int *p = tracebuffers[buffers].dword_ptr;
+            tracebuffers[buffers].timeofday_offset =
+                (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
+            tracebuffers[buffers].monotonic_offset =
+                (_u64)*p++ * (_u64)1000000000 + *p++;
+            fprintf(stderr,
+                    "timeofday_offset:%lld, "
+                    "monotonic_offset:%lld\n",
+                    tracebuffers[buffers].timeofday_offset,
+                    tracebuffers[buffers].monotonic_offset);
+            tracebuffers[buffers].dword_ptr += 4;
 
             fclose(file);
 
@@ -1779,8 +1677,7 @@ void tditrace_exit(int argc, char *argv[]) {
       }
     }
 
-    addentry(stdout, tracebuffers[d].text,
-
+    addentry(stdout, tracebuffers[d].text, tracebuffers[d].text_len,
              tracebuffers[d].timeofday_offset - abs_timeofday +
                  tracebuffers[d].monotonic_timestamp -
                  tracebuffers[d].monotonic_offset,
@@ -1805,7 +1702,8 @@ void tditrace_exit(int argc, char *argv[]) {
   }
 
   // Add one more entry 0.1 sec behind all the previous ones
-  addentry(stdout, "TDITRACE_EXIT\0", last_timestamp + 100 * 1000000, "", 0, 0);
+  addentry(stdout, "TDITRACE_EXIT", strlen("TDITRACE_EXIT"),
+           last_timestamp + 100 * 1000000, "", 0, 0);
 
   struct timespec atime;
 
@@ -1816,80 +1714,64 @@ void tditrace_exit(int argc, char *argv[]) {
           asctime(gmtime((const time_t *)&atime)));
 }
 
+void tditrace_internal(va_list args, const char *format);
+
+void tditrace(const char *format, ...) {
+  va_list args;
+
+  va_start(args, format);
+
+  tditrace_internal(args, format);
+
+  va_end(args);
+}
+
+void tditrace_ex(int mask, const char *format, ...) {
+  va_list args;
+
+  if (mask & gmask) {
+    va_start(args, format);
+
+    tditrace_internal(args, format);
+
+    va_end(args);
+  }
+}
+
+/*
+ * [TDIT]
+ * [RACE]
+ * [    ]timeofday_offset.tv_usec
+ * [    ]timeofday_offset.tv_sec
+ * [    ]clock_monotonic_offset.tv_nsec
+ * [    ]clock_monotonic_offset.tv_sec
+ * ------
+ * [    ]marker, lower 2 bytes is length in dwords
+ * [    ]clock_monotonic_timestamp.tv_nsec
+ * [    ]clock_monotonic_timestamp.tv_sec
+ * [    ]text, padded with 0 to multiple of 4 bytes
+ * ...
+ * ------
+ */
+
 void tditrace_internal(va_list args, const char *format) {
   if (!tditrace_inited) {
     return;
   }
 
+  unsigned int trace_text[1024 / 4];
+
+  /*
+   * take and store timestamp
+   */
   struct timespec mytime;
   clock_gettime(CLOCK_MONOTONIC, &mytime);
 
-  // Add the string to the tracebuffer, and add timestamp
-  // layout is "\ftimestamp_sec\ftimestamp_nsec\ftid\ftracestring"
-
-  char trace_text[1024];
-  char *trace_text_ptr = trace_text;
-
-  *trace_text_ptr++ = 0x0c;
-
-  int n1 = 0;
-  unsigned int d1 = 1;
-  unsigned int num1 = (int)mytime.tv_sec;
-
-  while (num1 / d1 >= 10) d1 *= 10;
-
-  while (d1 != 0) {
-    int digit1 = num1 / d1;
-    num1 %= d1;
-    d1 /= 10;
-    if (n1 || digit1 > 0 || d1 == 0) {
-      *trace_text_ptr++ = digit1 + '0';
-      n1++;
-    }
-  }
-  *trace_text_ptr++ = 0x0c;
-
-  int n2 = 0;
-  unsigned int d2 = 1;
-  unsigned int num2 = (int)mytime.tv_nsec;
-
-  while (num2 / d2 >= 10) d2 *= 10;
-
-  while (d2 != 0) {
-    int digit2 = num2 / d2;
-    num2 %= d2;
-    d2 /= 10;
-    if (n2 || digit2 > 0 || d2 == 0) {
-      *trace_text_ptr++ = digit2 + '0';
-      n2++;
-    }
-  }
-  *trace_text_ptr++ = 0x0c;
-
-  if (!report_tid) {
-    *trace_text_ptr++ = 0x30;
-  } else {
-    int n = 0;
-    unsigned int d = 1;
-    unsigned int num = (int)syscall(SYS_gettid);
-
-    while (num / d >= 10) d *= 10;
-
-    while (d != 0) {
-      int digit = num / d;
-      num %= d;
-      d /= 10;
-      if (n || digit > 0 || d == 0) {
-        *trace_text_ptr++ = digit + '0';
-        n++;
-      }
-    }
-  }
-
-  *trace_text_ptr++ = 0x0c;
-
-  // obtain the trace string
-
+  /*
+   * parse the format string
+   */
+  char *trace_text_ptr = (char *)trace_text;
+  unsigned int *trace_text_dword_ptr = (unsigned int *)trace_text;
   char ch;
 
   while (ch = *(format++)) {
@@ -1983,20 +1865,36 @@ void tditrace_internal(va_list args, const char *format) {
     }
   }
 
+  while ((unsigned int)trace_text_ptr & 0x3) *trace_text_ptr++ = 0;
+
+  int i = ((char *)trace_text_ptr - (char *)trace_text) >> 2;
+
+  /*
+   * store into tracebuffer
+   */
+
   simplefu_mutex_lock(&myMutex);
 
-  memcpy(trace_buffer_ptr, trace_text, trace_text_ptr - trace_text);
-  trace_buffer_ptr += trace_text_ptr - trace_text;
+  *trace_buffer_dword_ptr++ = 0x0003 + i;
+  *trace_buffer_dword_ptr++ = mytime.tv_sec;
+  *trace_buffer_dword_ptr++ = mytime.tv_nsec;
 
-  if ((trace_buffer_ptr - gtrace_buffer) > (gtracebuffersize - 1024)) {
+  while (i--) {
+    // fprintf(stderr, "[%08x] i=%d\n", *trace_text_dword_ptr, i);
+    *trace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
+  }
+
+  if (((char *)trace_buffer_dword_ptr - gtrace_buffer) >
+      (gtracebuffersize - 1024)) {
     if (do_offload) {
       // clear unused and rewind to rewind ptr
       fprintf(stderr, "tdi: [%d][%s], rewind for offload\n", gpid, gprocname);
       int i;
-      for (i = trace_buffer_ptr - gtrace_buffer; i < gtracebuffersize; i++) {
+      for (i = (char *)trace_buffer_dword_ptr - gtrace_buffer;
+           i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
-      trace_buffer_ptr = gtrace_buffer_rewind_ptr;
+      trace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
     } else {
       fprintf(stderr, "tdi: [%s][%d], full\n", gprocname, gpid);
       tditrace_inited = 0;
@@ -2004,26 +1902,4 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   simplefu_mutex_unlock(&myMutex);
-}
-
-void tditrace(const char *format, ...) {
-  va_list args;
-
-  va_start(args, format);
-
-  tditrace_internal(args, format);
-
-  va_end(args);
-}
-
-void tditrace_ex(int mask, const char *format, ...) {
-  va_list args;
-
-  if (mask & gmask) {
-    va_start(args, format);
-
-    tditrace_internal(args, format);
-
-    va_end(args);
-  }
 }

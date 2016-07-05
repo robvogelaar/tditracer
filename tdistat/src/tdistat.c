@@ -35,9 +35,7 @@ int main(int argc, char *argv[]) {
         FILE *file;
         char filename[128];
         char *bufmmapped;
-        char *ptr;
-        char *saveptr;
-        const char *search = "\f";
+        unsigned int *ptr;
 
         sprintf(filename, "/tmp/%s", ep->d_name);
 
@@ -49,12 +47,11 @@ int main(int argc, char *argv[]) {
 
           fprintf(stderr, "Found \"%s\" (%lldMB)\n", filename, st.st_size / (1024 * 1024));
 
-          bufmmapped = (char *)mmap(0, st.st_size, PROT_READ | PROT_WRITE,
+          bufmmapped = (char *)mmap(0, st.st_size, PROT_READ,
                                     MAP_PRIVATE, fileno(file), 0);
-          ptr = bufmmapped;
 
           // token should hold "TDITRACEBUFFER"
-          if (strncmp("TDITRACEBUFFER", strtok_r(ptr, search, &saveptr), 14) !=
+          if (strncmp("TDITRACE", bufmmapped, 8) !=
               0) {
             fprintf(stderr,
                     "invalid "
@@ -63,8 +60,32 @@ int main(int argc, char *argv[]) {
           }
 
           if ((argc == 1) || (strcmp(argv[1], "-pct") == 0)) {
-            fprintf(stdout, "%d\n",
-                    (int)(strlen(saveptr) * 100.0 / (st.st_size)));
+
+            /*
+             * [TDIT]
+             * [RACE]
+             * [    ]timeofday_offset.tv_usec
+             * [    ]timeofday_offset.tv_sec
+             * [    ]clock_monotonic_offset.tv_nsec
+             * [    ]clock_monotonic_offset.tv_sec
+             * ------
+             * [    ]marker, lower 2 bytes is length in dwords
+             * [    ]clock_monotonic_timestamp.tv_nsec
+             * [    ]clock_monotonic_timestamp.tv_sec
+             * [    ]text, padded with 0 to multiple of 4 bytes
+             * ...
+             * ------
+             */
+
+            unsigned int *ptr = (unsigned int*)bufmmapped;
+
+            int i = 0;
+            ptr+= 6;
+            while(*ptr) {
+              ptr+= *ptr & 0xffff;
+              i++;
+            }
+            fprintf(stdout, "%lld%% (%d)\n", ((char*)ptr - bufmmapped) * 100LL / (st.st_size) + 1, i);
           }
 
           munmap(bufmmapped, st.st_size);
