@@ -29,6 +29,7 @@ evts = []
 offset_nsec = 0
 first_tstamp = 0
 ref_offset = 0
+flat = 0
 
 def addtask(evtwords):
 
@@ -130,7 +131,6 @@ def build(tdifilename):
 
    f = open(tdifilename)
 
-
    for line in f:
       if line.startswith('END'):
          offset = int(line.split()[1])
@@ -139,15 +139,18 @@ def build(tdifilename):
             ref_offset = offset
          else:
             hours = roundToNearest(abs(ref_offset - offset), 3600000000000) / 3600000000000
-            sys.stderr.write('abs is %d, hours is %d\n' % (abs(ref_offset - offset), hours))
 
-            if offset > ref_offset:
-               offset = offset - (3600000000000 * hours)
+            if (flat == 0):
+               sys.stderr.write('abs is %d, hours is %d, not flattening...\n' % (abs(ref_offset - offset), hours))
+               if offset > ref_offset:
+                  offset = offset - (3600000000000 * hours)
+
+               else:
+                  offset = offset + (3600000000000 * hours)
 
             else:
-               offset = offset + (3600000000000 * hours)
-
-
+               sys.stderr.write('abs is %d, hours is %d, flattening...\n' % (abs(ref_offset - offset), hours))
+               offset = ref_offset
 
    f.seek(0)
    qvals = []
@@ -293,16 +296,22 @@ def natural_sort(l):
 def main():
    global first_tstamp
    global offset_nsec
+   global flat
 
    if len(sys.argv) >= 2:
 
       #build filelist
       filelist = []
       for filespec in sys.argv[1:]:
-         for afile in os.listdir('.'):
-            if fnmatch.fnmatch(afile, filespec):
-               if afile not in filelist:
-                  filelist.append(afile)
+
+         #sys.stderr.write('file=[%s]\n' % filespec)
+         if filespec == '-f':
+            flat = 1;
+         else:
+            for afile in os.listdir('.'):
+               if fnmatch.fnmatch(afile, filespec):
+                  if afile not in filelist:
+                     filelist.append(afile)
 
       filelist = natural_sort(filelist)
 
@@ -346,7 +355,7 @@ def main():
       print 'END %d UTC' % (offset_nsec), datetime.utcfromtimestamp(offset_nsec / 1000000000).strftime('%Y-%m-%d %H:%M:%S')
 
    else:
-      print("Usage: %s tdifile1 tdifile2..." % sys.argv[0])
+      print("Usage: %s <-f> tdifile1 tdifile2..." % sys.argv[0])
 
 if __name__ == "__main__":
    main()

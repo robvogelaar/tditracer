@@ -43,26 +43,28 @@ def main():
                #sys.stderr.write('line:\'%s\'' % line);
                #sys.stderr.write('argv[2]:\'%s\'\n' % sys.argv[2]);
 
-               m = re.search(sys.argv[2]+'\d', line)
+               m = re.search(sys.argv[2]+'@0=', line)
                if m:
-                  #sys.stderr.write('line:\'%s\'\n' % line);
-                  s = line.split(sys.argv[2])[1].split(',')[0];
-                  l = (line.split(sys.argv[2])[0]).split()[3];
+                  #sys.stderr.write('line:\'%s\'\n' % line)
+                  l = (line.split(sys.argv[2])[0]).split()[3]
+
+                  s = re.search(r'@1=[0-9a-f]+', line).group()[3:]
+                  #sys.stderr.write('s:\'%s\'\n' % s)
 
                   #print s;
                   if l not in matches:
                      matches.append(l);
                      iterations.append(1);
-                     totals.append(int(s));
-                     maxes.append(int(s));
-                     mins.append(int(s));
+                     totals.append(int(s, 16));
+                     maxes.append(int(s, 16));
+                     mins.append(int(s, 16));
                   else:
-                     iterations[matches.index(l)] += 1;
-                     totals[matches.index(l)] += int(s);
-                     if int(s) > maxes[matches.index(l)]:
-                        maxes[matches.index(l)] = int(s);
-                     if int(s) < mins[matches.index(l)]:
-                        mins[matches.index(l)] = int(s);
+                     iterations[matches.index(l)] += 1
+                     totals[matches.index(l)] += int(s, 16)
+                     if int(s,16) > maxes[matches.index(l)]:
+                        maxes[matches.index(l)] = int(s, 16)
+                     if int(s,16) < mins[matches.index(l)]:
+                        mins[matches.index(l)] = int(s, 16)
 
       f.close()
 
@@ -70,7 +72,7 @@ def main():
 
       i = 0;
       for m in matches:
-         results.append  ( str(totals[i]) + ' ' + str(iterations[i]) + 'x ' + str(mins[i]) + '..' + str(maxes[i]) + ' ' + m );
+         results.append ( str(totals[i]) + ' ' + str(iterations[i]) + 'x ' + str(mins[i]) + '..' + str(maxes[i]) + ' ' + m );
          i = i + 1;
 
       results.sort(key = sortby, reverse=True);

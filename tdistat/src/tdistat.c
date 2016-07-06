@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
               ptr+= *ptr & 0xffff;
               i++;
             }
-            fprintf(stdout, "%lld%% (%d)\n", ((char*)ptr - bufmmapped) * 100LL / (st.st_size) + 1, i);
+            fprintf(stdout, "%lld%% (#%d, %dB)\n", ((char*)ptr - bufmmapped) * 100LL / (st.st_size) + 1, i, (char*)ptr - bufmmapped);
           }
 
           munmap(bufmmapped, st.st_size);

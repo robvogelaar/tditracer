@@ -160,13 +160,19 @@ static _u64 timestamp_monotonic_nsec(void) {
 void tditrace_rewind();
 
 static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
-                     char *procname, int pid, int tid) {
+                     char *procname, int pid, int tid, int nr_numbers,
+                     unsigned int *numbers, unsigned short identifier) {
   int i;
   int entry;
   char fullentry[1024];
 
   char name[1024];
   int value = 0;
+
+  // if (nr_numbers) fprintf(stderr, "nr_numbers=%d(%x)\n", nr_numbers,
+  // numbers[0]);
+
+  // fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers, text_len);
 
   // fprintf(stderr, "text_in=\"%s\" (%d)\n", text_in, text_len);
   // for (i=0;i<30;i++)
@@ -181,6 +187,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
   sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
   int procpidtidlen = strlen(text_in1);
 
+
   if ((strncmp(text_in, "@T+", 3) == 0) || (strncmp(text_in, "@T-", 3) == 0) ||
       (strncmp(text_in, "@I+", 3) == 0) || (strncmp(text_in, "@I-", 3) == 0) ||
       (strncmp(text_in, "@A+", 3) == 0) || (strncmp(text_in, "@A-", 3) == 0) ||
@@ -191,8 +198,13 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
              procname, pid, tid, &text_in[3]);
 
   } else {
-    snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s", procname,
+
+    if (text_len)
+      snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s", procname,
              pid, tid, text_in);
+    else
+      snprintf(text_in1, procpidtidlen + 2 + 1, "[%s][%d][%d]%02X", procname,
+             pid, tid, identifier);
   }
 
   // fprintf(stderr, "text=\"%s\"\n", text);
@@ -205,6 +217,12 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
     if ((text[i] == 13) || (text[i] == 10)) {
       text[i] = 0x5f;
     }
+  }
+
+  for (i = 0; i < nr_numbers; i++) {
+    char number[16];
+    sprintf(number, "%s@%d=%x", i == 0 ? " " : "", i, numbers[i]);
+    strcat(text, number);
   }
 
   /*
@@ -759,6 +777,10 @@ typedef struct {
   _u64 timeofday_offset;
   _u64 monotonic_offset;
   _u64 monotonic_timestamp;
+  unsigned short identifier;
+  int nr_numbers;
+  unsigned int *numbers;
+
   char *text;
   int text_len;
   int tid;
@@ -776,6 +798,10 @@ static void parse(int bid) {
   unsigned int *p = tracebuffers[bid].dword_ptr;
   unsigned int marker = *p++;
 
+  //fprintf(stderr,"marker[0x%08x]\n", marker);
+
+  tracebuffers[bid].identifier = marker >> 24;
+
   tracebuffers[bid].dword_ptr += marker & 0xffff;
 
   int tvsec = *p++;
@@ -783,10 +809,17 @@ static void parse(int bid) {
   tracebuffers[bid].monotonic_timestamp =
       (_u64)tvsec * (_u64)1000000000 + (_u64)tvnsec;
 
+  tracebuffers[bid].nr_numbers = (marker >> 16) & 0xff;
+  tracebuffers[bid].numbers = p;
+  int i = (marker >> 16) & 0xff;
+  while (i--) p++;
+
   tracebuffers[bid].tid = 0;
   tracebuffers[bid].text = (char *)p;
-  tracebuffers[bid].text_len = ((marker & 0xffff) - 3) * 4;
+  tracebuffers[bid].text_len = (((marker & 0xffff) - 3) - ((marker >> 16) & 0xff)) << 2;
   tracebuffers[bid].valid = (marker != 0);
+
+  //fprintf(stderr,"marker[0x%08x](%d)(%d)\n", marker, tracebuffers[bid].nr_numbers, tracebuffers[bid].text_len);
 
   // fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
   //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
@@ -1116,7 +1149,8 @@ void create_trace_buffer(void) {
    * [    ]clock_monotonic_offset.tv_nsec
    * [    ]clock_monotonic_offset.tv_sec
    * ------
-   * [    ]marker, lower 2 bytes is length in dwords
+   * [    ]marker, lower 2 bytes is total length in dwords, upper 2bytes is nr
+   * numbers
    * [    ]clock_monotonic_timestamp.tv_nsec
    * [    ]clock_monotonic_timestamp.tv_sec
    * [    ]text, padded with 0 to multiple of 4 bytes
@@ -1251,7 +1285,7 @@ void *delayed_init_thread(void *param) {
     while (delay > 0) {
       fprintf(stderr, "tdi: [%s][%d], delay %d second(s)...\n", gprocname, gpid,
               delay);
-      usleep(1 * 1000000);
+      usleep(1 * 1000 * 000);
 
       delay--;
     }
@@ -1417,10 +1451,6 @@ int tditrace_init(void) {
           sprintf(fullname, "/tmp/%s", ep->d_name);
 
           struct stat sts;
-
-          // if (stat(procpid, &sts) != -1) {
-          //    printf("found \"%s\"\n", procpid);
-          //}
 
           if (stat(procpid, &sts) == -1) {
             unlink(fullname);
@@ -1601,6 +1631,7 @@ void tditrace_exit(int argc, char *argv[]) {
   nr_entries = 0;
   while (1) {
     int pctused;
+    int bytesused;
     int d = -1;
 
     for (i = 0; i < buffers; i++) {
@@ -1630,13 +1661,14 @@ void tditrace_exit(int argc, char *argv[]) {
              tracebuffers[d].timeofday_offset - abs_timeofday +
                  tracebuffers[d].monotonic_timestamp -
                  tracebuffers[d].monotonic_offset,
-
-             tracebuffers[d].procname, tracebuffers[d].pid,
-             tracebuffers[d].tid);
+             tracebuffers[d].procname, tracebuffers[d].pid, tracebuffers[d].tid,
+             tracebuffers[d].nr_numbers, tracebuffers[d].numbers,
+             tracebuffers[d].identifier);
 
     pctused = (((tracebuffers[d].text - tracebuffers[d].bufmmapped) * 100.0) /
                tracebuffers[d].bufsize) +
               1;
+    bytesused = tracebuffers[d].text - tracebuffers[d].bufmmapped;
 
     nr_entries++;
 
@@ -1647,14 +1679,14 @@ void tditrace_exit(int argc, char *argv[]) {
     parse(d);
 
     if (!tracebuffers[d].valid) {
-      fprintf(stderr, "\"%s\" %d%% (%d)\n", tracebuffers[d].filename, pctused,
-              nr_entries);
+      fprintf(stderr, "\"%s\" %d%% (#%d,%dB)\n", tracebuffers[d].filename,
+              pctused, nr_entries, bytesused);
     }
   }
 
   // Add one more entry 0.1 sec behind all the previous ones
   addentry(stdout, "TDITRACE_EXIT", strlen("TDITRACE_EXIT"),
-           last_timestamp + 100 * 1000000, "", 0, 0);
+           last_timestamp + 100 * 1000000, "", 0, 0, 0, 0, 0);
 
   struct timespec atime;
 
@@ -1697,10 +1729,12 @@ void tditrace_ex(int mask, const char *format, ...) {
  * [    ]clock_monotonic_offset.tv_nsec
  * [    ]clock_monotonic_offset.tv_sec
  * ------
- * [    ]marker, lower 2 bytes is length in dwords
+ * [    ]marker, lower 2 bytes is total length in dwords, upper byte is identifier,
+ *       middle byte is nr numbers
  * [    ]clock_monotonic_timestamp.tv_nsec
  * [    ]clock_monotonic_timestamp.tv_sec
- * [    ]text, padded with 0 to multiple of 4 bytes
+ * [    ]<optional> numbers
+ * [    ]<optional> text, padded with 0's to multiple of 4 bytes
  * ...
  * ------
  */
@@ -1711,6 +1745,10 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   unsigned int trace_text[1024 / 4];
+  unsigned int numbers[8];
+  unsigned int nr_numbers = 0;
+  unsigned short identifier = 0;
+  int i;
 
   /*
    * take and store timestamp
@@ -1720,6 +1758,7 @@ void tditrace_internal(va_list args, const char *format) {
 
   /*
    * parse the format string
+   * %0 %1 %2 pull in integers
    */
   char *trace_text_ptr = (char *)trace_text;
   unsigned int *trace_text_dword_ptr = (unsigned int *)trace_text;
@@ -1807,6 +1846,17 @@ void tditrace_internal(va_list args, const char *format) {
           break;
         }
 
+        case 'n': {
+          numbers[nr_numbers] = va_arg(args, int);
+          nr_numbers++;
+          break;
+        }
+
+        case 'm': {
+          identifier = va_arg(args, int) & 0xff;
+          break;
+        }
+
         default:
           break;
       }
@@ -1818,19 +1868,35 @@ void tditrace_internal(va_list args, const char *format) {
 
   while ((unsigned int)trace_text_ptr & 0x3) *trace_text_ptr++ = 0;
 
-  int i = (trace_text_ptr - (char *)trace_text) >> 2;
+  int nr_textdwords = (trace_text_ptr - (char *)trace_text) >> 2;
 
   /*
    * store into tracebuffer
    */
   simplefu_mutex_lock(&myMutex);
 
-  *trace_buffer_dword_ptr++ = 0x0003 + i;
+  /*
+   * marker, 4 bytes
+   *       bytes 1+0 hold total length in dwords : 3 (marker,sec,nsec) +
+   *                                           nr_numbers + nr_dwordtext
+   *       byte    2 hold nr_numbers
+   *       byte    3 hold 0..f
+   */
+
+  *trace_buffer_dword_ptr++ = (0x0003 + nr_numbers + nr_textdwords) |
+                              ((nr_numbers & 0xff) << 16) |
+                              ((identifier & 0xff) << 24);
   *trace_buffer_dword_ptr++ = mytime.tv_sec;
   *trace_buffer_dword_ptr++ = mytime.tv_nsec;
 
+  i = 0;
+  while (i != nr_numbers) {
+    *trace_buffer_dword_ptr++ = numbers[i];
+    i++;
+  }
+
+  i = nr_textdwords;
   while (i--) {
-    // fprintf(stderr, "[%08x] i=%d\n", *trace_text_dword_ptr, i);
     *trace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
   }
   /*

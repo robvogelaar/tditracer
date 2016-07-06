@@ -183,7 +183,7 @@ extern "C" int open(const char* pathname, int flags, ...) {
 
   if (libcopenrecording) {
     // tditrace("@I+open() %s", pathname);
-    tditrace("@E+open() %s,ra=%x", pathname, ra);
+    tditrace("@E+open() %s%n", pathname, ra);
   }
 
   int ret = __open(pathname, flags, a1);
@@ -213,7 +213,7 @@ extern "C" FILE* fopen(const char* path, const char* mode) {
 
   if (libcfopenrecording) {
     // tditrace("@I+fopen() %s", path);
-    tditrace("@E+fopen() %s,ra=%x", path, ra);
+    tditrace("@E+fopen() %s%n", path, ra);
   }
 
   FILE* ret = __fopen(path, mode);
@@ -242,7 +242,7 @@ extern "C" FILE* fdopen(int fd, const char* mode) {
 
   if (libcfdopenrecording) {
     // tditrace("@I+fdopen() %d", fd);
-    tditrace("@E+fdopen() %d,ra=%x", fd, ra);
+    tditrace("@E+fdopen() %d%n", fd, ra);
   }
 
   FILE* ret = __fdopen(fd, mode);
@@ -272,7 +272,7 @@ extern "C" FILE* freopen(const char* path, const char* mode, FILE* stream) {
 
   if (libcfreopenrecording) {
     // tditrace("@I+freopen() %s", path);
-    tditrace("@E+freopen() %s,ra=%x", path, ra);
+    tditrace("@E+freopen() %s%n", path, ra);
   }
 
   FILE* ret = __freopen(path, mode, stream);
@@ -336,50 +336,49 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
 
         if (strncmp((const char*)buf, "GET", 3) == 0) {
           if (libcfd)
-            tditrace("@E+write()_%d_GET %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_%d_GET %d \"%s\"%n", fd, count, s, ra);
           else
-            tditrace("@E+write()_GET %d %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_GET %d %d \"%s\"%n", fd, count, s, ra);
 
         } else if (strncmp((const char*)buf, "PUT", 3) == 0) {
           if (libcfd)
-            tditrace("@E+write()_%d_PUT %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_%d_PUT %d \"%s\"%n", fd, count, s, ra);
           else
-            tditrace("@E+write()_PUT %d %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_PUT %d %d \"%s\"%n", fd, count, s, ra);
         } else if (strncmp((const char*)buf, "POST", 4) == 0) {
           if (libcfd)
-            tditrace("@E+write()_%d_POST %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_%d_POST %d \"%s\"%n", fd, count, s, ra);
           else
-            tditrace("@E+write()_POST %d %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_POST %d %d \"%s\"%n", fd, count, s, ra);
         } else if (strncmp((const char*)buf, "{\"", 2) == 0) {
           if (libcfd)
-            tditrace("@E+write()_%d_{ %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_%d_{ %d \"%s\"%n", fd, count, s, ra);
           else
-            tditrace("@E+write()_{ %d %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_{ %d %d \"%s\"%n", fd, count, s, ra);
         } else if (strncmp((const char*)buf + 2, "xml", 3) == 0) {
           if (libcfd)
-            tditrace("@E+write()_%d_xml %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_%d_xml %d \"%s\"%n", fd, count, s, ra);
           else
-            tditrace("@E+write()_xml %d %d ra=%x \"%s\"", fd, count, ra, s);
+            tditrace("@E+write()_xml %d %d \"%s\"%n", fd, count, s, ra);
         } else {
           s[MIN(1, count)] = '\0';
           if (libcfd)
-            tditrace("@E+write()_%d %d ra=%x \"%s...\"", fd, count, ra,
-                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+            tditrace("@E+write()_%d %d \"%s...\"%n", fd, count, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           else
-            tditrace("@E+write() %d %d ra=%x \"%s...\"", fd, count, ra,
-                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+            tditrace("@E+write() %d %d \"%s...\"%n", fd, count, 
+                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           // tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
         }
 
       } else {
         if (libcfd)
-          tditrace("@E+write()_%d %d", fd, count);
+          tditrace("@E+write()_%d %d%n", fd, count, ra);
         else
-          tditrace("@E+write() %d %d", fd, count);
+          tditrace("@E+write() %d %d%n", fd, count, ra);
       }
 
     } else {
-      tditrace("@E+write()_%d %d", fd, count);
+      tditrace("@E+write()_%d %d%n", fd, count, ra);
     }
   }
 
@@ -419,15 +418,15 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
     if (ret == -1) {
       // tditrace("@I-read()) =-1");
       if (libcfd)
-        tditrace("@E+read()_%d %d =-1 ra=%x", fd, count, ra);
+        tditrace("@E+read()_%d %d =-1%N", fd, count, ra);
       else
-        tditrace("@E+read() %d %d =-1 ra=%x", fd, count, ra);
+        tditrace("@E+read() %d %d =-1%n", fd, count, ra);
     } else if (ret == 0) {
       // tditrace("@I-read() =0");
       if (libcfd)
-        tditrace("@E+read()_%d %d =0 ra=%x", fd, count, ra);
+        tditrace("@E+read()_%d %d =0%n", fd, count, ra);
       else
-        tditrace("@E+read() %d %d =0 ra=%x", fd, count, ra);
+        tditrace("@E+read() %d %d =0%n", fd, count, ra);
     } else if (count == 64) {
       // ignore the read from /proc/pid/statm
     } else {
@@ -439,19 +438,19 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
 
           if (strncmp((const char*)buf, "HTTP", 4) == 0) {
             if (libcfd)
-              tditrace("@E+read()_%d_HTTP %d =%d ra=%x \"%s\"", fd, count, ret,
-                       ra, s);
+              tditrace("@E+read()_%d_HTTP %d =%d \"%s\"%n", fd, count, ret,
+                       s, ra);
             else
-              tditrace("@E+read()_HTTP %d %d =%d ra=%x \"%s\"", fd, count, ret,
-                       ra, s);
+              tditrace("@E+read()_HTTP %d %d =%d \"%s\"%n", fd, count, ret,
+                       s, ra);
           } else {
             s[MIN(1, ret)] = '\0';
             if (libcfd)
-              tditrace("@E+read()_%d %d =%d ra=%x \"%s...\"", fd, count, ret,
-                       ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+              tditrace("@E+read()_%d %d =%d \"%s...\"%n", fd, count, ret,
+                       (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
             else
-              tditrace("@E+read() %d %d =%d ra=%x \"%s...\"", fd, count, ret,
-                       ra, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?");
+              tditrace("@E+read() %d %d =%d \"%s...\"", fd, count, ret,
+                       (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           }
         }
       }
@@ -475,6 +474,11 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
     }
   }
 
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
   if (libcrecording || libcsendrecording) {
     // tditrace("@I+send() %d %d", sockfd, len);
 
@@ -486,45 +490,45 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
 
         if (strncmp((const char*)buf, "GET", 3) == 0) {
           if (libcfd)
-            tditrace("@E+send()_%d_GET %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_%d_GET %d \"%s\"%n", sockfd, len, s, ra);
           else
-            tditrace("@E+send()_GET %d %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_GET %d %d \"%s\"%n", sockfd, len, s, ra);
         } else if (strncmp((const char*)buf, "PUT", 3) == 0) {
           if (libcfd)
-            tditrace("@E+send()_%d_PUT %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_%d_PUT %d \"%s\"%n", sockfd, len, s, ra);
           else
-            tditrace("@E+send()_PUT %d %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_PUT %d %d \"%s\"%n", sockfd, len, s, ra);
         } else if (strncmp((const char*)buf, "POST", 4) == 0) {
           if (libcfd)
-            tditrace("@E+send()_%d_POST %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_%d_POST %d \"%s\"%n", sockfd, len, s, ra);
           else
-            tditrace("@E+send()_POST %d %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_POST %d %d \"%s\"%n", sockfd, len, s, ra);
         } else if (strncmp((const char*)buf, "{\"", 2) == 0) {
           if (libcfd)
-            tditrace("@E+send()_%d_{ %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_%d_{ %d \"%s\"%n", sockfd, len, s, ra);
           else
-            tditrace("@E+send()_{ %d %d \"%s\"", sockfd, len, s);
+            tditrace("@E+send()_{ %d %d \"%s\"%n", sockfd, len, s, ra);
         } else {
           // s[MIN(4, len)] = '\0';
           // tditrace("@E+send()_%d_? %d \"%s...\"", sockfd, len, s);
           if (libcfd)
-            tditrace("@E+send()_%d %d \"...\"", sockfd, len);
+            tditrace("@E+send()_%d %d \"...\"%n", sockfd, len, ra);
           else
-            tditrace("@E+send() %d %d \"...\"", sockfd, len);
+            tditrace("@E+send() %d %d \"...\"%n", sockfd, len, ra);
         }
 
       } else {
         if (libcfd)
-          tditrace("@E+send()_%d %d", sockfd, len);
+          tditrace("@E+send()_%d %d%n", sockfd, len, ra);
         else
-          tditrace("@E+send() %d %d", sockfd, len);
+          tditrace("@E+send() %d %d%n", sockfd, len, ra);
       }
 
     } else {
       if (libcfd)
-        tditrace("@E+send()_%d %d", sockfd, len);
+        tditrace("@E+send()_%d %d", sockfd, len, ra);
       else
-        tditrace("@E+send() %d %d", sockfd, len);
+        tditrace("@E+send() %d %d", sockfd, len, ra);
     }
   }
 
@@ -547,6 +551,11 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
     }
   }
 
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
   if (libcrecording || libcrecvrecording) {
     // tditrace("@I+recv() %d %d", sockfd, len);
   }
@@ -557,15 +566,15 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
     if (ret == -1) {
       // tditrace("@I-recv() =-1");
       if (libcfd)
-        tditrace("@E+recv()_%d %d =-1", sockfd, len);
+        tditrace("@E+recv()_%d %d =-1%n", sockfd, len, ra);
       else
-        tditrace("@E+recv() %d %d =-1", sockfd, len);
+        tditrace("@E+recv() %d %d =-1%n", sockfd, len, ra);
     } else if (ret == 0) {
       // tditrace("@I-recv() =0");
       if (libcfd)
-        tditrace("@E+recv()_%d %d =0", sockfd, len);
+        tditrace("@E+recv()_%d %d =0%n", sockfd, len, ra);
       else
-        tditrace("@E+recv() %d %d =0", sockfd, len);
+        tditrace("@E+recv() %d %d =0%n", sockfd, len, ra);
     } else {
       if (MAXSTRLEN) {
         if (buf) {
@@ -575,9 +584,9 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
 
           if (strncmp((const char*)buf, "HTTP", 4) == 0) {
             if (libcfd)
-              tditrace("@E+recv()_%d_HTTP %d =%d \"%s\"", sockfd, len, ret, s);
+              tditrace("@E+recv()_%d_HTTP %d =%d \"%s\"%n", sockfd, len, ret, s, ra);
             else
-              tditrace("@E+recv()_HTTP %d %d =%d \"%s\"", sockfd, len, ret, s);
+              tditrace("@E+recv()_HTTP %d %d =%d \"%s\"%n", sockfd, len, ret, s, ra);
           }
 
           else {
@@ -585,9 +594,9 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
             // tditrace("@E+recv()_%d_? =%d \"%s\"...", sockfd, ret, s);
 
             if (libcfd)
-              tditrace("@E+recv()_%d %d =%d \"...\"", sockfd, len, ret);
+              tditrace("@E+recv()_%d %d =%d \"...\"%n", sockfd, len, ret, ra);
             else
-              tditrace("@E+recv() %d %d =%d \"...\"", sockfd, len, ret);
+              tditrace("@E+recv() %d %d =%d \"...\"%n", sockfd, len, ret, ra);
           }
         }
       }
@@ -989,7 +998,7 @@ extern "C" char *strncpy(char *dest, const char *src, size_t n) {
 }
 #endif
 
-static void mi(void) {
+static void heaprss(void) {
   struct mallinfo mi;
   mi = mallinfo();
   static int prev_heap = 0;
@@ -997,9 +1006,7 @@ static void mi(void) {
     tditrace("HEAP~%d", mi.arena + mi.hblkhd);
     prev_heap = mi.arena + mi.hblkhd;
   }
-}
 
-static void ru(void) {
   unsigned long vmsize = 0L;
   static unsigned long prev_vmsize = 0L;
   unsigned long rss = 0L;
@@ -1022,10 +1029,6 @@ static void ru(void) {
     }
   }
   close(fh);
-
-  // struct rusage resourceUsage;
-  // getrusage(RUSAGE_SELF, &resourceUsage);
-  // tditrace("maxrss~%d", resourceUsage.ru_maxrss);
 }
 
 #if 1
@@ -1039,95 +1042,6 @@ extern "C" void* malloc(size_t size) {
     }
   }
 
-#if 0
-    if (NULL == glsl) {
-        glsl = dlsym(RTLD_NEXT, "glsl_set_line_capture_vertex");
-        if (glsl == NULL) {
-            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "glsl_set_line_capture_vertex");
-            fprintf(stderr, "glsl = 0x%x [0x%x]\n", glsl, &glsl);
-        } else {
-            fprintf(stderr, "got glsl!!!!!!!!! = 0x%x [0x%x]\n", glsl, &glsl);
-        }
-    }
-#endif
-
-#if 0
-    //static void *(*__malloc)(size_t) = NULL;
-    //static void* (*operator new)(unsigned int i) = NULL;
-    static void* __new = NULL;
-
-    if (__new == NULL) {
-        __new = (void *)dlsym(RTLD_NEXT, "_Znwj");
-        if (NULL == __new) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
-        else {
-            fprintf(stderr, "Got operator new : %p\n", __new);
-        }
-    }
-#endif
-
-#if 0
-    static void* v3ddriver_base = NULL;
-    static int v3ddriver_size = 0x110000;
-    static void* ___ftext = NULL;
-
-    if (NULL == v3ddriver_base) {
-        Dl_info dli;
-        if (dladdr(dlsym(RTLD_NEXT, "glEnable"), &dli)) {
-            fprintf(stderr, "dladdr, dli_fname[%s], dli_fbase[%x], dli_sname[%s], dli_saddr[%x]\n",
-                dli.dli_fname, dli.dli_fbase, dli.dli_sname, dli.dli_saddr);
-
-            //const char *dli_fname;  /* Pathname of shared object that
-            //void       *dli_fbase;  /* Address at which shared object
-            //const char *dli_sname;  /* Name of nearest symbol with address
-            //void       *dli_saddr;  /* Exact address of symbol named
-            v3ddriver_base = dli.dli_fbase;
-
-            if (dlopen("/usr/lib/libv3ddriver.so", RTLD_NOW | RTLD_NOLOAD)) {
-                fprintf(stderr, "/usr/lib/libv3ddriver.so - is resident\n");
-                ___ftext = dlsym(dlopen("/usr/lib/libv3ddriver.so", RTLD_NOW | RTLD_NOLOAD), "_ftext");
-                fprintf(stderr, "___ftext=%x\n", ___ftext);
-            } else {
-                fprintf(stderr, "/usr/lib/libv3ddriver.so - not resident\n");
-                v3ddriver_base = NULL;
-            }
-
-        } else {
-            fprintf(stderr, "dladdr, failed\n");
-        }
-    }
-#endif
-
-#if 0
-    if (NULL == ___ftext) {
-        ___ftext = dlsym(RTLD_NEXT, "_ftext");
-        if (___ftext == NULL) {
-            fprintf(stderr, "Error in `dlsym`: %s : %s\n", dlerror(), "_ftext");
-        } else {
-            fprintf(stderr, "got ___ftext = 0x%x\n", ___ftext);
-
-            Dl_info dli;
-            if (dladdr(___ftext, &dli)) {
-                fprintf(stderr, "dladdr, dli_fname[%s], dli_fbase[%x], dli_sname[%s], dli_saddr[%x]\n",
-                    dli.dli_fname, dli.dli_fbase, dli.dli_sname, dli.dli_saddr);
-
-                //const char *dli_fname;  /* Pathname of shared object that
-                //void       *dli_fbase;  /* Address at which shared object
-                //const char *dli_sname;  /* Name of nearest symbol with address
-                //void       *dli_saddr;  /* Exact address of symbol named
-
-                if (strstr(dli.dli_fname, "v3ddriver") == NULL) {
-                    ___ftext = NULL;
-                }
-
-            } else {
-                fprintf(stderr, "dladdr, failed\n");
-            }
-        }
-    }
-#endif
-
   unsigned int ra = 0;
 #ifdef __mips__
   asm volatile("move %0, $ra" : "=r"(ra));
@@ -1136,43 +1050,10 @@ extern "C" void* malloc(size_t size) {
   void* ret = __malloc(size);
 
   if (libcmalloc && (size >= libcmalloc)) {
-    // tditrace("m =%x,ra=%x,sz=%d", ret, ra, size);
-    // tditrace("m %d", size);
-    tditrace("m %d,ra=%x", size, ra);
-
-    mi();
-    ru();
-
-#if 0
-        if (size == 420)
-            tditrace("420m =%x,ra=%x,sz=%d", ret, ra, size);
-#endif
-#if 0
-        if (v3ddriver_base) {
-            if ((ra >= v3ddriver_base) && (ra <= v3ddriver_base + 0x110000)) {
-                tditrace("v3dm =%x,ra=%x,sz=%d", ret, ra, size);
-            }
-        }
-#endif
-#if 0
-        if (___ftext) {
-            if ((ra == ___ftext + 0x3534) && (size >= 1024)) {
-                closelog();
-                tditrace("v3dftext1024m =%x,ra=%x,sz=%d", ret, ra, size);
-                fprintf(stderr, "v3dftextm %d\n", size);
-            }
-        }
-#endif
-#if 0
-        if ((ra >= __new - 256) && (ra <= __new + 256)) {
-            tditrace("newm =%x,ra=%x,sz=%d", ret, ra, size);
-
-            if (size > 1024) {
-                tditrace("new1024m =%x,ra=%x,sz=%d", ret, ra, size);
-                closelog();
-            }
-        }
-#endif
+    tditrace("m%n%n", ra, size);
+    //tditrace("m%n%n%n", ra, size, ret);
+    //tditrace("%m%n%n%n", 0x01, ra, size, ret);
+    heaprss();
   }
 
   return ret;
@@ -1206,12 +1087,8 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
   void* ret = __calloc(nmemb, size);
 
   if (libccalloc && (nmemb * size) >= libccalloc) {
-    // tditrace("c =%x,ra=%x,sz=%d", ret, ra, nmemb * size);
-    // tditrace("c %d", nmemb * size);
-    tditrace("c %d,ra=%x", nmemb * size, ra);
-
-    mi();
-    ru();
+    tditrace("c%n%n", ra, nmemb * size);
+    heaprss();
   }
 
   return ret;
@@ -1237,12 +1114,8 @@ extern "C" void* realloc(void* ptr, size_t size) {
   void* ret = __realloc(ptr, size);
 
   if (libcrealloc && (size >= libcrealloc)) {
-    // tditrace("r =%x,ra=%x,sz=%d,ptr=%x", ret, ra, size, ptr);
-    // tditrace("r %d", size);
-    tditrace("r %d,ra=%x", size, ra);
-
-    mi();
-    ru();
+    tditrace("r%n%n", ra, size);
+    heaprss();
   }
 
   return ret;
@@ -1268,11 +1141,13 @@ extern "C" void free(void* ptr) {
   __free(ptr);
 
   if (libcfree) {
-    tditrace("f %x,ra=%x", ptr, ra);
+    tditrace("f%n%x", ra, ptr);
+    heaprss();
   }
 }
 #endif
 
+#if 1
 extern "C" int brk(void* __addr) {
   static int (*__brk)(void*) = NULL;
   if (__brk == NULL) {
@@ -1281,12 +1156,13 @@ extern "C" int brk(void* __addr) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-  tditrace("@I+brk()");
+  tditrace("brk");
   int ret = __brk(__addr);
-  tditrace("@I-brk()");
   return ret;
 }
+#endif
 
+#if 1
 extern "C" void* sbrk(intptr_t __delta) {
   static void* (*__sbrk)(intptr_t) = NULL;
   if (__sbrk == NULL) {
@@ -1295,11 +1171,11 @@ extern "C" void* sbrk(intptr_t __delta) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-  tditrace("@I+sbrk()");
+  tditrace("sbrk");
   void* ret = __sbrk(__delta);
-  tditrace("@I-sbrk()");
   return ret;
 }
+#endif
 
 #if 1
 extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
@@ -1321,11 +1197,8 @@ extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
   void* ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
 
   if (libcmmap) {
-    // tditrace("mmap %d =%x,ra=%x", (int)__len, ret, ra);
-    tditrace("mmap %d,ra=%x", (int)__len, ra);
-
-    mi();
-    ru();
+    tditrace("mm%n%n", ra, (int)__len);
+    heaprss();
   }
 
   return ret;
@@ -1350,10 +1223,8 @@ extern "C" int munmap(void* __addr, size_t __len) {
   int ret = __munmap(__addr, __len);
 
   if (libcmunmap) {
-    tditrace("munmap %d,ra=%x", __len, ra);
-
-    mi();
-    ru();
+    tditrace("mu%n%n", ra, __len);
+    heaprss();
   }
 
   return ret;
@@ -1378,11 +1249,8 @@ extern "C" void* memalign(size_t __alignment, size_t __size) {
   void* ret = __memalign(__alignment, __size);
 
   if (libcmemalign && (__size >= libcmemalign)) {
-    // tditrace("memalign %d =%x,ra=%x", __size, ret, ra);
-    tditrace("memalign %d,ra=%x", __size, ra);
-
-    mi();
-    ru();
+    tditrace("ma%n%n", ra, __size);
+    heaprss();
   }
 
   return ret;
@@ -1557,10 +1425,8 @@ void* operator new(unsigned int i) {
 
   if (libcoperatornew && (i >= libcoperatornew)) {
     // tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    tditrace("n %d,ra=%x", i, ra);
-
-    mi();
-    ru();
+    tditrace("n%n%n", ra, i);
+    heaprss();
   }
 
   return ret;

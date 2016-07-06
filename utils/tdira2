@@ -136,7 +136,8 @@ def main():
 
          if line.startswith('DSC'):
 
-            result = re.search(r'ra=[0-9a-f]+', line)
+            #result = re.search(r'ra=[0-9a-f]+', line)
+            result = re.search(r'@0=[0-9a-f]+', line)
             if result:
 
                address = (result.group().split(',')[0])[3:]
