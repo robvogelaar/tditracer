@@ -1204,6 +1204,7 @@ void create_trace_buffer(void) {
    * rewind ptr is used for offloading set to after
    */
   gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
+  *trace_buffer_dword_ptr = 0;
 
   reported_full = 0;
 
@@ -1514,6 +1515,7 @@ void tditrace_rewind() {
   trace_buffer_dword_ptr += 2;
 
   gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
+  *trace_buffer_dword_ptr = 0;
 
   reported_full = 0;
 
