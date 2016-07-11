@@ -174,12 +174,10 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
 
   // fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers, text_len);
 
-  // fprintf(stderr, "text_in=\"%s\" (%d)\n", text_in, text_len);
-  // for (i=0;i<30;i++)
-  //  fprintf(stderr, "%02x ", text_in[i]);
-  // fprintf(stderr,"\n");
-
-  // fprintf(stderr, "addentry:[%s][%d][%lld]\n", text_in, text_len, timestamp);
+  // fprintf(stderr, "text_in(%d)=\"", text_len);
+  // for (i=0;i<text_len;i++)
+  //   fprintf(stderr, "%c", text_in[i]);
+  // fprintf(stderr,"\"\n");
 
   char text_in1[1024];
   char *text = text_in1;
@@ -208,8 +206,9 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
   }
 
   // fprintf(stderr, "text=\"%s\"\n", text);
+
   // for (i=0;i<30;i++)
-  //  fprintf(stderr, "%02x ", text[i]);
+  //   fprintf(stderr, "%02x ", text[i]);
   // fprintf(stderr,"\n");
 
   // get rid of any '\n', replace with '_'
@@ -269,6 +268,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(tasks_array[nr_tasks], text, len);
+      tasks_array[nr_notes][len] = 0;
+
       entry = nr_tasks;
       nr_tasks++;
 
@@ -337,6 +338,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(semas_array[nr_semas], text, len);
+      semas_array[nr_notes][len] = 0;
+
       entry = nr_semas;
       nr_semas++;
 
@@ -406,6 +409,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(isrs_array[nr_isrs], text, len);
+      isrs_array[nr_notes][len] = 0;
+
       entry = nr_isrs;
       nr_isrs++;
 
@@ -473,6 +478,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(events_array[nr_events], text, len);
+      events_array[nr_notes][len] = 0;
+
       entry = nr_events;
       nr_events++;
 
@@ -544,6 +551,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(agents_array[nr_agents], text, len);
+      agents_array[nr_notes][len] = 0;
+
       entry = nr_agents;
       nr_agents++;
 
@@ -743,6 +752,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
       len = strlen(text);
 
     strncpy(notes_array[nr_notes], text, len);
+    notes_array[nr_notes][len] = 0;
+
     entry = nr_notes;
     nr_notes++;
 

@@ -108,19 +108,45 @@ void run_1(void) {
 }
 
 void run_2(void) {
-  struct simplefu_mutex myMutex;
+  struct simplefu_mutex futex;
+  pthread_spinlock_t spinlock;
+  pthread_mutex_t mutex;
   int i;
 
+  simplefu_mutex_init(&futex);
+  if (tditrace != NULL) tditrace("@T+futexx1000000");
+  for (i = 0; i < 1000000; i++) {
+    simplefu_mutex_lock(&futex);
+    simplefu_mutex_unlock(&futex);
+  }
+  if (tditrace != NULL) tditrace("@T-futexx1000000");
+
+  pthread_mutex_init(&mutex, NULL);
   if (tditrace != NULL) tditrace("@T+mutexx1000000");
   for (i = 0; i < 1000000; i++) {
-    simplefu_mutex_lock(&myMutex);
-    simplefu_mutex_unlock(&myMutex);
+    pthread_mutex_lock(&mutex);
+    pthread_mutex_unlock(&mutex);
   }
   if (tditrace != NULL) tditrace("@T-mutexx1000000");
+
+  pthread_spin_init(&spinlock, 0);
+  if (tditrace != NULL) tditrace("@T+spinlockx1000000");
+  for (i = 0; i < 1000000; i++) {
+    pthread_spin_lock(&spinlock);
+    pthread_spin_unlock(&spinlock);
+  }
+  if (tditrace != NULL) tditrace("@T-spinlockx1000000");
 }
 
 void run_3(void) {
   int i;
+
+  if (tditrace != NULL) tditrace("@T+tditrace_0x1000");
+  for (i = 0; i < 1000; i++) {
+    if (tditrace != NULL) tditrace("");
+  }
+  if (tditrace != NULL) tditrace("@T-tditrace_0x1000");
+
   if (tditrace != NULL) tditrace("@T+tditrace_10x1000");
   for (i = 0; i < 1000; i++) {
     if (tditrace != NULL) tditrace("1234567890");
@@ -403,13 +429,42 @@ void run_6(void) {
 #endif
 
   int i;
-//  for (i = 0; i < 50000; i++) {
-  while(1) {
+  //  for (i = 0; i < 50000; i++) {
+  while (1) {
     if (tditrace) tditrace("@T+HELLO012345678901234567890123456789");
     usleep(500);
     if (tditrace) tditrace("@T-HELLO012345678901234567890123456789");
     usleep(500);
   }
+}
+
+struct job {
+  int a;
+  int b;
+};
+
+void *worker(void *arg) {
+  struct job *job = (struct job *)arg;
+  int i = 0;
+  int t = syscall(SYS_gettid);
+  while (1) {
+    if (tditrace)
+      tditrace("%d %d", t, i++);
+  }
+  return NULL;
+}
+
+void run_10(void) {
+  struct job job = {0, 0};
+  int nthreads = 25;
+
+  /* Spawn threads. */
+  pthread_t threads[nthreads];
+  printf("Using %d thread%s.\n", nthreads, nthreads == 1 ? "" : "s");
+  for (int i = 0; i < nthreads; i++)
+    pthread_create(threads + i, NULL, worker, &job);
+
+  for (int i = 0; i < nthreads; i++) pthread_join(threads[i], NULL);
 }
 
 #if 1
@@ -418,9 +473,9 @@ int main(int argc, char **argv) {
   run_2();
   run_3();
   run_4();
-
-  //run_5();
-  //run_6();
+  // run_5();
+  // run_6();
+  // run_10();
 }
 
 #endif
