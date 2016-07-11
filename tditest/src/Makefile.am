@@ -8,4 +8,4 @@ tditest_LDADD = \
 tditest_SOURCES = \
     tditest.cpp
 
-tditest_CXXFLAGS = -fPIC -g2 -O0
+tditest_CXXFLAGS = -fPIC -g2 -O0 -lpthread
