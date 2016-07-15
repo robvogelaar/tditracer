@@ -10,6 +10,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "tdi.h"
 #include "tracermain.h"
@@ -314,7 +315,7 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
   static ssize_t (*__write)(int, const void*, size_t) = NULL;
 
   if (__write == NULL) {
-    __write = (ssize_t(*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
+    __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
     if (NULL == __write) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -363,9 +364,10 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
         } else {
           s[MIN(1, count)] = '\0';
           if (libcfd)
-            tditrace("@E+write()_%d %d \"%s...\"%n", fd, count, (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+            tditrace("@E+write()_%d %d \"%s...\"%n", fd, count,
+                     (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           else
-            tditrace("@E+write() %d %d \"%s...\"%n", fd, count, 
+            tditrace("@E+write() %d %d \"%s...\"%n", fd, count,
                      (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           // tditrace("@E+write()_%d_? %d \"%s...\"", fd, count, s);
         }
@@ -397,7 +399,7 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
   static ssize_t (*__read)(int, void*, size_t) = NULL;
 
   if (__read == NULL) {
-    __read = (ssize_t(*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
+    __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
     if (NULL == __read) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -438,11 +440,11 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
 
           if (strncmp((const char*)buf, "HTTP", 4) == 0) {
             if (libcfd)
-              tditrace("@E+read()_%d_HTTP %d =%d \"%s\"%n", fd, count, ret,
-                       s, ra);
+              tditrace("@E+read()_%d_HTTP %d =%d \"%s\"%n", fd, count, ret, s,
+                       ra);
             else
-              tditrace("@E+read()_HTTP %d %d =%d \"%s\"%n", fd, count, ret,
-                       s, ra);
+              tditrace("@E+read()_HTTP %d %d =%d \"%s\"%n", fd, count, ret, s,
+                       ra);
           } else {
             s[MIN(1, ret)] = '\0';
             if (libcfd)
@@ -468,7 +470,7 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
 
   if (__send == NULL) {
     __send =
-        (ssize_t(*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
+        (ssize_t (*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
     if (NULL == __send) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -545,7 +547,7 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
   static ssize_t (*__recv)(int, void*, size_t, int) = NULL;
 
   if (__recv == NULL) {
-    __recv = (ssize_t(*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
+    __recv = (ssize_t (*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
     if (NULL == __recv) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -584,9 +586,11 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
 
           if (strncmp((const char*)buf, "HTTP", 4) == 0) {
             if (libcfd)
-              tditrace("@E+recv()_%d_HTTP %d =%d \"%s\"%n", sockfd, len, ret, s, ra);
+              tditrace("@E+recv()_%d_HTTP %d =%d \"%s\"%n", sockfd, len, ret, s,
+                       ra);
             else
-              tditrace("@E+recv()_HTTP %d %d =%d \"%s\"%n", sockfd, len, ret, s, ra);
+              tditrace("@E+recv()_HTTP %d %d =%d \"%s\"%n", sockfd, len, ret, s,
+                       ra);
           }
 
           else {
@@ -616,8 +620,8 @@ extern "C" ssize_t sendto(int sockfd, const void* buf, size_t len, int flags,
 
   if (__sendto == NULL) {
     __sendto =
-        (ssize_t(*)(int, const void*, size_t, int, const struct sockaddr*,
-                    socklen_t))dlsym(RTLD_NEXT, "sendto");
+        (ssize_t (*)(int, const void*, size_t, int, const struct sockaddr*,
+                     socklen_t))dlsym(RTLD_NEXT, "sendto");
     if (NULL == __sendto) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -651,8 +655,8 @@ extern "C" ssize_t recvfrom(int sockfd, void* buf, size_t len, int flags,
                                socklen_t*) = NULL;
 
   if (__recvfrom == NULL) {
-    __recvfrom = (ssize_t(*)(int, void*, size_t, int, struct sockaddr*,
-                             socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
+    __recvfrom = (ssize_t (*)(int, void*, size_t, int, struct sockaddr*,
+                              socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
     if (NULL == __recvfrom) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -694,8 +698,8 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr* msg, int flags) {
   static ssize_t (*__sendmsg)(int, const struct msghdr*, int) = NULL;
 
   if (__sendmsg == NULL) {
-    __sendmsg =
-        (ssize_t(*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT, "sendmsg");
+    __sendmsg = (ssize_t (*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT,
+                                                                   "sendmsg");
     if (NULL == __sendmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -727,7 +731,7 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags) {
 
   if (__recvmsg == NULL) {
     __recvmsg =
-        (ssize_t(*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
+        (ssize_t (*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
     if (NULL == __recvmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -1051,8 +1055,8 @@ extern "C" void* malloc(size_t size) {
 
   if (libcmalloc && (size >= libcmalloc)) {
     tditrace("m%n%n", ra, size);
-    //tditrace("m%n%n%n", ra, size, ret);
-    //tditrace("%m%n%n%n", 0x01, ra, size, ret);
+    // tditrace("m%n%n%n", ra, size, ret);
+    // tditrace("%m%n%n%n", 0x01, ra, size, ret);
     heaprss();
   }
 
@@ -1415,15 +1419,14 @@ void* operator new(std::size_t n) throw(std::bad_alloc)
 //_Znwj
 #if 1
 void* operator new(unsigned int i) {
-  unsigned int ra = 0;
-
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = malloc(i);
 
   if (libcoperatornew && (i >= libcoperatornew)) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
     // tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
     tditrace("n%n%n", ra, i);
     heaprss();
@@ -1433,28 +1436,113 @@ void* operator new(unsigned int i) {
 }
 #endif
 
+#if 1
+extern "C" void syslog(int pri, const char* fmt, ...) {
+  static void (*__syslog)(int, const char*, ...) = NULL;
+
+  if (__syslog == NULL) {
+    __syslog = (void (*)(int, const char*, ...))dlsym(RTLD_NEXT, "syslog");
+    if (NULL == __syslog) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  int a1 = va_arg(args, int);
+  int a2 = va_arg(args, int);
+  int a3 = va_arg(args, int);
+  va_end(args);
+
+#define MAXSYSLOGSTRLEN 256
+  if (libcsyslog) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+    char s[MAXSYSLOGSTRLEN + 1];
+    char* m = s;
+    strncpy(s, (const char*)a1, MIN(MAXSYSLOGSTRLEN, libcsyslog));
+    s[MIN(MAXSYSLOGSTRLEN, libcsyslog)] = '\0';
+
 #if 0
-extern "C" void syslog(int pri, const char *fmt, ...) {
-    static void (*__syslog)(int, const char *, ...) = NULL;
-
-    if (__syslog == NULL) {
-        __syslog = (void (*)(int, const char *, ...))dlsym(RTLD_NEXT, "syslog");
-        if (NULL == __syslog) {
-            fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-        }
+    if (strstr(s, "p=0x61af")) {
+      tditrace("@S+SEGFAULT");
+      char *p = 0;
+      *p = 0;
     }
+#endif
 
-    va_list args;
-    va_start(args, fmt);
-    int a1 = va_arg(args, int);
-    int a2 = va_arg(args, int);
-    int a3 = va_arg(args, int);
-    va_end(args);
-
-    if (libcrecording || libcsyslogrecording) {
-        tditrace("@S+syslog() %s", a1 ? (char *)a1 : "");
+    if (m = strstr(s, "[mod=")) {
+      tditrace("@S+syslog():%s%n", m + 5, ra);
+    } else if (m = strstr(s, "[console] ")) {
+      tditrace("@S+syslog():%s%n", m + 10, ra);
+    } else {
+      tditrace("@S+syslog() %s%n", s, ra);
     }
+  }
 
-    __syslog(pri, a1, a2, a3);
+  __syslog(pri, a1, a2, a3);
+}
+#endif
+
+#if 1
+
+extern "C" int sigaction(int signum, const struct sigaction* act,
+                         struct sigaction* oldact) {
+  static int (*__sigaction)(int, const struct sigaction*, struct sigaction*) =
+      NULL;
+  if (__sigaction == NULL) {
+    __sigaction = (int (*)(int, const struct sigaction*,
+                           struct sigaction*))dlsym(RTLD_NEXT, "sigaction");
+    if (NULL == __sigaction) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcsigactionrecording) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+
+#if 1
+    // block the redirecting of sigsegv and sigtrap
+    if ((signum == 11) || (signum == 5)) {
+      tditrace("@S+sigaction()_%d_SKIP%n", signum, ra);
+      return 0;
+    } else {
+      tditrace("@S+sigaction()_%d%n", signum, ra);
+    }
+#else
+    tditrace("@S+sigaction() %d%n", signum, ra);
+#endif
+  }
+
+  return __sigaction(signum, act, oldact);
+}
+#endif
+
+#if 1
+int sigqueue(pid_t pid, int sig, const union sigval value) {
+  static int (*__sigqueue)(pid_t, int, const union sigval) = NULL;
+  if (__sigqueue == NULL) {
+    __sigqueue =
+        (int (*)(pid_t, int, const union sigval))dlsym(RTLD_NEXT, "sigqueue");
+    if (NULL == __sigqueue) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcsigqueuerecording) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+    tditrace("@S+sigqueue() %d%d%n", pid, sig, ra);
+  }
+
+  return __sigqueue(pid, sig, value);
 }
 #endif

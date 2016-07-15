@@ -60,7 +60,9 @@ bool libcrecvmmsgrecording;
 bool libcselectrecording;
 bool libcpollrecording;
 bool libcioctlrecording;
-bool libcsyslogrecording;
+unsigned int libcsyslog;
+bool libcsigactionrecording;
+bool libcsigqueuerecording;
 
 unsigned int libcmalloc;
 unsigned int libccalloc;
@@ -200,7 +202,13 @@ static void init(void) {
       libcrecvrecording = (atoi(env) >= 1);
     }
     if (env = getenv("LIBCSYSLOG")) {
-      libcsyslogrecording = (atoi(env) >= 1);
+      libcsyslog = (atoi(env));
+    }
+    if (env = getenv("LIBCSIGACTION")) {
+      libcsigactionrecording = (atoi(env) >= 1);
+    }
+    if (env = getenv("LIBCSIGQUEUE")) {
+      libcsigqueuerecording = (atoi(env) >= 1);
     }
 
     if (getenv("PTHREAD")) {

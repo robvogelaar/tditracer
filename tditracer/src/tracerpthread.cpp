@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <pthread.h>
 #include <sched.h>
 #include <dlfcn.h>
@@ -7,30 +8,40 @@
 #include "tracermain.h"
 #include "tdi.h"
 
-#if 0
+#if 1
 extern "C" int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                               void *(*start)(void *), void *arg) {
-    static int (*__pthread_create)(pthread_t *, const pthread_attr_t *,
-                                   void *(*start)(void *), void *) = NULL;
+  static int (*__pthread_create)(pthread_t *, const pthread_attr_t *,
+                                 void *(*start)(void *), void *) = NULL;
 
-    if (!__pthread_create)
-        __pthread_create = (int (*)(pthread_t *, const pthread_attr_t *,
-                                    void *(*start)(void *),
-                                    void *))dlsym(RTLD_NEXT, "pthread_create");
+  if (__pthread_create == NULL) {
+    __pthread_create =
+        (int (*)(pthread_t *, const pthread_attr_t *, void *(*start)(void *),
+                 void *))dlsym(RTLD_NEXT, "pthread_create");
 
-    if (pthreadrecording) {
-        tditrace("pthread_create() 0x%x %p", *thread, start);
+    if (NULL == __pthread_create) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
-    // TDIPRINTF("[%ld]+pthread_create(), called from: %s, thread: %s\n",
-    // syscall(SYS_gettid), addrinfo(__builtin_return_address(0)),
-    // addrinfo((void*)start));
+  }
 
-    int r = __pthread_create(thread, attr, start, arg);
+  if (pthreadrecording) {
+    unsigned int ra = 0;
+#ifdef __mips__
+    asm volatile("move %0, $ra" : "=r"(ra));
+#endif
 
-    // TDIPRINTF("[%ld]-pthread_create():0x%x\n", syscall(SYS_gettid),
-    // pthreadid(*thread));
+    tditrace("@S+pthread_create() 0x%x 0x%p%n", *thread, start, ra);
+  }
+  // TDIPRINTF("[%ld]+pthread_create(), called from: %s, thread: %s\n",
+  // syscall(SYS_gettid), addrinfo(__builtin_return_address(0)),
+  // addrinfo((void*)start));
 
-    return r;
+  int r = __pthread_create(thread, attr, start, arg);
+
+  // TDIPRINTF("[%ld]-pthread_create():0x%x\n", syscall(SYS_gettid),
+  // pthreadid(*thread));
+
+  return r;
 }
 #endif
 

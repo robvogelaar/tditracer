@@ -172,7 +172,8 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
   // if (nr_numbers) fprintf(stderr, "nr_numbers=%d(%x)\n", nr_numbers,
   // numbers[0]);
 
-  // fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers, text_len);
+  // fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers,
+  // text_len);
 
   // fprintf(stderr, "text_in(%d)=\"", text_len);
   // for (i=0;i<text_len;i++)
@@ -185,7 +186,6 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
   sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
   int procpidtidlen = strlen(text_in1);
 
-
   if ((strncmp(text_in, "@T+", 3) == 0) || (strncmp(text_in, "@T-", 3) == 0) ||
       (strncmp(text_in, "@I+", 3) == 0) || (strncmp(text_in, "@I-", 3) == 0) ||
       (strncmp(text_in, "@A+", 3) == 0) || (strncmp(text_in, "@A-", 3) == 0) ||
@@ -196,13 +196,12 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
              procname, pid, tid, &text_in[3]);
 
   } else {
-
     if (text_len)
-      snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s", procname,
-             pid, tid, text_in);
+      snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s",
+               procname, pid, tid, text_in);
     else
       snprintf(text_in1, procpidtidlen + 2 + 1, "[%s][%d][%d]%02X", procname,
-             pid, tid, identifier);
+               pid, tid, identifier);
   }
 
   // fprintf(stderr, "text=\"%s\"\n", text);
@@ -268,7 +267,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(tasks_array[nr_tasks], text, len);
-      tasks_array[nr_notes][len] = 0;
+      tasks_array[nr_tasks][len] = 0;
 
       entry = nr_tasks;
       nr_tasks++;
@@ -338,7 +337,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(semas_array[nr_semas], text, len);
-      semas_array[nr_notes][len] = 0;
+      semas_array[nr_semas][len] = 0;
 
       entry = nr_semas;
       nr_semas++;
@@ -409,7 +408,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(isrs_array[nr_isrs], text, len);
-      isrs_array[nr_notes][len] = 0;
+      isrs_array[nr_isrs][len] = 0;
 
       entry = nr_isrs;
       nr_isrs++;
@@ -478,7 +477,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(events_array[nr_events], text, len);
-      events_array[nr_notes][len] = 0;
+      events_array[nr_events][len] = 0;
 
       entry = nr_events;
       nr_events++;
@@ -551,7 +550,7 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         len = strlen(text);
 
       strncpy(agents_array[nr_agents], text, len);
-      agents_array[nr_notes][len] = 0;
+      agents_array[nr_agents][len] = 0;
 
       entry = nr_agents;
       nr_agents++;
@@ -809,7 +808,7 @@ static void parse(int bid) {
   unsigned int *p = tracebuffers[bid].dword_ptr;
   unsigned int marker = *p++;
 
-  //fprintf(stderr,"marker[0x%08x]\n", marker);
+  // fprintf(stderr,"marker[0x%08x]\n", marker);
 
   tracebuffers[bid].identifier = marker >> 24;
 
@@ -827,10 +826,12 @@ static void parse(int bid) {
 
   tracebuffers[bid].tid = 0;
   tracebuffers[bid].text = (char *)p;
-  tracebuffers[bid].text_len = (((marker & 0xffff) - 3) - ((marker >> 16) & 0xff)) << 2;
+  tracebuffers[bid].text_len =
+      (((marker & 0xffff) - 3) - ((marker >> 16) & 0xff)) << 2;
   tracebuffers[bid].valid = (marker != 0);
 
-  //fprintf(stderr,"marker[0x%08x](%d)(%d)\n", marker, tracebuffers[bid].nr_numbers, tracebuffers[bid].text_len);
+  // fprintf(stderr,"marker[0x%08x](%d)(%d)\n", marker,
+  // tracebuffers[bid].nr_numbers, tracebuffers[bid].text_len);
 
   // fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
   //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
@@ -956,9 +957,13 @@ static char offload_location[256] = {0};
 static int offload_counter = 0;
 static int offload_over50 = 0;
 
+static int do_wrap = 0;
+
+static int do_dump_proc_self_maps = 0;
+
+
 void *monitor_thread(void *param) {
   static int seconds_counter = 0;
-  static int do_dump_proc_self_maps = 0;
 
   stat(gtracebufferfilename, &gtrace_buffer_st);
   usleep(1 * 1000 * 1000);
@@ -1212,7 +1217,7 @@ void create_trace_buffer(void) {
           gprocname, gpid, atimeofday_offset, amonotonic_offset);
 
   /*
-   * rewind ptr is used for offloading set to after
+   * rewind ptr is used for offloading set to after timestamp offsets
    */
   gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
   *trace_buffer_dword_ptr = 0;
@@ -1426,6 +1431,11 @@ int tditrace_init(void) {
   if (env = getenv("OFFLOAD")) {
     do_offload = 1;
     strcpy(offload_location, env);
+  }
+
+  do_wrap = 0;
+  if (env = getenv("WRAP")) {
+    do_wrap = (atoi(env) >= 1);
   }
 
   report_tid = 0;
@@ -1742,7 +1752,8 @@ void tditrace_ex(int mask, const char *format, ...) {
  * [    ]clock_monotonic_offset.tv_nsec
  * [    ]clock_monotonic_offset.tv_sec
  * ------
- * [    ]marker, lower 2 bytes is total length in dwords, upper byte is identifier,
+ * [    ]marker, lower 2 bytes is total length in dwords, upper byte is
+ * identifier,
  *       middle byte is nr numbers
  * [    ]clock_monotonic_timestamp.tv_nsec
  * [    ]clock_monotonic_timestamp.tv_sec
@@ -1866,7 +1877,7 @@ void tditrace_internal(va_list args, const char *format) {
         }
 
         case 'm': {
-          identifier = va_arg(args, int) & 0xff;
+          identifier = va_arg(args, int)&0xff;
           break;
         }
 
@@ -1919,15 +1930,16 @@ void tditrace_internal(va_list args, const char *format) {
 
   if (((char *)trace_buffer_dword_ptr - gtrace_buffer) >
       (gtracebuffersize - 1024)) {
-    if (do_offload) {
+    if (do_offload || do_wrap) {
       // clear unused and rewind to rewind ptr
-      fprintf(stderr, "tdi: [%d][%s], rewind for offload\n", gpid, gprocname);
+      fprintf(stderr, "tdi: [%d][%s], rewind\n", gpid, gprocname);
       int i;
       for (i = (char *)trace_buffer_dword_ptr - gtrace_buffer;
            i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
       trace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
+      if (!do_offload) do_dump_proc_self_maps = 1;
     } else {
       fprintf(stderr, "tdi: [%s][%d], full\n", gprocname, gpid);
       tditrace_inited = 0;

@@ -24,7 +24,9 @@ extern bool libcrecvmmsgrecording;
 extern bool libcselectrecording;
 extern bool libcpollrecording;
 extern bool libcioctlrecording;
-extern bool libcsyslogrecording;
+extern unsigned int libcsyslog;
+extern bool libcsigactionrecording;
+extern bool libcsigqueuerecording;
 
 extern unsigned int libcmalloc;
 extern unsigned int libccalloc;
