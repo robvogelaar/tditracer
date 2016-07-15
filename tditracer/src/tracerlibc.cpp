@@ -1507,7 +1507,7 @@ extern "C" int sigaction(int signum, const struct sigaction* act,
     asm volatile("move %0, $ra" : "=r"(ra));
 #endif
 
-#if 1
+#if 0
     // block the redirecting of sigsegv and sigtrap
     if ((signum == 11) || (signum == 5)) {
       tditrace("@S+sigaction()_%d_SKIP%n", signum, ra);
@@ -1544,5 +1544,25 @@ int sigqueue(pid_t pid, int sig, const union sigval value) {
   }
 
   return __sigqueue(pid, sig, value);
+}
+#endif
+
+#if 1
+int raise(int sig) {
+  static int (*__raise)(int) = NULL;
+  if (__raise == NULL) {
+    __raise = (int (*)(int))dlsym(RTLD_NEXT, "raise");
+    if (NULL == __raise) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  unsigned int ra = 0;
+#ifdef __mips__
+  asm volatile("move %0, $ra" : "=r"(ra));
+#endif
+  tditrace("@S+raise()_%d%n", sig, ra);
+
+  return __raise(sig);
 }
 #endif
