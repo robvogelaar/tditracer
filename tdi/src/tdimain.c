@@ -961,7 +961,6 @@ static int do_wrap = 0;
 
 static int do_dump_proc_self_maps = 0;
 
-
 void *monitor_thread(void *param) {
   static int seconds_counter = 0;
 
@@ -1208,8 +1207,12 @@ void create_trace_buffer(void) {
   clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
   trace_buffer_dword_ptr += 2;
 
-  _u64 atimeofday_offset = (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
-  _u64 amonotonic_offset = (_u64)*p++ * (_u64)1000000000 + *p++;
+
+  _u64 atimeofday_offset = (_u64)*p++ * 1000000000;
+  atimeofday_offset += (_u64)*p++ * 1000;
+
+  _u64 amonotonic_offset = (_u64)*p++ * 1000000000;
+  amonotonic_offset += (_u64)*p++;
 
   fprintf(stderr,
           "tdi: [%s][%d], timeofday_timestamp:%lld, "
@@ -1583,9 +1586,12 @@ void check_trace_buffer(int b) {
 
     tracebuffers[b].dword_ptr += 2;
     unsigned int *p = tracebuffers[b].dword_ptr;
-    tracebuffers[b].timeofday_offset =
-        (_u64)*p++ * (_u64)1000000000 + *p++ * (_u64)1000;
-    tracebuffers[b].monotonic_offset = (_u64)*p++ * (_u64)1000000000 + *p++;
+
+    tracebuffers[b].timeofday_offset = (_u64)*p++ * (_u64)1000000000;
+    tracebuffers[b].timeofday_offset += (_u64)*p++ * (_u64)1000;
+
+    tracebuffers[b].monotonic_offset = (_u64)*p++ * (_u64)1000000000;
+    tracebuffers[b].monotonic_offset += (_u64)*p++;
     // fprintf(stderr,
     //        "timeofday_offset:%lld, "
     //        "monotonic_offset:%lld\n",
@@ -1877,7 +1883,7 @@ void tditrace_internal(va_list args, const char *format) {
         }
 
         case 'm': {
-          identifier = va_arg(args, int)&0xff;
+          identifier = va_arg(args, int) & 0xff;
           break;
         }
 

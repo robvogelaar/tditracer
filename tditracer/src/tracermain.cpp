@@ -47,7 +47,9 @@ bool libcfdopenrecording;
 bool libcfreopenrecording;
 bool libcfd;
 bool libcreadrecording;
+char *libcreadmatch;
 bool libcwriterecording;
+char *libcwritematch;
 bool libcsocketrecording;
 bool libcsendrecording;
 bool libcsendtorecording;
@@ -153,8 +155,14 @@ static void init(void) {
     if (env = getenv("LIBCREAD")) {
       libcreadrecording = (atoi(env) >= 1);
     }
+    if (env = getenv("LIBCREADMATCH")) {
+      libcreadmatch = env;
+    }
     if (env = getenv("LIBCWRITE")) {
       libcwriterecording = (atoi(env) >= 1);
+    }
+    if (env = getenv("LIBCWRITEMATCH")) {
+      libcwritematch = env;
     }
     if (env = getenv("LIBCSOCKET")) {
       libcsocketrecording = (atoi(env) >= 1);

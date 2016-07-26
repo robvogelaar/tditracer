@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <malloc.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +11,6 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include "tdi.h"
 #include "tracermain.h"
@@ -310,12 +310,27 @@ extern "C" int socket(int domain, int type, int protocol) {
 }
 #endif
 
+char* StrStr(const char* str, const char* target) {
+  if (!*target) return NULL;
+  char* p1 = (char*)str;
+  while (*p1) {
+    char *p1Begin = p1, *p2 = (char *)target;
+    while (*p1 && *p2 && (*p1 == *p2 || *p2 == '!')) {
+      p1++;
+      p2++;
+    }
+    if (!*p2) return p1Begin;
+    p1 = p1Begin + 1;
+  }
+  return NULL;
+}
+
 #if 1
 extern "C" ssize_t write(int fd, const void* buf, size_t count) {
   static ssize_t (*__write)(int, const void*, size_t) = NULL;
 
   if (__write == NULL) {
-    __write = (ssize_t (*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
+    __write = (ssize_t(*)(int, const void*, size_t))dlsym(RTLD_NEXT, "write");
     if (NULL == __write) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -325,6 +340,19 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
 #ifdef __mips__
   asm volatile("move %0, $ra" : "=r"(ra));
 #endif
+
+  if (libcwritematch) {
+    if (StrStr((const char*)buf, libcwritematch)) {
+      char s[MAXSTRLEN + 1];
+      strncpy(s, (const char*)buf, MIN(MAXSTRLEN, count));
+      s[MIN(MAXSTRLEN, count)] = '\0';
+      int i;
+      for (i = 0; i < MIN(MAXSTRLEN, count); i++)
+        if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+      tditrace("@E+write():\"%s\" \"%s\"", libcwritematch,
+               (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+    }
+  }
 
   if (libcwriterecording) {
     // tditrace("@I+write() %d %d", fd, count);
@@ -399,7 +427,7 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
   static ssize_t (*__read)(int, void*, size_t) = NULL;
 
   if (__read == NULL) {
-    __read = (ssize_t (*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
+    __read = (ssize_t(*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
     if (NULL == __read) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -416,11 +444,24 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
 
   ssize_t ret = __read(fd, buf, count);
 
+  if (libcreadmatch) {
+    if (StrStr((const char*)buf, libcreadmatch)) {
+      char s[MAXSTRLEN + 1];
+      strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+      s[MIN(MAXSTRLEN, ret)] = '\0';
+      int i;
+      for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
+        if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+      tditrace("@E+read():\"%s\" \"%s\"", libcreadmatch,
+               (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+    }
+  }
+
   if (libcreadrecording) {
     if (ret == -1) {
       // tditrace("@I-read()) =-1");
       if (libcfd)
-        tditrace("@E+read()_%d %d =-1%N", fd, count, ra);
+        tditrace("@E+read()_%d %d =-1%n", fd, count, ra);
       else
         tditrace("@E+read() %d %d =-1%n", fd, count, ra);
     } else if (ret == 0) {
@@ -446,12 +487,15 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
               tditrace("@E+read()_HTTP %d %d =%d \"%s\"%n", fd, count, ret, s,
                        ra);
           } else {
-            s[MIN(1, ret)] = '\0';
+            int i;
+            for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
+              if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+
             if (libcfd)
-              tditrace("@E+read()_%d %d =%d \"%s...\"%n", fd, count, ret,
+              tditrace("@E+read()_%d %d =%d \"%s\"%n", fd, count, ret,
                        (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
             else
-              tditrace("@E+read() %d %d =%d \"%s...\"", fd, count, ret,
+              tditrace("@E+read() %d %d =%d \"%s\"", fd, count, ret,
                        (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           }
         }
@@ -470,7 +514,7 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
 
   if (__send == NULL) {
     __send =
-        (ssize_t (*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
+        (ssize_t(*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
     if (NULL == __send) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -547,7 +591,7 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
   static ssize_t (*__recv)(int, void*, size_t, int) = NULL;
 
   if (__recv == NULL) {
-    __recv = (ssize_t (*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
+    __recv = (ssize_t(*)(int, void*, size_t, int))dlsym(RTLD_NEXT, "recv");
     if (NULL == __recv) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -620,8 +664,8 @@ extern "C" ssize_t sendto(int sockfd, const void* buf, size_t len, int flags,
 
   if (__sendto == NULL) {
     __sendto =
-        (ssize_t (*)(int, const void*, size_t, int, const struct sockaddr*,
-                     socklen_t))dlsym(RTLD_NEXT, "sendto");
+        (ssize_t(*)(int, const void*, size_t, int, const struct sockaddr*,
+                    socklen_t))dlsym(RTLD_NEXT, "sendto");
     if (NULL == __sendto) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -655,8 +699,8 @@ extern "C" ssize_t recvfrom(int sockfd, void* buf, size_t len, int flags,
                                socklen_t*) = NULL;
 
   if (__recvfrom == NULL) {
-    __recvfrom = (ssize_t (*)(int, void*, size_t, int, struct sockaddr*,
-                              socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
+    __recvfrom = (ssize_t(*)(int, void*, size_t, int, struct sockaddr*,
+                             socklen_t*))dlsym(RTLD_NEXT, "recvfrom");
     if (NULL == __recvfrom) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -698,8 +742,8 @@ extern "C" ssize_t sendmsg(int sockfd, const struct msghdr* msg, int flags) {
   static ssize_t (*__sendmsg)(int, const struct msghdr*, int) = NULL;
 
   if (__sendmsg == NULL) {
-    __sendmsg = (ssize_t (*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT,
-                                                                   "sendmsg");
+    __sendmsg =
+        (ssize_t(*)(int, const struct msghdr*, int))dlsym(RTLD_NEXT, "sendmsg");
     if (NULL == __sendmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
@@ -731,7 +775,7 @@ extern "C" ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags) {
 
   if (__recvmsg == NULL) {
     __recvmsg =
-        (ssize_t (*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
+        (ssize_t(*)(int, struct msghdr*, int))dlsym(RTLD_NEXT, "recvmsg");
     if (NULL == __recvmsg) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
