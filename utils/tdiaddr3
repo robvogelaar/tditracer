@@ -117,17 +117,19 @@ def main():
 
                if line.startswith('DSC'):
 
-                  result = re.search(r'(r|m),=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
-                  #result = re.search(r'r,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
-                  #result = re.search(r'm,=[0-9a-f]+,ra=[0-9a-f]+,sz=[0-9]+', line)
+                  #sys.stderr.write('%s\n' %line);
+
+                  result = re.search(r'(m|c|r|ma|n|n\[\]),@0=[0-9a-f]+@1=[0-9a-f]+@2=[0-9a-f]+', line)
 
                   if result:
 
-                     malloc = int((result.group().split(',')[1])[1:], 16)
-                     #address = int((result.group().split(',')[2])[3:], 16)
-                     size = int((result.group().split(',')[3])[3:])
+                     malloc = int((result.group().split('@2=')[1]), 16)
+                     size = int((result.group().split('@1=')[1].split('@2=')[0]), 16)
+
                      tag = line.split(' ')[3][:-1].split(',=')[0]
                      tag = tag.replace(',', ';')
+
+                     #sys.stderr.write('tag=[%s],malloc=%x,size=%x\n' %(tag, malloc, size));
 
                      if malloc < 0x30000000:
 
@@ -241,7 +243,6 @@ def main():
 
       for row in izip_longest(*leakchecklists):
          print row
-
 
    else:
       sys.stderr.write("Usage: %s tdifile cyclepattern-start cyclepattern-end cyclerange [maxnrcyclestocheck] [maxnrfuturecyclestocheckagainst]\n" % sys.argv[0])

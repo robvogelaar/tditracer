@@ -26,6 +26,14 @@
 #define unlikely(x) (x)
 #endif
 
+#ifdef __mips__
+#define save_ra() \
+  int ra;         \
+  asm volatile("move %0, $ra" : "=r"(ra));
+#else
+#define save_ra() int ra = 0;
+#endif
+
 #if 0
 /*
  * Several applications, such as Quake3, use dlopen("libGL.so.1"), but
@@ -163,6 +171,7 @@ extern "C" int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t a
 
 #if 1
 extern "C" int open(const char* pathname, int flags, ...) {
+  save_ra();
   static int (*__open)(const char*, int, ...) = NULL;
 
   if (__open == NULL) {
@@ -176,11 +185,6 @@ extern "C" int open(const char* pathname, int flags, ...) {
   va_start(args, flags);
   int a1 = va_arg(args, int);
   va_end(args);
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcopenrecording) {
     // tditrace("@I+open() %s", pathname);
@@ -198,6 +202,7 @@ extern "C" int open(const char* pathname, int flags, ...) {
 #endif
 
 extern "C" FILE* fopen(const char* path, const char* mode) {
+  save_ra();
   static FILE* (*__fopen)(const char*, const char*) = NULL;
 
   if (__fopen == NULL) {
@@ -206,11 +211,6 @@ extern "C" FILE* fopen(const char* path, const char* mode) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcfopenrecording) {
     // tditrace("@I+fopen() %s", path);
@@ -227,6 +227,7 @@ extern "C" FILE* fopen(const char* path, const char* mode) {
 }
 
 extern "C" FILE* fdopen(int fd, const char* mode) {
+  save_ra();
   static FILE* (*__fdopen)(int, const char*) = NULL;
 
   if (__fdopen == NULL) {
@@ -235,11 +236,6 @@ extern "C" FILE* fdopen(int fd, const char* mode) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcfdopenrecording) {
     // tditrace("@I+fdopen() %d", fd);
@@ -256,6 +252,7 @@ extern "C" FILE* fdopen(int fd, const char* mode) {
 }
 
 extern "C" FILE* freopen(const char* path, const char* mode, FILE* stream) {
+  save_ra();
   static FILE* (*__freopen)(const char*, const char*, FILE*) = NULL;
 
   if (__freopen == NULL) {
@@ -265,11 +262,6 @@ extern "C" FILE* freopen(const char* path, const char* mode, FILE* stream) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcfreopenrecording) {
     // tditrace("@I+freopen() %s", path);
@@ -327,6 +319,7 @@ char* StrStr(const char* str, const char* target) {
 
 #if 1
 extern "C" ssize_t write(int fd, const void* buf, size_t count) {
+  save_ra();
   static ssize_t (*__write)(int, const void*, size_t) = NULL;
 
   if (__write == NULL) {
@@ -335,11 +328,6 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcwritematch) {
     if (StrStr((const char*)buf, libcwritematch)) {
@@ -424,6 +412,7 @@ extern "C" ssize_t write(int fd, const void* buf, size_t count) {
 
 #if 1
 extern "C" ssize_t read(int fd, void* buf, size_t count) {
+  save_ra();
   static ssize_t (*__read)(int, void*, size_t) = NULL;
 
   if (__read == NULL) {
@@ -432,11 +421,6 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcreadrecording) {
     // tditrace("@I+read() %d %d", fd, count);
@@ -510,6 +494,7 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
 
 #if 1
 extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
+  save_ra();
   static ssize_t (*__send)(int, const void*, size_t, int) = NULL;
 
   if (__send == NULL) {
@@ -519,11 +504,6 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcrecording || libcsendrecording) {
     // tditrace("@I+send() %d %d", sockfd, len);
@@ -588,6 +568,7 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
 }
 
 extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
+  save_ra();
   static ssize_t (*__recv)(int, void*, size_t, int) = NULL;
 
   if (__recv == NULL) {
@@ -596,11 +577,6 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   if (libcrecording || libcrecvrecording) {
     // tditrace("@I+recv() %d %d", sockfd, len);
@@ -1081,6 +1057,7 @@ static void heaprss(void) {
 
 #if 1
 extern "C" void* malloc(size_t size) {
+  save_ra();
   static void* (*__malloc)(size_t) = NULL;
 
   if (unlikely(__malloc == NULL)) {
@@ -1090,16 +1067,11 @@ extern "C" void* malloc(size_t size) {
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = __malloc(size);
 
   if (libcmalloc && (size >= libcmalloc)) {
-    tditrace("m%n%n", ra, size);
-    // tditrace("m%n%n%n", ra, size, ret);
+    // tditrace("m%n%n", ra, size);
+    tditrace("m%n%n%n", ra, size, ret);
     // tditrace("%m%n%n%n", 0x01, ra, size, ret);
     heaprss();
   }
@@ -1117,6 +1089,7 @@ static void* temporary_calloc(size_t x, size_t y) {
 
 #if 1
 extern "C" void* calloc(size_t nmemb, size_t size) {
+  save_ra();
   static void* (*__calloc)(size_t, size_t) = NULL;
 
   if (unlikely(__calloc == NULL)) {
@@ -1127,15 +1100,11 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = __calloc(nmemb, size);
 
   if (libccalloc && (nmemb * size) >= libccalloc) {
-    tditrace("c%n%n", ra, nmemb * size);
+    // tditrace("c%n%n", ra, nmemb * size);
+    tditrace("c%n%n%n", ra, nmemb * size, ret);
     heaprss();
   }
 
@@ -1145,6 +1114,7 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
 
 #if 1
 extern "C" void* realloc(void* ptr, size_t size) {
+  save_ra();
   static void* (*__realloc)(void*, size_t) = NULL;
 
   if (unlikely(__realloc == NULL)) {
@@ -1154,15 +1124,11 @@ extern "C" void* realloc(void* ptr, size_t size) {
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = __realloc(ptr, size);
 
   if (libcrealloc && (size >= libcrealloc)) {
-    tditrace("r%n%n", ra, size);
+    // tditrace("r%n%n", ra, size);
+    tditrace("r%n%n%n", ra, size, ret);
     heaprss();
   }
 
@@ -1172,6 +1138,7 @@ extern "C" void* realloc(void* ptr, size_t size) {
 
 #if 1
 extern "C" void free(void* ptr) {
+  save_ra();
   static void (*__free)(void*) = NULL;
 
   if (__free == NULL) {
@@ -1180,11 +1147,6 @@ extern "C" void free(void* ptr) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   __free(ptr);
 
@@ -1228,6 +1190,7 @@ extern "C" void* sbrk(intptr_t __delta) {
 #if 1
 extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
                       int __fd, __off_t __offset) {
+  save_ra();
   static void* (*__mmap)(void*, size_t, int, int, int, __off_t) = NULL;
   if (unlikely(__mmap == NULL)) {
     __mmap = (void* (*)(void*, size_t, int, int, int, __off_t))dlsym(RTLD_NEXT,
@@ -1237,15 +1200,11 @@ extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
 
   if (libcmmap) {
-    tditrace("mm%n%n", ra, (int)__len);
+    // tditrace("mm%n%n", ra, (int)__len);
+    tditrace("mm%n%n%n", ra, (int)__len, ret);
     heaprss();
   }
 
@@ -1255,6 +1214,8 @@ extern "C" void* mmap(void* __addr, size_t __len, int __prot, int __flags,
 
 #if 1
 extern "C" int munmap(void* __addr, size_t __len) {
+  save_ra();
+
   static int (*__munmap)(void*, size_t) = NULL;
   if (unlikely(__munmap == NULL)) {
     __munmap = (int (*)(void*, size_t))dlsym(RTLD_NEXT, "munmap");
@@ -1262,11 +1223,6 @@ extern "C" int munmap(void* __addr, size_t __len) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   int ret = __munmap(__addr, __len);
 
@@ -1281,7 +1237,7 @@ extern "C" int munmap(void* __addr, size_t __len) {
 
 #if 1
 extern "C" void* memalign(size_t __alignment, size_t __size) {
-  static void* (*__memalign)(size_t, size_t) = NULL;
+  save_ra() static void* (*__memalign)(size_t, size_t) = NULL;
   if (unlikely(__memalign == NULL)) {
     __memalign = (void* (*)(size_t, size_t))dlsym(RTLD_NEXT, "memalign");
     if (__memalign == NULL) {
@@ -1289,15 +1245,11 @@ extern "C" void* memalign(size_t __alignment, size_t __size) {
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
   void* ret = __memalign(__alignment, __size);
 
   if (libcmemalign && (__size >= libcmemalign)) {
-    tditrace("ma%n%n", ra, __size);
+    // tditrace("ma%n%n", ra, __size);
+    tditrace("ma%n%n%n", ra, __size, ret);
     heaprss();
   }
 
@@ -1308,6 +1260,7 @@ extern "C" void* memalign(size_t __alignment, size_t __size) {
 #if 0
 extern "C" int posix_memalign(void** __memptr, size_t __alignment,
                               size_t __size) {
+  save_ra();
   static int (*__posix_memalign)(void**, size_t, size_t) = NULL;
   if (__posix_memalign == NULL) {
     __posix_memalign =
@@ -1317,10 +1270,6 @@ extern "C" int posix_memalign(void** __memptr, size_t __alignment,
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
 
   int ret = __posix_memalign(__memptr, __alignment, __size);
 
@@ -1457,22 +1406,51 @@ void* operator new(std::size_t n) throw(std::bad_alloc)
         }
     }
 }
+#endif
 
+#if 1
+void* operator new[](unsigned int i) {
+  save_ra();
+
+  // use a local copy so as to not incurr the tditrace from malloc
+  static void* (*___malloc)(size_t) = NULL;
+  if (unlikely(___malloc == NULL)) {
+    ___malloc = (void* (*)(size_t))dlsym(RTLD_NEXT, "malloc");
+    if (NULL == ___malloc) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  void* ret = ___malloc(i);
+
+  if (libcoperatornew && (i >= libcoperatornew)) {
+    // tditrace("n%n%n", ra, i);
+    tditrace("n[]%n%n%n", ra, i, ret);
+    heaprss();
+  }
+
+  return ret;
+}
 #endif
 
 //_Znwj
 #if 1
 void* operator new(unsigned int i) {
-  void* ret = malloc(i);
+  save_ra();
+
+  static void* (*___malloc)(size_t) = NULL;
+  if (unlikely(___malloc == NULL)) {
+    ___malloc = (void* (*)(size_t))dlsym(RTLD_NEXT, "malloc");
+    if (NULL == ___malloc) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  void* ret = ___malloc(i);
 
   if (libcoperatornew && (i >= libcoperatornew)) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
-    // tditrace("operator_new =%x,ra=%x,sz=%d", ret, ra, i);
-    tditrace("n%n%n", ra, i);
+    // tditrace("n%n%n", ra, i);
+    tditrace("n%n%n%n", ra, i, ret);
     heaprss();
   }
 
@@ -1482,6 +1460,7 @@ void* operator new(unsigned int i) {
 
 #if 1
 extern "C" void syslog(int pri, const char* fmt, ...) {
+  save_ra();
   static void (*__syslog)(int, const char*, ...) = NULL;
 
   if (__syslog == NULL) {
@@ -1500,11 +1479,6 @@ extern "C" void syslog(int pri, const char* fmt, ...) {
 
 #define MAXSYSLOGSTRLEN 256
   if (libcsyslog) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
     char s[MAXSYSLOGSTRLEN + 1];
     char* m = s;
     strncpy(s, (const char*)a1, MIN(MAXSYSLOGSTRLEN, libcsyslog));
@@ -1527,7 +1501,7 @@ extern "C" void syslog(int pri, const char* fmt, ...) {
     }
   }
 
-  __syslog(pri, a1, a2, a3);
+  __syslog(pri, (const char*)a1, a2, a3);
 }
 #endif
 
@@ -1535,6 +1509,7 @@ extern "C" void syslog(int pri, const char* fmt, ...) {
 
 extern "C" int sigaction(int signum, const struct sigaction* act,
                          struct sigaction* oldact) {
+  save_ra();
   static int (*__sigaction)(int, const struct sigaction*, struct sigaction*) =
       NULL;
   if (__sigaction == NULL) {
@@ -1546,11 +1521,6 @@ extern "C" int sigaction(int signum, const struct sigaction* act,
   }
 
   if (libcsigactionrecording) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
-
 #if 0
     // block the redirecting of sigsegv and sigtrap
     if ((signum == 11) || (signum == 5)) {
@@ -1570,6 +1540,7 @@ extern "C" int sigaction(int signum, const struct sigaction* act,
 
 #if 1
 int sigqueue(pid_t pid, int sig, const union sigval value) {
+  save_ra();
   static int (*__sigqueue)(pid_t, int, const union sigval) = NULL;
   if (__sigqueue == NULL) {
     __sigqueue =
@@ -1580,10 +1551,6 @@ int sigqueue(pid_t pid, int sig, const union sigval value) {
   }
 
   if (libcsigqueuerecording) {
-    unsigned int ra = 0;
-#ifdef __mips__
-    asm volatile("move %0, $ra" : "=r"(ra));
-#endif
     tditrace("@S+sigqueue() %d%d%n", pid, sig, ra);
   }
 
@@ -1593,6 +1560,7 @@ int sigqueue(pid_t pid, int sig, const union sigval value) {
 
 #if 1
 int raise(int sig) {
+  save_ra();
   static int (*__raise)(int) = NULL;
   if (__raise == NULL) {
     __raise = (int (*)(int))dlsym(RTLD_NEXT, "raise");
@@ -1601,10 +1569,6 @@ int raise(int sig) {
     }
   }
 
-  unsigned int ra = 0;
-#ifdef __mips__
-  asm volatile("move %0, $ra" : "=r"(ra));
-#endif
   tditrace("@S+raise()_%d%n", sig, ra);
 
   return __raise(sig);
