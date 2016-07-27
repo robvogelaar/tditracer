@@ -429,15 +429,17 @@ extern "C" ssize_t read(int fd, void* buf, size_t count) {
   ssize_t ret = __read(fd, buf, count);
 
   if (libcreadmatch) {
-    if (StrStr((const char*)buf, libcreadmatch)) {
-      char s[MAXSTRLEN + 1];
-      strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
-      s[MIN(MAXSTRLEN, ret)] = '\0';
-      int i;
-      for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
-        if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
-      tditrace("@E+read():\"%s\" \"%s\"", libcreadmatch,
-               (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+    if (ret != -1) {
+      if (StrStr((const char*)buf, libcreadmatch)) {
+        char s[MAXSTRLEN + 1];
+        strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+        s[MIN(MAXSTRLEN, ret)] = '\0';
+        int i;
+        for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
+          if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+        tditrace("@E+read():\"%s\" \"%s\"", libcreadmatch,
+                 (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+      }
     }
   }
 
@@ -502,6 +504,19 @@ extern "C" ssize_t send(int sockfd, const void* buf, size_t len, int flags) {
         (ssize_t(*)(int, const void*, size_t, int))dlsym(RTLD_NEXT, "send");
     if (NULL == __send) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (libcsendmatch) {
+    if (StrStr((const char*)buf, libcsendmatch)) {
+      char s[MAXSTRLEN + 1];
+      strncpy(s, (const char*)buf, MIN(MAXSTRLEN, len));
+      s[MIN(MAXSTRLEN, len)] = '\0';
+      int i;
+      for (i = 0; i < MIN(MAXSTRLEN, len); i++)
+        if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+      tditrace("@E+send():\"%s\" \"%s\"", libcsendmatch,
+               (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
     }
   }
 
@@ -584,6 +599,21 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
 
   ssize_t ret = __recv(sockfd, buf, len, flags);
 
+  if (libcrecvmatch) {
+    if (ret != -1) {
+      if (StrStr((const char*)buf, libcrecvmatch)) {
+        char s[MAXSTRLEN + 1];
+        strncpy(s, (const char*)buf, MIN(MAXSTRLEN, ret));
+        s[MIN(MAXSTRLEN, ret)] = '\0';
+        int i;
+        for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
+          if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
+        tditrace("@E+recv():\"%s\" \"%s\"", libcrecvmatch,
+                 (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
+      }
+    }
+  }
+
   if (libcrecording || libcrecvrecording) {
     if (ret == -1) {
       // tditrace("@I-recv() =-1");
@@ -611,16 +641,17 @@ extern "C" ssize_t recv(int sockfd, void* buf, size_t len, int flags) {
             else
               tditrace("@E+recv()_HTTP %d %d =%d \"%s\"%n", sockfd, len, ret, s,
                        ra);
-          }
-
-          else {
-            // s[MIN(4, ret)] = '\0';
-            // tditrace("@E+recv()_%d_? =%d \"%s\"...", sockfd, ret, s);
+          } else {
+            int i;
+            for (i = 0; i < MIN(MAXSTRLEN, ret); i++)
+              if (s[i] < 0x20 || s[i] >= 0x7f) s[i] = '.';
 
             if (libcfd)
-              tditrace("@E+recv()_%d %d =%d \"...\"%n", sockfd, len, ret, ra);
+              tditrace("@E+recv()_%d %d =%d \"%s\"%n", sockfd, len, ret,
+                       (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
             else
-              tditrace("@E+recv() %d %d =%d \"...\"%n", sockfd, len, ret, ra);
+              tditrace("@E+recv() %d %d =%d \"%s\"", sockfd, len, ret,
+                       (s[0] >= 0x20 && s[0] < 0x7f) ? s : "?", ra);
           }
         }
       }
