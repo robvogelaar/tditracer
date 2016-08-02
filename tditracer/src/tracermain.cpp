@@ -40,6 +40,11 @@ int texturerecording;
 int renderbufferrecording;
 int shaderrecording;
 
+int gosd;
+const char *osds[] = {
+    "spinner",  // 0x00000001
+};
+
 bool libcrecording;
 bool libcopenrecording;
 bool libcfopenrecording;
@@ -115,7 +120,8 @@ static void signalhandler(int sig, siginfo_t *si, void *context) {
 
 static void init(void) {
   static bool inited = false;
-  if (!inited) {
+  if (inited) return;
+
 #if 0
         static struct sigaction sVal;
 
@@ -127,162 +133,177 @@ static void init(void) {
         sigaction(SIGQUIT, &sVal, NULL);
 
 #endif
-    char *env;
-    if (env = getenv("LIBC")) {
-      libcrecording = (atoi(env) >= 1);
 
-      libcreadrecording = true;
-      libcwriterecording = true;
+  char *env;
 
-      libcsendrecording = true;
-      libcrecvrecording = true;
+  if (env = getenv("LIBC")) {
+    libcrecording = (atoi(env) >= 1);
 
-      libcsendtorecording = true;
-      libcrecvfromrecording = true;
+    libcreadrecording = true;
+    libcwriterecording = true;
 
-      libcsendmsgrecording = true;
-      libcrecvmsgrecording = true;
+    libcsendrecording = true;
+    libcrecvrecording = true;
 
-      libcsendmmsgrecording = true;
-      libcrecvmmsgrecording = true;
-    }
+    libcsendtorecording = true;
+    libcrecvfromrecording = true;
 
-    if (env = getenv("LIBCOPEN")) {
-      libcopenrecording = libcfopenrecording = libcfdopenrecording =
-          libcfreopenrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCFD")) {
-      libcfd = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCREAD")) {
-      libcreadrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCREADMATCH")) {
-      libcreadmatch = env;
-    }
-    if (env = getenv("LIBCRECVMATCH")) {
-      libcrecvmatch = env;
-    }
-    if (env = getenv("LIBCWRITE")) {
-      libcwriterecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCWRITEMATCH")) {
-      libcwritematch = env;
-    }
-    if (env = getenv("LIBCSENDMATCH")) {
-      libcsendmatch = env;
-    }
-    if (env = getenv("LIBCSOCKET")) {
-      libcsocketrecording = (atoi(env) >= 1);
-      libcsendrecording = libcsendtorecording = libcsendmsgrecording =
-          libcsendmmsgrecording = (atoi(env) >= 1);
-      libcrecvrecording = libcrecvfromrecording = libcrecvmsgrecording =
-          libcrecvmmsgrecording = (atoi(env) >= 1);
-      libcselectrecording = (atoi(env) >= 1);
-      libcpollrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCIOCTL")) {
-      libcioctlrecording = (atoi(env) >= 1);
-    }
+    libcsendmsgrecording = true;
+    libcrecvmsgrecording = true;
 
-    if (env = getenv("LIBCMALLOC")) {
-      libcmalloc = atoi(env);
-    }
-    if (env = getenv("LIBCCALLOC")) {
-      libccalloc = atoi(env);
-    }
-    if (env = getenv("LIBCREALLOC")) {
-      libcrealloc = atoi(env);
-    }
-    if (env = getenv("LIBCMEMALIGN")) {
-      libcmemalign = atoi(env);
-    }
-    if (env = getenv("LIBCFREE")) {
-      libcfree = atoi(env);
-    }
-    if (env = getenv("LIBCOPERATORNEW")) {
-      libcoperatornew = atoi(env);
-    }
-
-    if (env = getenv("LIBCMMAP")) {
-      libcmmap = atoi(env);
-    }
-    if (env = getenv("LIBCMUNMAP")) {
-      libcmunmap = atoi(env);
-    }
-
-    if (env = getenv("LIBCSEND")) {
-      libcsendrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCRECV")) {
-      libcrecvrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCSYSLOG")) {
-      libcsyslog = (atoi(env));
-    }
-    if (env = getenv("LIBCSIGACTION")) {
-      libcsigactionrecording = (atoi(env) >= 1);
-    }
-    if (env = getenv("LIBCSIGQUEUE")) {
-      libcsigqueuerecording = (atoi(env) >= 1);
-    }
-
-    if (getenv("PTHREAD")) {
-      pthreadrecording = (atoi(getenv("PTHREAD")) >= 1);
-    } else {
-      pthreadrecording = false;
-    }
-
-    if (getenv("EGL")) {
-      eglrecording = (atoi(getenv("EGL")) >= 1);
-    } else {
-      eglrecording = false;
-    }
-
-    if (getenv("GLES2")) {
-      gles2recording = (atoi(getenv("GLES2")) >= 1);
-    } else {
-      gles2recording = false;
-    }
-
-    if (getenv("GLDRAW")) {
-      gldrawrecording = (atoi(getenv("GLDRAW")) >= 1);
-    } else {
-      gldrawrecording = false;
-    }
-
-    if (getenv("GLTEXTURE")) {
-      gltexturerecording = (atoi(getenv("GLTEXTURE")) >= 1);
-    } else {
-      gltexturerecording = false;
-    }
-
-    if (getenv("TR")) {
-      texturerecording = atoi(getenv("TR"));
-    }
-    if (getenv("RR")) {
-      renderbufferrecording = atoi(getenv("RR"));
-    }
-    if (getenv("FR")) {
-      framerecording = atoi(getenv("FR"));
-    }
-    if (getenv("SR")) {
-      shaderrecording = atoi(getenv("SR"));
-    }
-
-    if (renderbufferrecording) {
-      texturerecording = renderbufferrecording;
-    }
-
-    fprintf(stderr,
-            "tditracer: [%d], libc:%s, pthread:%s, shaders:%s, "
-            "textures:%s, "
-            "renderbuffers:%s, frames:%d\n",
-            getpid(), libcrecording ? "yes" : "no",
-            pthreadrecording ? "yes" : "no", shaderrecording ? "yes" : "no",
-            texturerecording ? "yes" : "no",
-            renderbufferrecording ? "yes" : "no", framerecording);
-
-    inited = true;
+    libcsendmmsgrecording = true;
+    libcrecvmmsgrecording = true;
   }
+
+  if (env = getenv("LIBCOPEN")) {
+    libcopenrecording = libcfopenrecording = libcfdopenrecording =
+        libcfreopenrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCFD")) {
+    libcfd = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCREAD")) {
+    libcreadrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCREADMATCH")) {
+    libcreadmatch = env;
+  }
+  if (env = getenv("LIBCRECVMATCH")) {
+    libcrecvmatch = env;
+  }
+  if (env = getenv("LIBCWRITE")) {
+    libcwriterecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCWRITEMATCH")) {
+    libcwritematch = env;
+  }
+  if (env = getenv("LIBCSENDMATCH")) {
+    libcsendmatch = env;
+  }
+  if (env = getenv("LIBCSOCKET")) {
+    libcsocketrecording = (atoi(env) >= 1);
+    libcsendrecording = libcsendtorecording = libcsendmsgrecording =
+        libcsendmmsgrecording = (atoi(env) >= 1);
+    libcrecvrecording = libcrecvfromrecording = libcrecvmsgrecording =
+        libcrecvmmsgrecording = (atoi(env) >= 1);
+    libcselectrecording = (atoi(env) >= 1);
+    libcpollrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCIOCTL")) {
+    libcioctlrecording = (atoi(env) >= 1);
+  }
+
+  if (env = getenv("LIBCMALLOC")) {
+    libcmalloc = atoi(env);
+  }
+  if (env = getenv("LIBCCALLOC")) {
+    libccalloc = atoi(env);
+  }
+  if (env = getenv("LIBCREALLOC")) {
+    libcrealloc = atoi(env);
+  }
+  if (env = getenv("LIBCMEMALIGN")) {
+    libcmemalign = atoi(env);
+  }
+  if (env = getenv("LIBCFREE")) {
+    libcfree = atoi(env);
+  }
+  if (env = getenv("LIBCOPERATORNEW")) {
+    libcoperatornew = atoi(env);
+  }
+
+  if (env = getenv("LIBCMMAP")) {
+    libcmmap = atoi(env);
+  }
+  if (env = getenv("LIBCMUNMAP")) {
+    libcmunmap = atoi(env);
+  }
+
+  if (env = getenv("LIBCSEND")) {
+    libcsendrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCRECV")) {
+    libcrecvrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCSYSLOG")) {
+    libcsyslog = (atoi(env));
+  }
+  if (env = getenv("LIBCSIGACTION")) {
+    libcsigactionrecording = (atoi(env) >= 1);
+  }
+  if (env = getenv("LIBCSIGQUEUE")) {
+    libcsigqueuerecording = (atoi(env) >= 1);
+  }
+
+  if (getenv("PTHREAD")) {
+    pthreadrecording = (atoi(getenv("PTHREAD")) >= 1);
+  } else {
+    pthreadrecording = false;
+  }
+
+  if (getenv("EGL")) {
+    eglrecording = (atoi(getenv("EGL")) >= 1);
+  } else {
+    eglrecording = false;
+  }
+
+  if (getenv("GLES2")) {
+    gles2recording = (atoi(getenv("GLES2")) >= 1);
+  } else {
+    gles2recording = false;
+  }
+
+  if (getenv("GLDRAW")) {
+    gldrawrecording = (atoi(getenv("GLDRAW")) >= 1);
+  } else {
+    gldrawrecording = false;
+  }
+
+  if (getenv("GLTEXTURE")) {
+    gltexturerecording = (atoi(getenv("GLTEXTURE")) >= 1);
+  } else {
+    gltexturerecording = false;
+  }
+
+  if (getenv("TR")) {
+    texturerecording = atoi(getenv("TR"));
+  }
+  if (getenv("RR")) {
+    renderbufferrecording = atoi(getenv("RR"));
+  }
+  if (getenv("FR")) {
+    framerecording = atoi(getenv("FR"));
+  }
+  if (getenv("SR")) {
+    shaderrecording = atoi(getenv("SR"));
+  }
+
+  gosd = 0x0;
+  int i;
+  if (env = getenv("OSD")) {
+    for (i = 0; i < sizeof(osds) / sizeof(char *); i++) {
+      if (strstr(env, osds[i])) gosd |= (1 << i);
+    }
+    if (gosd == 0x0) gosd = strtoul(env, 0, 16);
+  }
+  fprintf(stderr, "tditracer: [%d], OSD = 0x%08x (", getpid(), gosd);
+  int d = 0;
+  for (i = 0; i < sizeof(osds) / sizeof(char *); i++) {
+    if (gosd & (1 << i)) {
+      fprintf(stderr, "%s%s", d ? "+" : "", osds[i]);
+      d = 1;
+    }
+  }
+  fprintf(stderr, ")\n");
+
+  fprintf(stderr,
+          "tditracer: [%d], libc:%s, pthread:%s, shaders:%s, "
+          "textures:%s, "
+          "renderbuffers:%s, frames:%d\n",
+          getpid(), libcrecording ? "yes" : "no",
+          pthreadrecording ? "yes" : "no", shaderrecording ? "yes" : "no",
+          texturerecording ? "yes" : "no", renderbufferrecording ? "yes" : "no",
+          framerecording);
+
+  inited = true;
 }

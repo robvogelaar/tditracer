@@ -2,6 +2,9 @@
 #include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <math.h>
 
 extern "C" {
 #include "framecapture.h"
@@ -14,11 +17,23 @@ extern "C" {
 #include "tracermain.h"
 #include "tracerutils.h"
 
+#include "gles2capture.h"
+#include "gles2spinner.h"
+
+#ifdef __mips__
+#define save_ra() \
+  int ra;         \
+  asm volatile("move %0, $ra" : "=r"(ra));
+#else
+#define save_ra() int ra = 0;
+#endif
+
 extern "C" void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height,
                              GLenum format, GLenum type, GLvoid *data);
 
 static GLuint boundtexture;
 static GLuint currentprogram;
+static GLuint currentbuffer;
 static GLuint boundframebuffer = 0;
 static GLuint boundrenderbuffer = 0;
 static GLuint framebuffertexture[1024] = {};
@@ -28,6 +43,7 @@ static GLuint renderbufferheight[1024] = {};
 
 static int draw_counter = 0;
 static int texturebind_counter = 0;
+static int texturegen_counter = 0;
 
 static int current_frame = 1;
 
@@ -60,71 +76,22 @@ extern "C" EGLBoolean eglInitialize(EGLDisplay display, EGLint *major,
   return ret;
 }
 
-extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
-  static EGLBoolean (*__eglSwapBuffers)(EGLDisplay display,
-                                        EGLSurface surface) = NULL;
-
-  if (__eglSwapBuffers == NULL) {
-    __eglSwapBuffers = (EGLBoolean(*)(EGLDisplay, EGLSurface))dlsym(
-        RTLD_NEXT, "eglSwapBuffers");
-    if (NULL == __eglSwapBuffers) {
-      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+extern "C" EGLContext eglCreateContext(EGLDisplay display, EGLConfig config,
+                                       EGLContext share_context,
+                                       const EGLint *attrib_list) {
+  static EGLContext (*__eglCreateContext)(EGLDisplay, EGLConfig, EGLContext,
+                                          const EGLint *) = NULL;
+  if (__eglCreateContext == NULL) {
+    __eglCreateContext =
+        (EGLContext(*)(EGLDisplay, EGLConfig, EGLContext, const EGLint *))dlsym(
+            RTLD_NEXT, "eglCreateContext");
+    if (__eglCreateContext == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-
-  if (eglrecording) tditrace("@I+eglSwapBuffers()");
-
-  EGLBoolean ret = __eglSwapBuffers(display, surface);
-
-  if (eglrecording) tditrace("@I-eglSwapBuffers()");
-
-  if (eglrecording)
-    tditrace("@S+eglSwapBuffers() #%d #gldraws=%d #gltexturebinds=%d",
-             current_frame, draw_counter, texturebind_counter);
-
-  if (eglrecording && gles2recording) tditrace("#gldraws~%d", 0);
-  if (eglrecording && gles2recording) tditrace("#gltexturebinds~%d", 0);
-
-  glDrawElements_counter = 0;
-  glDrawArrays_counter = 0;
-  glTexImage2D_counter = 0;
-  glTexSubImage2D_counter = 0;
-  glBindTexture_counter = 0;
-
-  draw_counter = 0;
-  texturebind_counter = 0;
-
-  if (framerecording) {
-    static char *framebuffer = 0;
-    if (!framebuffer) {
-      framebuffer = (char *)memalign(4096, 1280 * 720 * 4);
-    }
-    glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
-    framecapture_capframe(framebuffer);
-    frames_captured++;
-  }
-
-  /*
-   */
-
-  if ((current_frame == shaderrecording) ||
-      (current_frame == texturerecording) ||
-      (current_frame == framerecording)) {
-    if (shaderrecording) {
-      shadercapture_writeshaders();
-    }
-    if (texturerecording) {
-      texturecapture_writepngtextures();
-      texturecapture_deletetextures();
-    }
-    if (framerecording) {
-      framecapture_writepngframes();
-      framecapture_deleteframes();
-    }
-  }
-
-  current_frame++;
-
+  EGLContext ret =
+      __eglCreateContext(display, config, share_context, attrib_list);
+  if (gles2recording) tditrace("eglCreateContext() =0x%x", ret);
   return ret;
 }
 
@@ -146,15 +113,96 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
   // context=0x%x%s,[%s]\n", display, draw, read, context,
   // addrinfo(__builtin_return_address(0)));
 
-  if (eglrecording)
-    tditrace("@I+eglMakeCurrent() display=%d draw=0x%x read=0x%x context=0x%x",
-             display, draw, read, context);
+  if (eglrecording) tditrace("@I+eglMakeCurrent()");
   EGLBoolean b = __eglMakeCurrent(display, draw, read, context);
-  if (eglrecording) tditrace("@I-eglMakeCurrent()");
-
+  if (eglrecording) {
+    tditrace("@I-eglMakeCurrent()");
+    tditrace(
+        "@S+eglMakeCurrent()_%d_%d_%d_%d display=%d draw=0x%x read=0x%x "
+        "context=0x%x",
+        display, draw, read, context, display, draw, read, context);
+  }
   boundframebuffer = 0;
 
   return b;
+}
+
+extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
+  static EGLBoolean (*__eglSwapBuffers)(EGLDisplay display,
+                                        EGLSurface surface) = NULL;
+
+  if (__eglSwapBuffers == NULL) {
+    __eglSwapBuffers = (EGLBoolean(*)(EGLDisplay, EGLSurface))dlsym(
+        RTLD_NEXT, "eglSwapBuffers");
+    if (NULL == __eglSwapBuffers) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  if (eglrecording) tditrace("@I+eglSwapBuffers()");
+
+  if (gosd & 0x1) spinner_render(current_frame);
+  
+  //capture_frame();
+
+  EGLBoolean ret = __eglSwapBuffers(display, surface);
+
+  if (eglrecording) tditrace("@I-eglSwapBuffers()");
+
+  if (eglrecording)
+    tditrace("@S+eglSwapBuffers()_%d_%d #%d #gldraws=%d #gltexturebinds=%d",
+             display, surface, current_frame, draw_counter,
+             texturebind_counter);
+
+  if (eglrecording && gles2recording) tditrace("#gldraws~%d", 0);
+  if (eglrecording && gles2recording) tditrace("#gltexturebinds~%d", 0);
+
+  glDrawElements_counter = 0;
+  glDrawArrays_counter = 0;
+  glTexImage2D_counter = 0;
+  glTexSubImage2D_counter = 0;
+  glBindTexture_counter = 0;
+
+  draw_counter = 0;
+  texturebind_counter = 0;
+
+  if (framerecording) {
+    tditrace("@A+FR %d", current_frame);
+    static char *framebuffer = 0;
+    if (!framebuffer) {
+      framebuffer = (char *)memalign(4096, 1280 * 720 * 4);
+    }
+
+    glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
+
+    tditrace("@A-FR");
+    frames_captured++;
+  }
+
+/*
+ */
+#if 0
+  if ((current_frame == shaderrecording) ||
+      (current_frame == texturerecording) ||
+      (current_frame == renderbufferrecording) ||
+      (current_frame == framerecording)) {
+    if (shaderrecording) {
+      shadercapture_writeshaders();
+    }
+    if (texturerecording || renderbufferrecording) {
+      texturecapture_writepngtextures();
+      texturecapture_deletetextures();
+    }
+    if (framerecording) {
+      framecapture_writepngframes();
+      framecapture_deleteframes();
+    }
+  }
+#endif
+
+  current_frame++;
+
+  return ret;
 }
 
 extern "C" void glFinish(void) {
@@ -210,6 +258,7 @@ extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
 }
 
 extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
+  save_ra();
   static void (*__glDrawArrays)(GLenum, GLint, GLsizei) = NULL;
 
   if (__glDrawArrays == NULL) {
@@ -228,7 +277,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     if (gles2recording || gldrawrecording)
       tditrace(
           "@I+glDrawArrays() "
-          "@%d,#%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
+          "@%d,#%d,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u%n",
           current_frame, glDrawArrays_counter, MODESTRING(mode), count,
           boundtexture, currentprogram, boundframebuffer,
           framebuffertexture[boundframebuffer & 0x3ff],
@@ -236,13 +285,14 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
           renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
                             0x3ff],
           renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
-                             0x3ff]);
+                             0x3ff],
+          ra);
 
   } else {
     if (gles2recording || gldrawrecording)
-      tditrace("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u", current_frame,
+      tditrace("@I+glDrawArrays() @%d,#%d,%s,#i=%d,t=%u,p=%u%n", current_frame,
                glDrawArrays_counter, MODESTRING(mode), count, boundtexture,
-               currentprogram);
+               currentprogram, ra);
   }
   __glDrawArrays(mode, first, count);
 
@@ -255,12 +305,14 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
           renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
                              0x3ff];
       if (w && h) {
+        tditrace("@A+RR %d", framebuffertexture[boundframebuffer & 0x3ff]);
         unsigned char *p = (unsigned char *)malloc(w * h * 4);
         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, p);
         texturecapture_captexture(framebuffertexture[boundframebuffer & 0x3ff],
                                   RENDER, current_frame, 0, 0, w, h,
                                   (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
         free(p);
+        tditrace("@A-RR");
         textures_captured++;
       }
     }
@@ -271,6 +323,7 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
 extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
                                  const GLvoid *indices) {
+  save_ra();
   static void (*__glDrawElements)(GLenum, GLsizei, GLenum, const GLvoid *) =
       NULL;
 
@@ -290,7 +343,7 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
     if (gles2recording || gldrawrecording)
       tditrace(
           "@I+glDrawElements() "
-          "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u",
+          "@%d,#%d,%s,%s,#i=%d,t=%u,p=%u,f=%u,ft=%u,r=%u,%ux%u%n",
           current_frame, glDrawElements_counter, MODESTRING(mode),
           TYPESTRING(type), count, boundtexture, currentprogram,
           boundframebuffer, framebuffertexture[boundframebuffer & 0x3ff],
@@ -298,13 +351,14 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
           renderbufferwidth[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
                             0x3ff],
           renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
-                             0x3ff]);
+                             0x3ff],
+          ra);
 
   } else {
     if (gles2recording || gldrawrecording)
-      tditrace("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u",
+      tditrace("@I+glDrawElements() @%d,#%d,%s,%s,#i=%d,t=%u,p=%u%n",
                current_frame, glDrawElements_counter, MODESTRING(mode),
-               TYPESTRING(type), count, boundtexture, currentprogram);
+               TYPESTRING(type), count, boundtexture, currentprogram, ra);
   }
 
   __glDrawElements(mode, count, type, indices);
@@ -318,12 +372,14 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
           renderbufferheight[framebufferrenderbuffer[boundframebuffer & 0x3ff] &
                              0x3ff];
       if (w && h) {
+        tditrace("@A+RR %d", framebuffertexture[boundframebuffer & 0x3ff]);
         unsigned char *p = (unsigned char *)malloc(w * h * 4);
         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, p);
         texturecapture_captexture(framebuffertexture[boundframebuffer & 0x3ff],
                                   RENDER, current_frame, 0, 0, w, h,
                                   (int)GL_RGBA, (int)GL_UNSIGNED_BYTE, p);
         free(p);
+        tditrace("@A-RR");
         textures_captured++;
       }
     }
@@ -343,9 +399,11 @@ extern "C" void glGenTextures(GLsizei n, GLuint *textures) {
     }
   }
 
+  if (gles2recording) tditrace("#gltexturegens~%d", ++texturegen_counter);
+
   __glGenTextures(n, textures);
 
-  if (gles2recording) tditrace("glGenTextures() %d =%d", n, *textures);
+  if (gles2recording) tditrace("glGenTextures() %d=%d", n, textures[0]);
 }
 
 extern "C" GLvoid glBindTexture(GLenum target, GLuint texture) {
@@ -391,8 +449,10 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
              FORMATSTRING(format), boundtexture, pixels);
 
   if (texturerecording) {
+    tditrace("@A+TR %d", boundtexture);
     texturecapture_captexture(boundtexture, PARENT, current_frame, 0, 0, width,
                               height, (int)format, (int)type, pixels);
+    tditrace("@A-TR");
     textures_captured++;
   }
 
@@ -430,9 +490,11 @@ extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
              TYPESTRING(type), FORMATSTRING(format), boundtexture, pixels);
 
   if (texturerecording) {
+    tditrace("@A+TR %d", boundtexture);
     texturecapture_captexture(boundtexture, SUB, current_frame, xoffset,
                               yoffset, width, height, (int)format, (int)type,
                               pixels);
+    tditrace("@A-TR");
     textures_captured++;
   }
 
@@ -459,11 +521,13 @@ extern "C" GLvoid glCopyTexImage2D(GLenum target, GLint level,
   }
 
   if (gles2recording)
-    tditrace("glCopyTexImage2D() %dx%d+%d+%d,%u", width, height, x, y,
+    tditrace("@I+glCopyTexImage2D() %dx%d+%d+%d,%u", width, height, x, y,
              boundtexture);
 
   __glCopyTexImage2D(target, level, internalformat, x, y, width, height,
                      border);
+
+  if (gles2recording) tditrace("@I-glCopyTexImage2D()");
 }
 
 extern "C" GLvoid glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
@@ -482,10 +546,12 @@ extern "C" GLvoid glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
   }
 
   if (gles2recording)
-    tditrace("glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height, x, y,
-             xoffset, yoffset, boundtexture);
+    tditrace("@I+glCopyTexSubImage2D() %dx%d+%d+%d+%d+%d,%u", width, height, x,
+             y, xoffset, yoffset, boundtexture);
 
   __glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+
+  if (gles2recording) tditrace("@I-glCopyTexSubImage2D()");
 }
 
 extern "C" GLvoid glTexParameteri(GLenum target, GLenum pname, GLint param) {
@@ -686,9 +752,6 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     }
   }
 
-  // printf("%s,[%s]\n", CLEARSTRING(mask),
-  // addrinfo(__builtin_return_address(0)));
-
   if (gles2recording || gldrawrecording || gltexturerecording)
     tditrace("@I+glClear() %s", CLEARSTRING(mask));
 
@@ -696,6 +759,32 @@ extern "C" GLvoid glClear(GLbitfield mask) {
 
   if (gles2recording || gldrawrecording || gltexturerecording)
     tditrace("@I-glClear()");
+}
+
+extern "C" void glGenBuffers(GLsizei n, GLuint *buffers) {
+  static void (*__glGenBuffers)(GLsizei, GLuint *) = NULL;
+  if (__glGenBuffers == NULL) {
+    __glGenBuffers =
+        (void (*)(GLsizei, GLuint *))dlsym(RTLD_NEXT, "glGenBuffers");
+    if (__glGenBuffers == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  __glGenBuffers(n, buffers);
+  if (gles2recording) tditrace("glGenBuffers() %d=%d", n, buffers[0]);
+}
+
+extern "C" void glDeleteBuffers(GLsizei n, const GLuint *buffers) {
+  static void (*__glDeleteBuffers)(GLsizei, const GLuint *) = NULL;
+  if (__glDeleteBuffers == NULL) {
+    __glDeleteBuffers =
+        (void (*)(GLsizei, const GLuint *))dlsym(RTLD_NEXT, "glDeleteBuffers");
+    if (__glDeleteBuffers == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glDeleteBuffers() %d=%d", n, buffers[0]);
+  __glDeleteBuffers(n, buffers);
 }
 
 extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
@@ -708,9 +797,46 @@ extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
     }
   }
 
-  if (gles2recording) tditrace("glBindBuffer() %u", buffer);
-
+  if (gles2recording)
+    tditrace("glBindBuffer() %s,%u", TARGETSTRING(target), buffer);
   __glBindBuffer(target, buffer);
+  currentbuffer = buffer;
+}
+
+extern "C" void glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data,
+                             GLenum usage) {
+  static void (*__glBufferData)(GLenum, GLsizeiptr, const GLvoid *, GLenum) =
+      NULL;
+  if (__glBufferData == NULL) {
+    __glBufferData = (void (*)(GLenum, GLsizeiptr, const GLvoid *,
+                               GLenum))dlsym(RTLD_NEXT, "glBufferData");
+    if (__glBufferData == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording)
+    tditrace("glBufferData() b=%d,%s,%d", currentbuffer, TARGETSTRING(target),
+             size);
+  __glBufferData(target, size, data, usage);
+}
+
+extern "C" void glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size,
+                                const GLvoid *data) {
+  static void (*__glBufferSubData)(GLenum, GLintptr, GLsizeiptr,
+                                   const GLvoid *) = NULL;
+  if (__glBufferSubData == NULL) {
+    __glBufferSubData =
+        (void (*)(GLenum, GLintptr, GLsizeiptr, const GLvoid *))dlsym(
+            RTLD_NEXT, "glBufferSubData");
+    if (__glBufferSubData == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (gles2recording)
+    tditrace("glBufferSubData() b=%d,%s,%d,%d", currentbuffer,
+             TARGETSTRING(target), offset, size);
+  __glBufferSubData(target, offset, size, data);
 }
 
 extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {
@@ -725,8 +851,7 @@ extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {
   }
 
   __glGenFramebuffers(n, framebuffers);
-
-  if (gles2recording) tditrace("glGenFramebuffers() %d =%d", n, *framebuffers);
+  if (gles2recording) tditrace("glGenFramebuffers() %d=%d", n, framebuffers[0]);
 }
 
 extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer) {
@@ -741,9 +866,7 @@ extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer) {
   }
 
   if (gles2recording) tditrace("glBindFramebuffer() %u", framebuffer);
-
   __glBindFramebuffer(target, framebuffer);
-
   boundframebuffer = framebuffer;
 }
 
@@ -765,10 +888,38 @@ extern "C" GLvoid glFramebufferTexture2D(GLenum target, GLenum attachment,
   if (gles2recording)
     tditrace("glFramebufferTexture2D() %s,%u", ATTACHMENTSTRING(attachment),
              texture);
-
   __glFramebufferTexture2D(target, attachment, textarget, texture, level);
-
   framebuffertexture[boundframebuffer & 0x3ff] = texture;
+}
+
+extern "C" GLvoid glGenRenderbuffers(GLsizei n, GLuint *renderbuffers) {
+  static void (*__glGenRenderbuffers)(GLsizei, GLuint *) = NULL;
+
+  if (__glGenRenderbuffers == NULL) {
+    __glGenRenderbuffers =
+        (void (*)(GLsizei, GLuint *))dlsym(RTLD_NEXT, "glGenRenderbuffers");
+    if (NULL == __glGenRenderbuffers) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  __glGenRenderbuffers(n, renderbuffers);
+  if (gles2recording)
+    tditrace("glGenRenderbuffers() %d=%d", n, renderbuffers[0]);
+}
+
+extern "C" void glDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers) {
+  static void (*__glDeleteRenderbuffers)(GLsizei, const GLuint *) = NULL;
+  if (__glDeleteRenderbuffers == NULL) {
+    __glDeleteRenderbuffers = (void (*)(GLsizei, const GLuint *))dlsym(
+        RTLD_NEXT, "glDeleteRenderbuffers");
+    if (__glDeleteRenderbuffers == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording)
+    tditrace("glDeleteRenderbuffers() %d,%d", n, renderbuffers[0]);
+  __glDeleteRenderbuffers(n, renderbuffers);
 }
 
 extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat,
@@ -785,29 +936,13 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat,
   }
 
   if (gles2recording)
-    tditrace("glRenderbufferStorage() %s0x%x,%dx%d",
+    tditrace("glRenderbufferStorage() %s,0x%x,%dx%d",
              IFORMATSTRING(internalformat), internalformat, width, height);
 
   __glRenderbufferStorage(target, internalformat, width, height);
 
   renderbufferwidth[boundrenderbuffer & 0x3ff] = width;
   renderbufferheight[boundrenderbuffer & 0x3ff] = height;
-}
-
-extern GLvoid glGenRenderbuffers(GLsizei n, GLuint *renderbuffers) {
-  static void (*__glgenRenderbuffers)(GLsizei, GLuint *) = NULL;
-
-  if (__glgenRenderbuffers == NULL) {
-    __glgenRenderbuffers =
-        (void (*)(GLsizei, GLuint *))dlsym(RTLD_NEXT, "glgenRenderbuffers");
-    if (NULL == __glgenRenderbuffers) {
-      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
-    }
-  }
-
-  if (gles2recording) tditrace("glgenRenderbuffers() %d", n);
-
-  __glgenRenderbuffers(n, renderbuffers);
 }
 
 extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment,
@@ -977,3 +1112,307 @@ extern "C" void glDeleteShader(GLuint shader) {
     tditrace("@E+glDeleteShader() %u", shader);
 }
 #endif
+
+extern "C" void glUniform1i(GLint location, GLint v0) {
+  static void (*__glUniform1i)(GLint, GLint) = NULL;
+  if (__glUniform1i == NULL) {
+    __glUniform1i = (void (*)(GLint, GLint))dlsym(RTLD_NEXT, "glUniform1i");
+    if (__glUniform1i == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform1i() location=%x,v0=%d", location, v0);
+  __glUniform1i(location, v0);
+}
+
+extern "C" void glUniform2i(GLint location, GLint v0, GLint v1) {
+  static void (*__glUniform2i)(GLint, GLint, GLint) = NULL;
+  if (__glUniform2i == NULL) {
+    __glUniform2i =
+        (void (*)(GLint, GLint, GLint))dlsym(RTLD_NEXT, "glUniform2i");
+    if (__glUniform2i == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform2i()");
+  __glUniform2i(location, v0, v1);
+}
+
+extern "C" void glUniform3i(GLint location, GLint v0, GLint v1, GLint v2) {
+  static void (*__glUniform3i)(GLint, GLint, GLint, GLint) = NULL;
+  if (__glUniform3i == NULL) {
+    __glUniform3i =
+        (void (*)(GLint, GLint, GLint, GLint))dlsym(RTLD_NEXT, "glUniform3i");
+    if (__glUniform3i == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform3i()");
+  __glUniform3i(location, v0, v1, v2);
+}
+
+extern "C" void glUniform4i(GLint location, GLint v0, GLint v1, GLint v2,
+                            GLint v3) {
+  static void (*__glUniform4i)(GLint, GLint, GLint, GLint, GLint) = NULL;
+  if (__glUniform4i == NULL) {
+    __glUniform4i = (void (*)(GLint, GLint, GLint, GLint, GLint))dlsym(
+        RTLD_NEXT, "glUniform4i");
+    if (__glUniform4i == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform4i()");
+  __glUniform4i(location, v0, v1, v2, v3);
+}
+
+extern "C" void glUniform1f(GLint location, GLfloat v0) {
+  static void (*__glUniform1f)(GLint, GLfloat) = NULL;
+  if (__glUniform1f == NULL) {
+    __glUniform1f = (void (*)(GLint, GLfloat))dlsym(RTLD_NEXT, "glUniform1f");
+    if (__glUniform1f == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (gles2recording) {
+    char v0_str[256];
+    sprintf(v0_str, "%f", v0);
+    tditrace("glUniform1f() location=%x,v0=%s", location, v0_str);
+  }
+  __glUniform1f(location, v0);
+}
+
+extern "C" void glUniform2f(GLint location, GLfloat v0, GLfloat v1) {
+  static void (*__glUniform2f)(GLint, GLfloat, GLfloat) = NULL;
+  if (__glUniform2f == NULL) {
+    __glUniform2f =
+        (void (*)(GLint, GLfloat, GLfloat))dlsym(RTLD_NEXT, "glUniform2f");
+    if (__glUniform2f == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform2f()");
+  __glUniform2f(location, v0, v1);
+}
+
+extern "C" void glUniform3f(GLint location, GLfloat v0, GLfloat v1,
+                            GLfloat v2) {
+  static void (*__glUniform3f)(GLint, GLfloat, GLfloat, GLfloat) = NULL;
+  if (__glUniform3f == NULL) {
+    __glUniform3f = (void (*)(GLint, GLfloat, GLfloat, GLfloat))dlsym(
+        RTLD_NEXT, "glUniform3f");
+    if (__glUniform3f == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform3f()");
+  __glUniform3f(location, v0, v1, v2);
+}
+
+extern "C" void glUniform4f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2,
+                            GLfloat v3) {
+  static void (*__glUniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat) =
+      NULL;
+  if (__glUniform4f == NULL) {
+    __glUniform4f = (void (*)(GLint, GLfloat, GLfloat, GLfloat, GLfloat))dlsym(
+        RTLD_NEXT, "glUniform4f");
+    if (__glUniform4f == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform4f()");
+  __glUniform4f(location, v0, v1, v2, v3);
+}
+
+extern "C" void glUniform1iv(GLint location, GLsizei count,
+                             const GLint *value) {
+  static void (*__glUniform1iv)(GLint, GLsizei, const GLint *) = NULL;
+  if (__glUniform1iv == NULL) {
+    __glUniform1iv = (void (*)(GLint, GLsizei, const GLint *))dlsym(
+        RTLD_NEXT, "glUniform1iv");
+    if (__glUniform1iv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform1iv()");
+  __glUniform1iv(location, count, value);
+}
+
+extern "C" void glUniform2iv(GLint location, GLsizei count,
+                             const GLint *value) {
+  static void (*__glUniform2iv)(GLint, GLsizei, const GLint *) = NULL;
+  if (__glUniform2iv == NULL) {
+    __glUniform2iv = (void (*)(GLint, GLsizei, const GLint *))dlsym(
+        RTLD_NEXT, "glUniform2iv");
+    if (__glUniform2iv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform2iv()");
+  __glUniform2iv(location, count, value);
+}
+
+extern "C" void glUniform3iv(GLint location, GLsizei count,
+                             const GLint *value) {
+  static void (*__glUniform3iv)(GLint, GLsizei, const GLint *) = NULL;
+  if (__glUniform3iv == NULL) {
+    __glUniform3iv = (void (*)(GLint, GLsizei, const GLint *))dlsym(
+        RTLD_NEXT, "glUniform3iv");
+    if (__glUniform3iv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform3iv()");
+  __glUniform3iv(location, count, value);
+}
+
+extern "C" void glUniform4iv(GLint location, GLsizei count,
+                             const GLint *value) {
+  static void (*__glUniform4iv)(GLint, GLsizei, const GLint *) = NULL;
+  if (__glUniform4iv == NULL) {
+    __glUniform4iv = (void (*)(GLint, GLsizei, const GLint *))dlsym(
+        RTLD_NEXT, "glUniform4iv");
+    if (__glUniform4iv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform4iv()");
+  __glUniform4iv(location, count, value);
+}
+
+extern "C" void glUniform1fv(GLint location, GLsizei count,
+                             const GLfloat *value) {
+  static void (*__glUniform1fv)(GLint, GLsizei, const GLfloat *) = NULL;
+  if (__glUniform1fv == NULL) {
+    __glUniform1fv = (void (*)(GLint, GLsizei, const GLfloat *))dlsym(
+        RTLD_NEXT, "glUniform1fv");
+    if (__glUniform1fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform1fv()");
+  __glUniform1fv(location, count, value);
+}
+
+extern "C" void glUniform2fv(GLint location, GLsizei count,
+                             const GLfloat *value) {
+  static void (*__glUniform2fv)(GLint, GLsizei, const GLfloat *) = NULL;
+  if (__glUniform2fv == NULL) {
+    __glUniform2fv = (void (*)(GLint, GLsizei, const GLfloat *))dlsym(
+        RTLD_NEXT, "glUniform2fv");
+    if (__glUniform2fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniform2fv()");
+  __glUniform2fv(location, count, value);
+}
+
+extern "C" void glUniform3fv(GLint location, GLsizei count,
+                             const GLfloat *value) {
+  static void (*__glUniform3fv)(GLint, GLsizei, const GLfloat *) = NULL;
+  if (__glUniform3fv == NULL) {
+    __glUniform3fv = (void (*)(GLint, GLsizei, const GLfloat *))dlsym(
+        RTLD_NEXT, "glUniform3fv");
+    if (__glUniform3fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  tditrace("glUniform3fv()");
+  __glUniform3fv(location, count, value);
+}
+
+extern "C" void glUniform4fv(GLint location, GLsizei count,
+                             const GLfloat *value) {
+  static void (*__glUniform4fv)(GLint, GLsizei, const GLfloat *) = NULL;
+  if (__glUniform4fv == NULL) {
+    __glUniform4fv = (void (*)(GLint, GLsizei, const GLfloat *))dlsym(
+        RTLD_NEXT, "glUniform4fv");
+    if (__glUniform4fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (gles2recording) {
+    char value_str[16];
+    char value_strs[256] = "\0";
+    int i;
+    for (i = 0; i < 4; i++) {
+      sprintf(value_str, "%s%f", i == 0 ? "" : ",", value[i]);
+      strcat(value_strs, value_str);
+    }
+    tditrace("glUniform4fv() location=%x,count=%d,value[]=%s", location, count,
+             value_strs);
+  }
+  __glUniform4fv(location, count, value);
+}
+
+extern "C" void glUniformMatrix2fv(GLint location, GLsizei count,
+                                   GLboolean transpose, const GLfloat *value) {
+  static void (*__glUniformMatrix2fv)(GLint, GLsizei, GLboolean,
+                                      const GLfloat *) = NULL;
+  if (__glUniformMatrix2fv == NULL) {
+    __glUniformMatrix2fv =
+        (void (*)(GLint, GLsizei, GLboolean, const GLfloat *))dlsym(
+            RTLD_NEXT, "glUniformMatrix2fv");
+    if (__glUniformMatrix2fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glUniformMatrix2fv()");
+  __glUniformMatrix2fv(location, count, transpose, value);
+}
+
+extern "C" void glUniformMatrix3fv(GLint location, GLsizei count,
+                                   GLboolean transpose, const GLfloat *value) {
+  static void (*__glUniformMatrix3fv)(GLint, GLsizei, GLboolean,
+                                      const GLfloat *) = NULL;
+  if (__glUniformMatrix3fv == NULL) {
+    __glUniformMatrix3fv =
+        (void (*)(GLint, GLsizei, GLboolean, const GLfloat *))dlsym(
+            RTLD_NEXT, "glUniformMatrix3fv");
+    if (__glUniformMatrix3fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (gles2recording) {
+    char value_str[16];
+    char value_strs[256] = "\0";
+    int i;
+    for (i = 0; i < 9; i++) {
+      sprintf(value_str, "%s%f", i == 0 ? "" : ",", value[i]);
+      strcat(value_strs, value_str);
+    }
+    tditrace("glUniformMatrix3fv() location=%x,count=%d,value[]=%s", location,
+             count, value_strs);
+  }
+  __glUniformMatrix3fv(location, count, transpose, value);
+}
+
+extern "C" void glUniformMatrix4fv(GLint location, GLsizei count,
+                                   GLboolean transpose, const GLfloat *value) {
+  static void (*__glUniformMatrix4fv)(GLint, GLsizei, GLboolean,
+                                      const GLfloat *) = NULL;
+  if (__glUniformMatrix4fv == NULL) {
+    __glUniformMatrix4fv =
+        (void (*)(GLint, GLsizei, GLboolean, const GLfloat *))dlsym(
+            RTLD_NEXT, "glUniformMatrix4fv");
+    if (__glUniformMatrix4fv == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (gles2recording) {
+    char value_str[16];
+    char value_strs[256] = "\0";
+    int i;
+    for (i = 0; i < 16; i++) {
+      sprintf(value_str, "%s%f", i == 0 ? "" : ",", value[i]);
+      strcat(value_strs, value_str);
+    }
+    tditrace("glUniformMatrix4fv() location=%x,count=%d,value[]=%s", location,
+             count, value_strs);
+  }
+  __glUniformMatrix4fv(location, count, transpose, value);
+}

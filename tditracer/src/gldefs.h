@@ -4,16 +4,22 @@ typedef int32_t EGLint;
 typedef void* EGLDisplay;
 typedef void* EGLSurface;
 typedef void* EGLContext;
+typedef void* EGLConfig;
 
-typedef int GLboolean;
+typedef unsigned char GLboolean;
 typedef char GLchar;
 typedef unsigned int GLenum;
 typedef unsigned int GLuint;
 typedef int GLint;
 typedef int GLsizei;
+typedef int GLintptr;
+typedef int GLsizeiptr;
 typedef void GLvoid;
 typedef unsigned int GLbitfield;
 typedef float GLclampf;
+typedef float GLfloat;
+typedef int GLfixed;
+typedef unsigned char GLubyte;
 
 #define GL_POINTS 0x0000
 #define GL_LINES 0x0001
@@ -116,16 +122,24 @@ typedef float GLclampf;
 #define GL_SHADING_LANGUAGE_VERSION 0x8B8C
 #define GL_CURRENT_PROGRAM 0x8B8D
 
-#define CLEARSTRING(mask)                                                \
-  (mask == GL_DEPTH_BUFFER_BIT                                           \
-       ? "GL_DEPTH_BUFFER_BIT"                                           \
-       : mask == GL_STENCIL_BUFFER_BIT                                   \
-             ? "GL_STENCIL_BUFFER_BIT"                                   \
-             : mask == GL_COLOR_BUFFER_BIT                               \
-                   ? "GL_COLOR_BUFFER_BIT"                               \
-                   : mask == (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) \
-                         ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT"     \
-                         : "???")
+#define GL_ARRAY_BUFFER 0x8892
+#define GL_ELEMENT_ARRAY_BUFFER 0x8893
+
+#define CLEARSTRING(mask)                                                      \
+  (mask == GL_DEPTH_BUFFER_BIT                                                 \
+       ? "GL_DEPTH_BUFFER_BIT"                                                 \
+       : mask == GL_STENCIL_BUFFER_BIT                                         \
+             ? "GL_STENCIL_BUFFER_BIT"                                         \
+             : mask == GL_COLOR_BUFFER_BIT                                     \
+                   ? "GL_COLOR_BUFFER_BIT"                                     \
+                   : mask == (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)       \
+                         ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT"           \
+                         : mask == (GL_COLOR_BUFFER_BIT |                      \
+                                    GL_DEPTH_BUFFER_BIT |                      \
+                                    GL_STENCIL_BUFFER_BIT)                     \
+                               ? "GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_" \
+                                 "STENCIL_BUFFER_BIT"                          \
+                               : "???")
 
 #define CAPSTRING(factor)                                                             \
   (cap == GL_TEXTURE_2D                                                               \
@@ -299,6 +313,12 @@ typedef float GLclampf;
              : attachment == GL_STENCIL_ATTACHMENT ? "GL_STENCIL_ATTACHMENT" \
                                                    : "???")
 
+#define TARGETSTRING(target)                                           \
+  (target == GL_ARRAY_BUFFER                                           \
+       ? "GL_ARRAY_BUFFER"                                             \
+       : target == GL_ELEMENT_ARRAY_BUFFER ? "GL_ELEMENT_ARRAY_BUFFER" \
+                                           : "???")
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -307,6 +327,14 @@ GLenum glGetError(void);
 void glGetProgramiv(GLuint program, GLenum pname, GLint* params);
 void glGetIntegerv(GLenum pname, GLint* data);
 GLboolean glIsProgram(GLuint program);
+void glCopyTexImage2D(GLenum target, GLint level, GLenum internalformat,
+                      GLint x, GLint y, GLsizei width, GLsizei height,
+                      GLint border);
+void glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
+                         GLint yoffset, GLint x, GLint y, GLsizei width,
+                         GLsizei height);
+extern GLvoid glBindTexture(GLenum target, GLuint texture);
+
 #ifdef __cplusplus
 }
 #endif

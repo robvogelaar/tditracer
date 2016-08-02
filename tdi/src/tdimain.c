@@ -948,7 +948,7 @@ static int do_majflt = 0;
 static int do_minflt = 0;
 static int do_persecond = 0;
 
-static int allow_rewind = 0;
+static int gtouch = 0x0;
 
 static int monitor;
 
@@ -960,6 +960,14 @@ static int offload_over50 = 0;
 static int do_wrap = 0;
 
 static int do_dump_proc_self_maps = 0;
+
+extern void shadercapture_writeshaders(void) __attribute__((weak));
+extern void texturecapture_writepngtextures(void) __attribute__((weak));
+extern void texturecapture_deletetextures(void) __attribute__((weak));
+extern void framecapture_writepngframes(void) __attribute__((weak));
+extern void framecapture_deleteframes(void) __attribute__((weak));
+
+extern void capture_dump(void) __attribute__((weak));
 
 void *monitor_thread(void *param) {
   static int seconds_counter = 0;
@@ -1061,7 +1069,7 @@ void *monitor_thread(void *param) {
     struct stat st;
     stat(gtracebufferfilename, &st);
 
-    if (allow_rewind) {
+    if (gtouch) {
       // fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n",
       // gtracebufferfilename,
       //        st.st_atim.tv_sec, gtrace_buffer_st.st_atim.tv_sec);
@@ -1075,9 +1083,45 @@ void *monitor_thread(void *param) {
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
         stat(gtracebufferfilename, &gtrace_buffer_st);
 
-        fprintf(stderr, "tdi: [%s][%d], rewinding...\n", gprocname, gpid);
-        tditrace_rewind();
-        do_dump_proc_self_maps = 1;
+        //"rewind"   // 0x00000001
+        //"shaders"  // 0x00000002
+        //"textures" // 0x00000004
+        //"frames"   // 0x00000008
+
+        if (gtouch & 0x1) {
+          fprintf(stderr, "tdi: [%s][%d], rewinding...\n", gprocname, gpid);
+          tditrace_rewind();
+          do_dump_proc_self_maps = 1;
+        }
+
+        if (gtouch & 0x2) {
+          fprintf(stderr, "tdi: [%s][%d], dump shaders...\n", gprocname, gpid);
+          if (shadercapture_writeshaders != NULL) {
+            shadercapture_writeshaders();
+          }
+        }
+
+        if (gtouch & 0x4) {
+          fprintf(stderr, "tdi: [%s][%d], dump textures...\n", gprocname, gpid);
+
+          if (texturecapture_writepngtextures != NULL) {
+            texturecapture_writepngtextures();
+          }
+          if (texturecapture_deletetextures != NULL) {
+            texturecapture_deletetextures();
+          }
+        }
+
+        if (gtouch & 0x8) {
+          fprintf(stderr, "tdi: [%s][%d], dump frames...\n", gprocname, gpid);
+
+          if (framecapture_writepngframes != NULL) {
+            framecapture_writepngframes();
+          }
+          if (framecapture_deleteframes != NULL) {
+            framecapture_deleteframes();
+          }
+        }
       }
     }
 
@@ -1206,7 +1250,6 @@ void create_trace_buffer(void) {
 
   clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
   trace_buffer_dword_ptr += 2;
-
 
   _u64 atimeofday_offset = (_u64)*p++ * 1000000000;
   atimeofday_offset += (_u64)*p++ * 1000;
@@ -1337,6 +1380,11 @@ const char *instruments[] = {"console",     // 0x00000001
                              "javascript",  // 0x00002000
                              "allocator"};  // 0x00004000
 
+const char *touches[] = {"rewind",    // 0x00000001
+                         "shaders",   // 0x00000002
+                         "textures",  // 0x00000004
+                         "frames"};   // 0x00000008
+
 int tditrace_init(void) {
   struct timeval mytime;
   int i;
@@ -1385,17 +1433,32 @@ int tditrace_init(void) {
     }
     if (gmask == 0x0) gmask = strtoul(env, 0, 16);
   }
-  fprintf(stderr, "tdi: [%s][%d], mask = 0x%08x (", gprocname, gpid, gmask);
+  fprintf(stderr, "tdi: [%s][%d], MASK = 0x%08x (", gprocname, gpid, gmask);
+  int d = 0;
   for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
-    if (gmask & (1 << i))
-      fprintf(stderr, "%s%s", i == 0 ? "" : ",", instruments[i]);
+    if (gmask & (1 << i)) {
+      fprintf(stderr, "%s%s", d ? "+" : "", instruments[i]);
+      d = 1;
+    }
   }
   fprintf(stderr, ")\n");
 
-  allow_rewind = 0;
-  if (env = getenv("REWIND")) {
-    allow_rewind = (atoi(env) >= 1);
+  gtouch = 0x0;
+  if (env = getenv("TOUCH")) {
+    for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
+      if (strstr(env, touches[i])) gtouch |= (1 << i);
+    }
+    if (gtouch == 0x0) gtouch = strtoul(env, 0, 16);
   }
+  fprintf(stderr, "tdi: [%s][%d], TOUCH = 0x%08x (", gprocname, gpid, gtouch);
+  d = 0;
+  for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
+    if (gtouch & (1 << i)) {
+      fprintf(stderr, "%s%s", d ? "+" : "", touches[i]);
+      d = 1;
+    }
+  }
+  fprintf(stderr, ")\n");
 
   do_persecond = 1;
 

@@ -4,6 +4,8 @@ extern int texturerecording;
 extern int renderbufferrecording;
 extern int shaderrecording;
 
+extern int gosd;
+
 extern bool libcrecording;
 extern bool libcopenrecording;
 extern bool libcfopenrecording;

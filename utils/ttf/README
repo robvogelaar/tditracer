@@ -1,0 +1,4 @@
+
+g++ ttf.cpp -I /usr/include/freetype2/ -lfreetype -o ttf
+
+./ttf FreeSans.ttf 36
