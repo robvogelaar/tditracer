@@ -2,10 +2,10 @@
 
 lib_LTLIBRARIES = libtditracer.la
 
-libtditracer_la_CPPFLAGS = -fpermissive -O0 -g
+libtditracer_la_CPPFLAGS = -fpermissive -O2 -g
 
 libtditracer_la_LIBADD = \
-    ../../tdi/src/libtdi.la -ldl
+   ../../tdi/src/libtdi.la -ldl
 
 libtditracer_la_SOURCES = \
    framecapture.c \
@@ -26,4 +26,9 @@ libtditracer_la_SOURCES = \
    tracerpthread.cpp \
    tracersem.cpp \
    tracermq.cpp \
-   tracerextra.cpp
+   tracerextra.cpp \
+   gles2spinner.cpp \
+   gles2text.cpp \
+   gles2capture.cpp \
+   gles2extra.cpp \
+   gles2util.cpp
