@@ -116,6 +116,6 @@ void extra_render(void) {
 
   GLenum e = glGetError();
   if (e != GL_NO_ERROR) {
-    fprintf(stderr, "GL ERROR = %x\n", e);
+    fprintf(stderr, "GL ERROR = 0x%x\n", e);
   }
 }

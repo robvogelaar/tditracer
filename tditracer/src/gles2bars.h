@@ -1,0 +1,2 @@
+
+void bars_render();

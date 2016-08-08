@@ -29,6 +29,7 @@ libtditracer_la_SOURCES = \
    tracerextra.cpp \
    gles2spinner.cpp \
    gles2text.cpp \
+   gles2bars.cpp \
    gles2capture.cpp \
    gles2extra.cpp \
    gles2util.cpp

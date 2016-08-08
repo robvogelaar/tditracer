@@ -1,10 +1,10 @@
 #include <dlfcn.h>
 #include <malloc.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <math.h>
 
 extern "C" {
 #include "framecapture.h"
@@ -17,6 +17,7 @@ extern "C" {
 #include "tracermain.h"
 #include "tracerutils.h"
 
+#include "gles2bars.h"
 #include "gles2capture.h"
 #include "gles2spinner.h"
 
@@ -141,9 +142,12 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
 
   if (eglrecording) tditrace("@I+eglSwapBuffers()");
 
-  if (gosd & 0x1) spinner_render(current_frame);
-  
-  //capture_frame();
+  if (gosd & 0x1) {
+    spinner_render(current_frame);
+    bars_render();
+  }
+
+  // capture_frame();
 
   EGLBoolean ret = __eglSwapBuffers(display, surface);
 

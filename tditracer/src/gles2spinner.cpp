@@ -54,6 +54,8 @@ void spinner_render(int f) {
   static GLfloat modelview[4][4];
   static GLfloat mvp[4][4];
 
+  GLenum err;
+
   static bool inited = false;
   if (!inited) {
     spinner_init();
@@ -85,9 +87,9 @@ void spinner_render(int f) {
 
   glDrawArrays(GL_LINE_LOOP, 0, 4);
 
-  GLenum e = glGetError();
-  if (e != GL_NO_ERROR) {
-    fprintf(stderr, "GL ERROR = %x\n", e);
+  err = glGetError();
+  if (err != GL_NO_ERROR) {
+    fprintf(stderr, "GL ERROR = 0x%x\n", err);
   }
 
   if (prev_timestamp) {
