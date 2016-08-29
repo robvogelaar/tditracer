@@ -1620,8 +1620,8 @@ void check_trace_buffer(int b) {
     struct stat st;
     stat(tracebuffers[b].filename, &st);
 
-    fprintf(stderr, "\"%s\" (%lldMB) ...\n", tracebuffers[b].filename,
-            st.st_size / (1024 * 1024));
+    fprintf(stderr, "\"%s\" (%lluMB) ...\n", tracebuffers[b].filename,
+            (unsigned long long)st.st_size / (1024 * 1024));
 
     char *s1 = strchr(tracebuffers[b].filename, '@');
     char *s2 = strchr(s1 + 1, '@');

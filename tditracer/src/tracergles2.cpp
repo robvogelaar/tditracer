@@ -119,7 +119,7 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
   if (eglrecording) {
     tditrace("@I-eglMakeCurrent()");
     tditrace(
-        "@S+eglMakeCurrent()_%d_%d_%d_%d display=%d draw=0x%x read=0x%x "
+        "@S+eglMakeCurrent()_%x_%x_%x_%x display=%d draw=0x%x read=0x%x "
         "context=0x%x",
         display, draw, read, context, display, draw, read, context);
   }
@@ -208,6 +208,87 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
 
   return ret;
 }
+
+extern "C" EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval) {
+  static EGLBoolean (*__eglSwapInterval)(EGLDisplay, EGLint) = NULL;
+  if (__eglSwapInterval == NULL) {
+    __eglSwapInterval =
+        (EGLBoolean(*)(EGLDisplay, EGLint))dlsym(RTLD_NEXT, "eglSwapInterval");
+    if (__eglSwapInterval == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (eglrecording) tditrace("eglSwapInterval() %d", interval);
+  EGLBoolean ret = __eglSwapInterval(dpy, interval);
+  return ret;
+}
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+
+typedef void *EGLSyncKHR;
+
+static PFNEGLCREATESYNCKHRPROC _eglCreateSyncKHR;
+static PFNEGLDESTROYSYNCKHRPROC _eglDestroySyncKHR;
+static PFNEGLCLIENTWAITSYNCKHRPROC _eglClientWaitSyncKHR;
+static PFNEGLGETSYNCATTRIBKHRPROC _eglGetSyncAttribKHR;
+
+EGLSyncKHR __eglCreateSyncKHR(EGLDisplay dpy, EGLenum type,
+                              const EGLint *attrib_list) {
+  if (eglrecording) tditrace("eglCreateSyncKHR()");
+  return _eglCreateSyncKHR(dpy, type, attrib_list);
+}
+
+EGLBoolean __eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync) {
+  if (eglrecording) tditrace("eglDestroySyncKHR()");
+}
+
+EGLint __eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags,
+                              EGLTimeKHR timeout) {
+  if (eglrecording) tditrace("eglClientWaitSyncKHR()");
+  return _eglClientWaitSyncKHR(dpy, sync, flags, timeout);
+}
+
+EGLBoolean __eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync,
+                                 EGLint attribute, EGLint *value) {
+  if (eglrecording) tditrace("eglGetSyncAttribKHR()");
+  return _eglGetSyncAttribKHR(dpy, sync, attribute, value);
+}
+
+
+extern "C" void (*eglGetProcAddress(const char *procname))() {
+  static void (*(*__eglGetProcAddress)(char const *))() = NULL;
+  if (__eglGetProcAddress == NULL) {
+    __eglGetProcAddress =
+        (void (*(*)(const char *))())dlsym(RTLD_NEXT, "eglGetProcAddress");
+    if (__eglGetProcAddress == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  if (eglrecording) tditrace("eglGetProcAddress() \"%s\"", procname);
+
+  if (strcmp(procname, "eglCreateSyncKHR") == 0) {
+    _eglCreateSyncKHR = __eglGetProcAddress(procname);
+    return __eglCreateSyncKHR;
+  } else if (strcmp(procname, "eglDestroySyncKHR") == 0) {
+    _eglDestroySyncKHR = __eglGetProcAddress(procname);
+    return __eglDestroySyncKHR;
+  } else if (strcmp(procname, "eglClientWaitSyncKHR") == 0) {
+    _eglClientWaitSyncKHR = __eglGetProcAddress(procname);
+    return __eglClientWaitSyncKHR;
+  } else if (strcmp(procname, "eglGetSyncAttribKHR") == 0) {
+    _eglGetSyncAttribKHR = __eglGetProcAddress(procname);
+    return __eglGetSyncAttribKHR;
+  }
+
+  void (*a)() = __eglGetProcAddress(procname);
+  return a;
+}
+
+/*
+ ***********************************************************************************
+*/
 
 extern "C" void glFinish(void) {
   static void (*__glFinish)(void) = NULL;
