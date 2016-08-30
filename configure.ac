@@ -4,7 +4,6 @@
 AC_PREREQ([2.69])
 AC_INIT([tditracer], [0.1], [revogelaar@gmail.com])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
-AC_ENABLE_SHARED
 LT_INIT
 AC_CONFIG_SRCDIR([tdidump/src/tdidump.c])
 # AC_CONFIG_MACRO_DIR([m4])
@@ -19,6 +18,10 @@ AC_PROG_RANLIB
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/time.h unistd.h refsw/nexus_config.h])
+
+# Checks for pkg-config
+PKG_PROG_PKG_CONFIG
+PKG_CHECK_MODULES([libpng], [libpng >= 1.2.0], [], [AC_MSG_ERROR([Unable to find libpng])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL

@@ -9,3 +9,4 @@ tdidump_LDADD = \
 tdidump_SOURCES = \
     tdidump.c
 
+tdidump_CFLAGS = -fPIC -O2 -lrt

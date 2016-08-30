@@ -2,7 +2,8 @@
 
 lib_LTLIBRARIES = libtditracer.la
 
-libtditracer_la_CPPFLAGS = -fpermissive -O2 -g
+libtditracer_la_CPPFLAGS = -fpermissive -O2 -g \
+    $(libpng_CFLAGS)
 
 libtditracer_la_LIBADD = \
    ../../tdi/src/libtdi.la -ldl
