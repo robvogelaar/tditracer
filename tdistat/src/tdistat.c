@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
           struct stat st;
           stat(filename, &st);
 
-          fprintf(stderr, "\"%s\" (%lldMB)\n", filename, st.st_size / (1024 * 1024));
+          fprintf(stderr, "\"%s\" (%lluMB)\n", filename, (unsigned long long)st.st_size / (1024 * 1024));
 
           bufmmapped = (char *)mmap(0, st.st_size, PROT_READ,
                                     MAP_PRIVATE, fileno(file), 0);

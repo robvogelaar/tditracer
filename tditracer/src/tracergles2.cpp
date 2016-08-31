@@ -226,7 +226,7 @@ extern "C" EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval) {
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-typedef void *EGLSyncKHR;
+extern "C" {
 
 static PFNEGLCREATESYNCKHRPROC _eglCreateSyncKHR;
 static PFNEGLDESTROYSYNCKHRPROC _eglDestroySyncKHR;
@@ -254,7 +254,7 @@ EGLBoolean __eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync,
   if (eglrecording) tditrace("eglGetSyncAttribKHR()");
   return _eglGetSyncAttribKHR(dpy, sync, attribute, value);
 }
-
+}
 
 extern "C" void (*eglGetProcAddress(const char *procname))() {
   static void (*(*__eglGetProcAddress)(char const *))() = NULL;
