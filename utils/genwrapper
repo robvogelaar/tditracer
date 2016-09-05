@@ -18,9 +18,9 @@ import subprocess
 #        }
 #    }
 #
-#    tditrace_ex("@T+extra()");
+#    tditrace("@T+extra()");
 #    int ret = __extra(in, out);
-#    tditrace_ex("@T-extra()");
+#    tditrace("@T-extra()");
 #
 #    return ret;
 #}
@@ -131,9 +131,9 @@ def parse_xml(input_xml):
             #        }
             #    }
             #
-            #    tditrace_ex("@T+extra()");
+            #    tditrace("@T+extra()");
             #    int ret = __extra(in, out);
-            #    tditrace_ex("@T-extra()");
+            #    tditrace("@T-extra()");
             #
             #    return ret;
             #}
@@ -182,12 +182,12 @@ def parse_xml(input_xml):
 
             print 'dlsym(RTLD_NEXT, \"' + function_name + '\");'
             print '      if (__' +  function_name + ' == NULL) {'
-            print '         fprintf(stderr, \"Error in dlsym: %s\\n\", dlerror());'
+            print '         fprintf(stderr, \"Error in dlsym: %s(%s)\\n\", dlerror()?dlerror():"?",\"' + function_name + '\");'
             print '      }'
             print '   }'
 
 
-            print '   tditrace_ex("@A+' + function_name + '()\");'
+            print '   tditrace("@A+' + function_name + '()\");'
 
             if return_type == 'void':
                 print '   __' + function_name,
@@ -206,9 +206,9 @@ def parse_xml(input_xml):
 
 
             #    int ret = __extra(in, out);
-            #    tditrace_ex("@T-extra()");
+            #    tditrace("@T-extra()");
             #
-            print '   tditrace_ex("@A-' + function_name + '()\");'
+            print '   tditrace("@A-' + function_name + '()\");'
 
             if return_type != 'void':
                 print '   return ret;'

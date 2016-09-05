@@ -25,6 +25,9 @@ void tditrace_ex(int mask, const char *format, ...);
 pid_t gpid;
 char gprocname[128];
 
+#if 0
+
+
 struct simplefu_semaphore {
   int avail;
   int waiters;
@@ -38,28 +41,9 @@ struct simplefu_mutex {
 
 typedef struct simplefu_mutex *simplemu;
 
-void simplefu_down(simplefu who);
-void simplefu_up(simplefu who);
+struct simplefu_mutex myMutex;
 
-void simplefu_mutex_init(simplemu mx);
-void simplefu_mutex_lock(simplemu mx);
-void simplefu_mutex_unlock(simplemu mx);
-
-#define SIMPLEFU_MUTEX_INITIALIZER \
-  {                                \
-    { 1, 0 }                       \
-  }
-
-void simplefu_mutex_init(simplemu mx) {
-  mx->sema.avail = 1;
-  mx->sema.waiters = 0;
-}
-
-void simplefu_mutex_lock(simplemu mx) { simplefu_down(&mx->sema); }
-
-void simplefu_mutex_unlock(simplemu mx) { simplefu_up(&mx->sema); }
-
-void simplefu_down(simplefu who) {
+static void simplefu_down(simplefu who) {
   int val;
   do {
     val = who->avail;
@@ -71,12 +55,48 @@ void simplefu_down(simplefu who) {
   } while (1);
 }
 
-void simplefu_up(simplefu who) {
+static void simplefu_up(simplefu who) {
   int nval = __sync_add_and_fetch(&who->avail, 1);
   if (who->waiters > 0) {
     syscall(__NR_futex, &who->avail, FUTEX_WAKE, nval, NULL, 0, 0);
   }
 }
+
+static void simplefu_mutex_init(simplemu mx) {
+  mx->sema.avail = 1;
+  mx->sema.waiters = 0;
+}
+
+static void simplefu_mutex_lock(simplemu mx) { simplefu_down(&mx->sema); }
+static void simplefu_mutex_unlock(simplemu mx) { simplefu_up(&mx->sema); }
+
+void LOCK_init(void) {
+  simplefu_mutex_init(&myMutex);
+} 
+
+void LOCK(void) {
+  simplefu_mutex_lock(&myMutex);
+} 
+
+void UNLOCK(void) {
+  simplefu_mutex_unlock(&myMutex);
+}
+
+#else
+
+pthread_mutex_t lock;
+
+void LOCK_init(void) {
+  if (pthread_mutex_init(&lock, NULL) != 0) {
+    fprintf(stderr, "\n mutex init failed\n");
+  }
+}
+
+void LOCK(void) { pthread_mutex_lock(&lock); }
+
+void UNLOCK(void) { pthread_mutex_unlock(&lock); }
+
+#endif
 
 #define TASKS 0
 #define ISRS 1
@@ -104,8 +124,6 @@ static int reported_full;
 static int report_tid;
 
 typedef unsigned long long _u64;
-
-struct simplefu_mutex myMutex;
 
 // 128 tasks of 1024 chars each
 static char tasks_array[1024][128];
@@ -1131,10 +1149,10 @@ void *monitor_thread(void *param) {
       static FILE *offload_file;
 
       if (!offload_over50) {
-        simplefu_mutex_lock(&myMutex);
+        LOCK();
         int check =
             ((trace_buffer_byte_ptr - gtrace_buffer) > (gtracebuffersize / 2));
-        simplefu_mutex_unlock(&myMutex);
+        UNLOCK();
 
         if (check) {
           offload_over50 = 1;
@@ -1169,10 +1187,10 @@ void *monitor_thread(void *param) {
         }
 
       } else {
-        simplefu_mutex_lock(&myMutex);
+        LOCK();
         int check =
             ((trace_buffer_byte_ptr - gtrace_buffer) < (gtracebuffersize / 2));
-        simplefu_mutex_unlock(&myMutex);
+        UNLOCK();
 
         if (check) {
           offload_over50 = 0;
@@ -1270,9 +1288,9 @@ void create_trace_buffer(void) {
 
   reported_full = 0;
 
-  simplefu_mutex_lock(&myMutex);
+  LOCK();
   tditrace_inited = 1;
-  simplefu_mutex_unlock(&myMutex);
+  UNLOCK();
 }
 
 static int thedelay;
@@ -1555,7 +1573,7 @@ int tditrace_init(void) {
     }
   }
 
-  simplefu_mutex_init(&myMutex);
+  LOCK_init();
 
   if (thedelay == 0) {
     create_trace_buffer();
@@ -1580,9 +1598,9 @@ void tditrace_rewind() {
   struct timeval mytime;
   int i;
 
-  simplefu_mutex_lock(&myMutex);
+  LOCK();
   tditrace_inited = 0;
-  simplefu_mutex_unlock(&myMutex);
+  UNLOCK();
 
   trace_buffer_byte_ptr = gtrace_buffer;
   trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
@@ -1606,9 +1624,9 @@ void tditrace_rewind() {
 
   reported_full = 0;
 
-  simplefu_mutex_lock(&myMutex);
+  LOCK();
   tditrace_inited = 1;
-  simplefu_mutex_unlock(&myMutex);
+  UNLOCK();
 }
 
 void check_trace_buffer(int b) {
@@ -1966,7 +1984,7 @@ void tditrace_internal(va_list args, const char *format) {
   /*
    * store into tracebuffer
    */
-  simplefu_mutex_lock(&myMutex);
+  LOCK();
 
   /*
    * marker, 4 bytes
@@ -2015,5 +2033,5 @@ void tditrace_internal(va_list args, const char *format) {
     }
   }
 
-  simplefu_mutex_unlock(&myMutex);
+  UNLOCK();
 }

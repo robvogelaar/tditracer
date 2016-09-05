@@ -85,6 +85,7 @@ unsigned int libcmunmap;
 bool pthreadrecording;
 bool eglrecording;
 bool gles2recording;
+bool sgxrecording;
 bool gldrawrecording;
 bool gltexturerecording;
 
@@ -251,6 +252,12 @@ static void init(void) {
     gles2recording = (atoi(getenv("GLES2")) >= 1);
   } else {
     gles2recording = false;
+  }
+
+  if (getenv("SGX")) {
+    sgxrecording = (atoi(getenv("SGX")) >= 1);
+  } else {
+    sgxrecording = false;
   }
 
   if (getenv("GLDRAW")) {

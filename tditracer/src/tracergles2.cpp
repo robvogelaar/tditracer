@@ -223,37 +223,152 @@ extern "C" EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval) {
   return ret;
 }
 
+/*
+ *
+ * eglCreateSyncKHR
+ * eglDestroySyncKHR
+ * eglClientWaitSyncKHR
+ * eglGetSyncAttribKHR
+ *
+ * eglCreateImageKHR
+ * eglDestroyImageKHR
+ * glEGLImageTargetTexture2DOES
+ *
+ * eglCreateNativePixmapNDS
+ * eglDestroyNativePixmapNDS
+ * eglFlushNativePixmapNDS
+ * eglQueryNativePixmapNDS
+ *
+ * eglGetVideoYUVImagesNDS
+ * eglReleaseVideoYUVImagesNDS
+ *
+ */
+
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
 extern "C" {
+
+/*---------------------------------------------------------------*/
 
 static PFNEGLCREATESYNCKHRPROC _eglCreateSyncKHR;
 static PFNEGLDESTROYSYNCKHRPROC _eglDestroySyncKHR;
 static PFNEGLCLIENTWAITSYNCKHRPROC _eglClientWaitSyncKHR;
 static PFNEGLGETSYNCATTRIBKHRPROC _eglGetSyncAttribKHR;
 
-EGLSyncKHR __eglCreateSyncKHR(EGLDisplay dpy, EGLenum type,
-                              const EGLint *attrib_list) {
-  if (eglrecording) tditrace("eglCreateSyncKHR()");
-  return _eglCreateSyncKHR(dpy, type, attrib_list);
+static EGLSyncKHR __eglCreateSyncKHR(EGLDisplay dpy, EGLenum type,
+                                     const EGLint *attrib_list) {
+  if (eglrecording) tditrace("@I+eglCreateSyncKHR()_%x", dpy);
+  EGLSyncKHR sync = _eglCreateSyncKHR(dpy, type, attrib_list);
+  if (eglrecording) tditrace("@I-eglCreateSyncKHR()_%x =%x", dpy, sync);
+  return sync;
 }
 
-EGLBoolean __eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync) {
-  if (eglrecording) tditrace("eglDestroySyncKHR()");
+static EGLBoolean __eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync) {
+  if (eglrecording) tditrace("@I+eglDestroySyncKHR()_%x %x", dpy, sync);
+  EGLBoolean ret = _eglDestroySyncKHR(dpy, sync);
+  if (eglrecording) tditrace("@I-eglDestroySyncKHR()_%x", dpy, sync);
+  return ret;
 }
 
-EGLint __eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags,
-                              EGLTimeKHR timeout) {
-  if (eglrecording) tditrace("eglClientWaitSyncKHR()");
-  return _eglClientWaitSyncKHR(dpy, sync, flags, timeout);
+static EGLint __eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync,
+                                     EGLint flags, EGLTimeKHR timeout) {
+  if (eglrecording) tditrace("@I+eglClientWaitSyncKHR()_%x %x", dpy, sync);
+  EGLint ret = _eglClientWaitSyncKHR(dpy, sync, flags, timeout);
+  if (eglrecording)
+    tditrace("@I-eglClientWaitSyncKHR()_%x %x=%x", dpy, sync, ret);
+  return ret;
 }
 
-EGLBoolean __eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync,
-                                 EGLint attribute, EGLint *value) {
-  if (eglrecording) tditrace("eglGetSyncAttribKHR()");
+static EGLBoolean __eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync,
+                                        EGLint attribute, EGLint *value) {
+  if (eglrecording) tditrace("eglGetSyncAttribKHR()_%x %x", dpy, sync);
   return _eglGetSyncAttribKHR(dpy, sync, attribute, value);
 }
+
+/*---------------------------------------------------------------*/
+
+static PFNEGLCREATEIMAGEKHRPROC _eglCreateImageKHR;
+static PFNEGLDESTROYIMAGEKHRPROC _eglDestroyImageKHR;
+
+static EGLImageKHR __eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx,
+                                       EGLenum target, EGLClientBuffer buffer,
+                                       const EGLint *attrib_list) {
+  EGLImageKHR image = _eglCreateImageKHR(dpy, ctx, target, buffer, attrib_list);
+  if (eglrecording) tditrace("eglCreateImageKHR()_%x =%x", dpy, image);
+  return image;
+}
+
+static EGLBoolean __eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image) {
+  if (eglrecording) tditrace("eglDestroyImageKHR()_%x %x", dpy, image);
+  return _eglDestroyImageKHR(dpy, image);
+}
+
+// void __glEGLImageTargetTexture2DOES(GLenum target, EGLImageKHR image) {}
+
+/*---------------------------------------------------------------*/
+
+typedef EGLNativePixmapType(EGLAPIENTRYP PFNEGLCREATENATIVEPIXMAPNDSPROC)(
+    EGLDisplay display, const EGLint *attrib_list);
+typedef EGLBoolean(EGLAPIENTRYP PFNEGLFLUSHNATIVEPIXMAPNDSPROC)(
+    EGLDisplay display, EGLNativePixmapType pixmap);
+typedef EGLBoolean(EGLAPIENTRYP PFNEGLDESTROYNATIVEPIXMAPNDSPROC)(
+    EGLDisplay display, EGLNativePixmapType pixmap);
+typedef EGLBoolean(EGLAPIENTRYP PFNEGLQUERYNATIVEPIXMAPNDSPROC)(
+    EGLDisplay display, EGLNativePixmapType pixmap, EGLint attribute,
+    EGLint *value);
+
+static PFNEGLCREATENATIVEPIXMAPNDSPROC _eglCreateNativePixmapNDS;
+static PFNEGLFLUSHNATIVEPIXMAPNDSPROC _eglFlushNativePixmapNDS;
+static PFNEGLDESTROYNATIVEPIXMAPNDSPROC _eglDestroyNativePixmapNDS;
+static PFNEGLQUERYNATIVEPIXMAPNDSPROC _eglQueryNativePixmapNDS;
+
+static EGLNativePixmapType __eglCreateNativePixmapNDS(
+    EGLDisplay display, const EGLint *attrib_list) {
+  EGLNativePixmapType pixmap = _eglCreateNativePixmapNDS(display, attrib_list);
+  if (eglrecording) tditrace("eglCreateNativePixmapNDS()_%x =%x", display, pixmap);
+  return pixmap;
+}
+
+static EGLBoolean __eglFlushNativePixmapNDS(EGLDisplay display,
+                                            EGLNativePixmapType pixmap) {
+  if (eglrecording) tditrace("eglFlushNativePixmapNDS()_%x %x", display, pixmap);
+  return _eglFlushNativePixmapNDS(display, pixmap);
+}
+
+static EGLBoolean __eglDestroyNativePixmapNDS(EGLDisplay display,
+                                              EGLNativePixmapType pixmap) {
+  if (eglrecording) tditrace("eglDestroyNativePixmapNDS()_%x %x", display, pixmap);
+  return _eglDestroyNativePixmapNDS(display, pixmap);
+}
+
+static EGLBoolean __eglQueryNativePixmapNDS(EGLDisplay display,
+                                            EGLNativePixmapType pixmap,
+                                            EGLint attribute, EGLint *value) {
+  if (eglrecording) tditrace("eglQueryNativePixmapNDS()_%x %x", display, pixmap);
+  return _eglQueryNativePixmapNDS(display, pixmap, attribute, value);
+}
+
+/*---------------------------------------------------------------*/
+
+typedef EGLBoolean(EGLAPIENTRYP PFNEGLGETVIDEOYUVIMAGESNDSPROC)(
+    EGLDisplay display, EGLImageKHR *images_array, EGLint nb_images,
+    const EGLint *attrib_list);
+typedef EGLBoolean(EGLAPIENTRYP PFNEGLRELEASEVIDEOYUVIMAGESNDSPROC)(
+    EGLDisplay display, const EGLImageKHR *images_array, EGLint nb_images);
+
+static PFNEGLGETVIDEOYUVIMAGESNDSPROC _eglGetVideoYUVImagesNDS;
+static PFNEGLRELEASEVIDEOYUVIMAGESNDSPROC _eglReleaseVideoYUVImagesNDS;
+
+EGLBoolean eglGetVideoYUVImagesNDS(EGLDisplay display,
+                                   EGLImageKHR *images_array, EGLint nb_images,
+                                   const EGLint *attrib_list);
+
+EGLBoolean eglReleaseVideoYUVImagesNDS(EGLDisplay display,
+                                       const EGLImageKHR *images_array,
+                                       EGLint nb_images);
+
+/*---------------------------------------------------------------*/
 }
 
 extern "C" void (*eglGetProcAddress(const char *procname))() {
@@ -280,6 +395,20 @@ extern "C" void (*eglGetProcAddress(const char *procname))() {
   } else if (strcmp(procname, "eglGetSyncAttribKHR") == 0) {
     _eglGetSyncAttribKHR = __eglGetProcAddress(procname);
     return __eglGetSyncAttribKHR;
+  }
+
+    else if (strcmp(procname, "eglCreateNativePixmapNDS") == 0) {
+    _eglCreateNativePixmapNDS = __eglGetProcAddress(procname);
+    return __eglCreateNativePixmapNDS;
+  } else if (strcmp(procname, "eglDestroyNativePixmapNDS") == 0) {
+    _eglDestroyNativePixmapNDS = __eglGetProcAddress(procname);
+    return __eglDestroyNativePixmapNDS;
+  } else if (strcmp(procname, "eglFlushNativePixmapNDS") == 0) {
+    _eglFlushNativePixmapNDS = __eglGetProcAddress(procname);
+    return __eglFlushNativePixmapNDS;
+  } else if (strcmp(procname, "eglQueryNativePixmapNDS") == 0) {
+    _eglQueryNativePixmapNDS = __eglGetProcAddress(procname);
+    return __eglQueryNativePixmapNDS;
   }
 
   void (*a)() = __eglGetProcAddress(procname);
@@ -502,10 +631,14 @@ extern "C" GLvoid glBindTexture(GLenum target, GLuint texture) {
     }
   }
 
-  if (gles2recording) tditrace("#gltexturebinds~%d", ++texturebind_counter);
+  if (texture) texturebind_counter++;
 
-  if (gles2recording)
-    tditrace("glBindTexture() #%d,%u", ++glBindTexture_counter, texture);
+  if (gles2recording) tditrace("#gltexturebinds~%d", texturebind_counter);
+
+  if (gles2recording) {
+    if (texture) glBindTexture_counter++;
+    tditrace("glBindTexture() #%d,%u", glBindTexture_counter, texture);
+  }
 
   __glBindTexture(target, texture);
 
@@ -868,7 +1001,7 @@ extern "C" void glDeleteBuffers(GLsizei n, const GLuint *buffers) {
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-  if (gles2recording) tditrace("glDeleteBuffers() %d=%d", n, buffers[0]);
+  if (gles2recording) tditrace("glDeleteBuffers() %d %d", n, buffers[0]);
   __glDeleteBuffers(n, buffers);
 }
 
@@ -1003,7 +1136,7 @@ extern "C" void glDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers) {
     }
   }
   if (gles2recording)
-    tditrace("glDeleteRenderbuffers() %d,%d", n, renderbuffers[0]);
+    tditrace("glDeleteRenderbuffers() %d %d", n, renderbuffers[0]);
   __glDeleteRenderbuffers(n, renderbuffers);
 }
 
