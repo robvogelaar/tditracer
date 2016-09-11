@@ -1194,6 +1194,7 @@ static void *monitor_thread(void *param) {
                     offloadfilename, errsv);
           }
 
+#ifndef __UCLIBC__
           if (posix_fallocate(fileno(offload_file), 0, gtracebuffersize) != 0) {
             fprintf(
                 stderr,
@@ -1206,7 +1207,7 @@ static void *monitor_thread(void *param) {
 
             pthread_exit(NULL);
           }
-#if 0
+#else
           if (ftruncate(fileno(offload_file), gtracebuffersize) == -1) {
             fprintf(
                 stderr,
@@ -1295,6 +1296,7 @@ static int create_trace_buffer(void) {
     return -1;
   }
 
+#ifndef __UCLIBC__
   if (posix_fallocate(fileno(file), 0, gtracebuffersize) != 0) {
     fprintf(stderr, "tdi: [%s][%d], !!! failed to resize \"%s\" (%dMB)\n",
             gprocname, gpid, gtracebufferfilename,
@@ -1306,8 +1308,7 @@ static int create_trace_buffer(void) {
 
     return -1;
   }
-
-#if 0
+#else
   if (ftruncate(fileno(file), gtracebuffersize) == -1) {
     fprintf(stderr, "tdi: [%s][%d], !!! failed to resize \"%s\" (%dMB)\n",
             gprocname, gpid, gtracebufferfilename,
