@@ -34,3 +34,23 @@ libtditracer_la_SOURCES = \
    gles2capture.cpp \
    gles2extra.cpp \
    gles2util.cpp
+
+if NOEGL
+libtditracer_la_CPPFLAGS += -DNOEGL
+endif
+
+if NOGLES2
+libtditracer_la_CPPFLAGS += -DNOGLES2
+endif
+
+if NOLIBC
+libtditracer_la_CPPFLAGS += -DNOLIBC
+endif
+
+if NOLIBPTHREAD
+libtditracer_la_CPPFLAGS += -DNOLIBPTHREAD
+endif
+
+if NOSGX
+libtditracer_la_CPPFLAGS += -DNOSGX
+endif

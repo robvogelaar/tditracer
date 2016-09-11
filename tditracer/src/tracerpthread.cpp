@@ -1,3 +1,5 @@
+#ifndef NOLIBPTHREAD
+
 #include <stdio.h>
 #include <pthread.h>
 #include <sched.h>
@@ -204,4 +206,6 @@ extern "C" int pthread_cond_signal(pthread_cond_t* cond)
 
     return r;
 }
+#endif
+
 #endif

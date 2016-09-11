@@ -175,7 +175,7 @@ static _u64 timestamp_monotonic_nsec(void) {
       (_u64)((_u64)mytime.tv_nsec + (_u64)mytime.tv_sec * (_u64)1000000000));
 }
 
-void tditrace_rewind();
+static void tditrace_rewind();
 
 static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
                      char *procname, int pid, int tid, int nr_numbers,
@@ -987,7 +987,31 @@ extern void framecapture_deleteframes(void) __attribute__((weak));
 
 extern void capture_dump(void) __attribute__((weak));
 
-void *monitor_thread(void *param) {
+static void tmpfs_message(void) {
+  fprintf(stderr, "\n");
+  fprintf(stderr,
+          "tdi: [%s][%d], "
+          "----------------------------------------------------------------"
+          "\n",
+          gprocname, gpid);
+  fprintf(stderr, "tdi: [%s][%d], adjust the trace buffer size:\n", gprocname,
+          gpid);
+  fprintf(stderr, "tdi: [%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
+          gpid);
+  fprintf(stderr, "tdi: [%s][%d], adjust the /tmp size:\n", gprocname, gpid);
+  fprintf(stderr,
+          "tdi: [%s][%d],     \"mount -o "
+          "remount,noexec,nosuid,nr_blocks=15000 /tmp\"\n",
+          gprocname, gpid);
+  fprintf(stderr,
+          "tdi: [%s][%d], "
+          "----------------------------------------------------------------"
+          "\n",
+          gprocname, gpid);
+  fprintf(stderr, "\n");
+}
+
+static void *monitor_thread(void *param) {
   static int seconds_counter = 0;
 
   stat(gtracebufferfilename, &gtrace_buffer_st);
@@ -1170,10 +1194,38 @@ void *monitor_thread(void *param) {
                     offloadfilename, errsv);
           }
 
-          (void)ftruncate(fileno(offload_file), gtracebuffersize);
+          if (posix_fallocate(fileno(offload_file), 0, gtracebuffersize) != 0) {
+            fprintf(
+                stderr,
+                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
+                gpid, gprocname, offloadfilename);
+            tmpfs_message();
+
+            fclose(offload_file);
+            unlink(offloadfilename);
+
+            pthread_exit(NULL);
+          }
+#if 0
+          if (ftruncate(fileno(offload_file), gtracebuffersize) == -1) {
+            fprintf(
+                stderr,
+                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
+                gpid, gprocname, offloadfilename);
+            pthread_exit(NULL);
+            tmpfs_message();
+          }
+#endif
 
           offload_buffer = (char *)mmap(0, gtracebuffersize, PROT_WRITE,
                                         MAP_SHARED, fileno(offload_file), 0);
+
+          if (offload_buffer == MAP_FAILED) {
+            fprintf(stderr,
+                    "tdi: [%d][%s], !!! failed to mmap offloadfile: \"%s\" \n",
+                    gpid, gprocname, offloadfilename);
+            pthread_exit(NULL);
+          }
 
           fprintf(stderr, "tdi: [%d][%s], created offloadfile: \"%s\" \n", gpid,
                   gprocname, offloadfilename);
@@ -1217,7 +1269,7 @@ void *monitor_thread(void *param) {
   pthread_exit(NULL);
 }
 
-void create_trace_buffer(void) {
+static int create_trace_buffer(void) {
   /*
    * [TDIT]
    * [RACE]
@@ -1238,13 +1290,47 @@ void create_trace_buffer(void) {
           gpid);
   FILE *file;
   if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
-    fprintf(stderr, "Error creating file \"%s\"", gtracebufferfilename);
+    fprintf(stderr, "tdi: [%s][%d], !!! failed to create \"%s\"\n", gprocname,
+            gpid, gtracebufferfilename);
+    return -1;
   }
-  int i = ftruncate(fileno(file), gtracebuffersize);
+
+  if (posix_fallocate(fileno(file), 0, gtracebuffersize) != 0) {
+    fprintf(stderr, "tdi: [%s][%d], !!! failed to resize \"%s\" (%dMB)\n",
+            gprocname, gpid, gtracebufferfilename,
+            gtracebuffersize / (1024 * 1024));
+    tmpfs_message();
+
+    fclose(file);
+    unlink(gtracebufferfilename);
+
+    return -1;
+  }
+
+#if 0
+  if (ftruncate(fileno(file), gtracebuffersize) == -1) {
+    fprintf(stderr, "tdi: [%s][%d], !!! failed to resize \"%s\" (%dMB)\n",
+            gprocname, gpid, gtracebufferfilename,
+            gtracebuffersize / (1024 * 1024));
+
+    tmpfs_message();
+    return -1;
+  }
+#endif
+
   gtrace_buffer = (char *)mmap(0, gtracebuffersize, PROT_READ | PROT_WRITE,
                                MAP_SHARED, fileno(file), 0);
+
+  if (gtrace_buffer == MAP_FAILED) {
+    fprintf(stderr, "tdi: [%s][%d], !!! failed to mmap \"%s\" (%dMB)\n",
+            gprocname, gpid, gtracebufferfilename,
+            gtracebuffersize / (1024 * 1024));
+    return -1;
+  }
+
   stat(gtracebufferfilename, &gtrace_buffer_st);
 
+  int i;
   for (i = 0; i < gtracebuffersize; i++) {
     gtrace_buffer[i] = 0;
   }
@@ -1291,11 +1377,13 @@ void create_trace_buffer(void) {
   LOCK();
   tditrace_inited = 1;
   UNLOCK();
+
+  return 0;
 }
 
 static int thedelay;
 
-void *delayed_init_thread(void *param) {
+static void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
   int delay = *pdelay;
 
@@ -1374,7 +1462,9 @@ void *delayed_init_thread(void *param) {
 
   fprintf(stderr, "tdi: [%s][%d], delay finished...\n", gprocname, gpid);
 
-  create_trace_buffer();
+  if (create_trace_buffer() == -1) {
+    pthread_exit(NULL);
+  }
 
   pthread_t monitor_thread_id;
   pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
@@ -1576,7 +1666,9 @@ int tditrace_init(void) {
   LOCK_init();
 
   if (thedelay == 0) {
-    create_trace_buffer();
+    if (create_trace_buffer() == -1) {
+      return -1;
+    }
 
     pthread_t monitor_thread_id;
     pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
@@ -1594,7 +1686,7 @@ int tditrace_init(void) {
   return 0;
 }
 
-void tditrace_rewind() {
+static void tditrace_rewind() {
   struct timeval mytime;
   int i;
 
@@ -1807,7 +1899,7 @@ void tditrace_exit(int argc, char *argv[]) {
           asctime(gmtime((const time_t *)&atime)));
 }
 
-void tditrace_internal(va_list args, const char *format);
+static void tditrace_internal(va_list args, const char *format);
 
 void tditrace(const char *format, ...) {
   va_list args;

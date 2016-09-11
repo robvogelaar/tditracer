@@ -26,7 +26,9 @@ static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();
 
 static void tditracer_constructor() {
-  tditrace_init();
+  if (tditrace_init() == -1) {
+    return;
+  }
 
   init();
 }

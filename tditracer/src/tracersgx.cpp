@@ -1,11 +1,10 @@
-#if 0
+#ifndef NOSGX
 
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "tdi.h"
 #include "tracermain.h"
-
 
 #if 1
 extern "C" int SGXQueueTransfer(void *hTransferContext,
@@ -559,88 +558,131 @@ extern "C" int drmCommandWrite(int fd, unsigned long drmCommandIndex,
 
   package_t *ppackage = (package_t *)data;
 
-  if (sgxrecording) tditrace("@A+drm() \"%s\"", ddk_1_9_strings[ppackage->id - 0xc01c6700]);
+  if (sgxrecording)
+    tditrace("@A+drm() \"%s\"", ddk_1_9_strings[ppackage->id - 0xc01c6700]);
   int ret = __drmCommandWrite(fd, drmCommandIndex, data, size);
   if (sgxrecording) tditrace("@A-drm() =%x", ret);
   return ret;
 }
 #endif
 
-
-
 /*
  *--------------------------------------------------------------------
  */
 
-#include "pvr2d.h"
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
 
+typedef unsigned int PVR2D_UINT;
+typedef void *PVR2DCONTEXTHANDLE;
+typedef unsigned long PVR2D_ULONG;
+typedef void PVR2D_VOID;
 
-extern "C" PVR2DERROR PVR2DQueryBlitsComplete ( PVR2DCONTEXTHANDLE hContext ,  const PVR2DMEMINFO *  pMemInfo ,  PVR2D_UINT uiWaitForComplete )
-{
-   static PVR2DERROR (* __PVR2DQueryBlitsComplete) ( PVR2DCONTEXTHANDLE ,  const PVR2DMEMINFO *  ,  PVR2D_UINT ) = NULL;
-   if (__PVR2DQueryBlitsComplete == NULL) {
-      __PVR2DQueryBlitsComplete = (PVR2DERROR (*) ( PVR2DCONTEXTHANDLE ,  const PVR2DMEMINFO *  ,  PVR2D_UINT )) dlsym(RTLD_NEXT, "PVR2DQueryBlitsComplete");
-      if (__PVR2DQueryBlitsComplete == NULL) {
-         fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror()?dlerror():"?","PVR2DQueryBlitsComplete");
-      }
-   }
-   tditrace("@A+PVR2DQueryBlitsComplete() %x %x %d", hContext, pMemInfo, uiWaitForComplete);
-   PVR2DERROR ret = __PVR2DQueryBlitsComplete ( hContext ,  pMemInfo ,  uiWaitForComplete );
-   tditrace("@A-PVR2DQueryBlitsComplete() =%x", ret);
-   return ret;
+typedef enum {
+  PVR2D_OK = 0,
+  PVR2DERROR_INVALID_PARAMETER = -1,
+  PVR2DERROR_DEVICE_UNAVAILABLE = -2,
+  PVR2DERROR_INVALID_CONTEXT = -3,
+  PVR2DERROR_MEMORY_UNAVAILABLE = -4,
+  PVR2DERROR_DEVICE_NOT_PRESENT = -5,
+  PVR2DERROR_IOCTL_ERROR = -6,
+  PVR2DERROR_GENERIC_ERROR = -7,
+  PVR2DERROR_BLT_NOTCOMPLETE = -8,
+  PVR2DERROR_HW_FEATURE_NOT_SUPPORTED = -9,
+  PVR2DERROR_NOT_YET_IMPLEMENTED = -10,
+  PVR2DERROR_MAPPING_FAILED = -11
+} PVR2DERROR;
+
+typedef struct _PVR2DMEMINFO {
+  PVR2D_VOID *pBase;
+  PVR2D_ULONG ui32MemSize;
+  PVR2D_ULONG ui32DevAddr;
+  PVR2D_ULONG ulFlags;
+  PVR2D_VOID *hPrivateData;
+  PVR2D_VOID *hPrivateMapData;
+} PVR2DMEMINFO;
+
+extern "C" PVR2DERROR PVR2DQueryBlitsComplete(PVR2DCONTEXTHANDLE hContext,
+                                              const PVR2DMEMINFO *pMemInfo,
+                                              PVR2D_UINT uiWaitForComplete) {
+  static PVR2DERROR (*__PVR2DQueryBlitsComplete)(
+      PVR2DCONTEXTHANDLE, const PVR2DMEMINFO *, PVR2D_UINT) = NULL;
+  if (__PVR2DQueryBlitsComplete == NULL) {
+    __PVR2DQueryBlitsComplete =
+        (PVR2DERROR(*)(PVR2DCONTEXTHANDLE, const PVR2DMEMINFO *,
+                       PVR2D_UINT))dlsym(RTLD_NEXT, "PVR2DQueryBlitsComplete");
+    if (__PVR2DQueryBlitsComplete == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "PVR2DQueryBlitsComplete");
+    }
+  }
+  tditrace("@A+PVR2DQueryBlitsComplete() %x %x %d", hContext, pMemInfo,
+           uiWaitForComplete);
+  PVR2DERROR ret =
+      __PVR2DQueryBlitsComplete(hContext, pMemInfo, uiWaitForComplete);
+  tditrace("@A-PVR2DQueryBlitsComplete() =%x", ret);
+  return ret;
 }
-
 
 #include "gdl.h"
 
-extern "C" gdl_ret_t gdl_flip ( gdl_plane_id_t plane_id ,  gdl_surface_id_t surface_id ,  gdl_flip_t sync )
-{
-   static gdl_ret_t (* __gdl_flip) ( gdl_plane_id_t ,  gdl_surface_id_t ,  gdl_flip_t ) = NULL;
-   if (__gdl_flip == NULL) {
-      __gdl_flip = (gdl_ret_t (*) ( gdl_plane_id_t ,  gdl_surface_id_t ,  gdl_flip_t )) dlsym(RTLD_NEXT, "gdl_flip");
-      if (__gdl_flip == NULL) {
-         fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-      }
-   }
-   tditrace("@A+gdl_flip()");
-   gdl_ret_t ret = __gdl_flip ( plane_id ,  surface_id ,  sync );
-   tditrace("@A-gdl_flip()");
-   return ret;
+extern "C" gdl_ret_t gdl_flip(gdl_plane_id_t plane_id,
+                              gdl_surface_id_t surface_id, gdl_flip_t sync) {
+  static gdl_ret_t (*__gdl_flip)(gdl_plane_id_t, gdl_surface_id_t, gdl_flip_t) =
+      NULL;
+  if (__gdl_flip == NULL) {
+    __gdl_flip = (gdl_ret_t(*)(gdl_plane_id_t, gdl_surface_id_t,
+                               gdl_flip_t))dlsym(RTLD_NEXT, "gdl_flip");
+    if (__gdl_flip == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  tditrace("@A+gdl_flip()");
+  gdl_ret_t ret = __gdl_flip(plane_id, surface_id, sync);
+  tditrace("@A-gdl_flip()");
+  return ret;
 }
 
-extern "C" gdl_ret_t gdl_flip_stereo ( gdl_plane_id_t left_plane_id ,  gdl_surface_id_t left_surface_id ,  gdl_surface_id_t right_surface_id ,  gdl_int32 shift ,  gdl_flip_t type )
-{
-   static gdl_ret_t (* __gdl_flip_stereo) ( gdl_plane_id_t ,  gdl_surface_id_t ,  gdl_surface_id_t ,  gdl_int32 ,  gdl_flip_t ) = NULL;
-   if (__gdl_flip_stereo == NULL) {
-      __gdl_flip_stereo = (gdl_ret_t (*) ( gdl_plane_id_t ,  gdl_surface_id_t ,  gdl_surface_id_t ,  gdl_int32 ,  gdl_flip_t )) dlsym(RTLD_NEXT, "gdl_flip_stereo");
-      if (__gdl_flip_stereo == NULL) {
-         fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-      }
-   }
-   tditrace("@A+gdl_flip_stereo()");
-   gdl_ret_t ret = __gdl_flip_stereo ( left_plane_id ,  left_surface_id ,  right_surface_id ,  shift ,  type );
-   tditrace("@A-gdl_flip_stereo()");
-   return ret;
+extern "C" gdl_ret_t gdl_flip_stereo(gdl_plane_id_t left_plane_id,
+                                     gdl_surface_id_t left_surface_id,
+                                     gdl_surface_id_t right_surface_id,
+                                     gdl_int32 shift, gdl_flip_t type) {
+  static gdl_ret_t (*__gdl_flip_stereo)(gdl_plane_id_t, gdl_surface_id_t,
+                                        gdl_surface_id_t, gdl_int32,
+                                        gdl_flip_t) = NULL;
+  if (__gdl_flip_stereo == NULL) {
+    __gdl_flip_stereo = (gdl_ret_t(*)(
+        gdl_plane_id_t, gdl_surface_id_t, gdl_surface_id_t, gdl_int32,
+        gdl_flip_t))dlsym(RTLD_NEXT, "gdl_flip_stereo");
+    if (__gdl_flip_stereo == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  tditrace("@A+gdl_flip_stereo()");
+  gdl_ret_t ret = __gdl_flip_stereo(left_plane_id, left_surface_id,
+                                    right_surface_id, shift, type);
+  tditrace("@A-gdl_flip_stereo()");
+  return ret;
 }
 
-extern "C" gdl_ret_t gdl_display_wait_for_vblank ( gdl_display_id_t display_id ,  gdl_polarity_t *  polarity )
-{
-   static gdl_ret_t (* __gdl_display_wait_for_vblank) ( gdl_display_id_t ,  gdl_polarity_t *  ) = NULL;
-   if (__gdl_display_wait_for_vblank == NULL) {
-      __gdl_display_wait_for_vblank = (gdl_ret_t (*) ( gdl_display_id_t ,  gdl_polarity_t *  )) dlsym(RTLD_NEXT, "gdl_display_wait_for_vblank");
-      if (__gdl_display_wait_for_vblank == NULL) {
-         fprintf(stderr, "Error in dlsym: %s\n", dlerror());
-      }
-   }
-   tditrace("@A+gdl_display_wait_for_vblank()");
-   gdl_ret_t ret = __gdl_display_wait_for_vblank ( display_id ,  polarity );
-   tditrace("@A-gdl_display_wait_for_vblank()");
-   return ret;
+extern "C" gdl_ret_t gdl_display_wait_for_vblank(gdl_display_id_t display_id,
+                                                 gdl_polarity_t *polarity) {
+  static gdl_ret_t (*__gdl_display_wait_for_vblank)(gdl_display_id_t,
+                                                    gdl_polarity_t *) = NULL;
+  if (__gdl_display_wait_for_vblank == NULL) {
+    __gdl_display_wait_for_vblank =
+        (gdl_ret_t(*)(gdl_display_id_t, gdl_polarity_t *))dlsym(
+            RTLD_NEXT, "gdl_display_wait_for_vblank");
+    if (__gdl_display_wait_for_vblank == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  tditrace("@A+gdl_display_wait_for_vblank()");
+  gdl_ret_t ret = __gdl_display_wait_for_vblank(display_id, polarity);
+  tditrace("@A-gdl_display_wait_for_vblank()");
+  return ret;
 }
 
 #endif

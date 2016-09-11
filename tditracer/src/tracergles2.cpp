@@ -326,26 +326,30 @@ static PFNEGLQUERYNATIVEPIXMAPNDSPROC _eglQueryNativePixmapNDS;
 static EGLNativePixmapType __eglCreateNativePixmapNDS(
     EGLDisplay display, const EGLint *attrib_list) {
   EGLNativePixmapType pixmap = _eglCreateNativePixmapNDS(display, attrib_list);
-  if (eglrecording) tditrace("eglCreateNativePixmapNDS()_%x =%x", display, pixmap);
+  if (eglrecording)
+    tditrace("eglCreateNativePixmapNDS()_%x =%x", display, pixmap);
   return pixmap;
 }
 
 static EGLBoolean __eglFlushNativePixmapNDS(EGLDisplay display,
                                             EGLNativePixmapType pixmap) {
-  if (eglrecording) tditrace("eglFlushNativePixmapNDS()_%x %x", display, pixmap);
+  if (eglrecording)
+    tditrace("eglFlushNativePixmapNDS()_%x %x", display, pixmap);
   return _eglFlushNativePixmapNDS(display, pixmap);
 }
 
 static EGLBoolean __eglDestroyNativePixmapNDS(EGLDisplay display,
                                               EGLNativePixmapType pixmap) {
-  if (eglrecording) tditrace("eglDestroyNativePixmapNDS()_%x %x", display, pixmap);
+  if (eglrecording)
+    tditrace("eglDestroyNativePixmapNDS()_%x %x", display, pixmap);
   return _eglDestroyNativePixmapNDS(display, pixmap);
 }
 
 static EGLBoolean __eglQueryNativePixmapNDS(EGLDisplay display,
                                             EGLNativePixmapType pixmap,
                                             EGLint attribute, EGLint *value) {
-  if (eglrecording) tditrace("eglQueryNativePixmapNDS()_%x %x", display, pixmap);
+  if (eglrecording)
+    tditrace("eglQueryNativePixmapNDS()_%x %x", display, pixmap);
   return _eglQueryNativePixmapNDS(display, pixmap, attribute, value);
 }
 
@@ -384,31 +388,38 @@ extern "C" void (*eglGetProcAddress(const char *procname))() {
   if (eglrecording) tditrace("eglGetProcAddress() \"%s\"", procname);
 
   if (strcmp(procname, "eglCreateSyncKHR") == 0) {
-    _eglCreateSyncKHR = __eglGetProcAddress(procname);
-    return __eglCreateSyncKHR;
+    _eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglCreateSyncKHR;
   } else if (strcmp(procname, "eglDestroySyncKHR") == 0) {
-    _eglDestroySyncKHR = __eglGetProcAddress(procname);
-    return __eglDestroySyncKHR;
+    _eglDestroySyncKHR =
+        (PFNEGLDESTROYSYNCKHRPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglDestroySyncKHR;
   } else if (strcmp(procname, "eglClientWaitSyncKHR") == 0) {
-    _eglClientWaitSyncKHR = __eglGetProcAddress(procname);
-    return __eglClientWaitSyncKHR;
+    _eglClientWaitSyncKHR =
+        (PFNEGLCLIENTWAITSYNCKHRPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglClientWaitSyncKHR;
   } else if (strcmp(procname, "eglGetSyncAttribKHR") == 0) {
-    _eglGetSyncAttribKHR = __eglGetProcAddress(procname);
-    return __eglGetSyncAttribKHR;
+    _eglGetSyncAttribKHR =
+        (PFNEGLGETSYNCATTRIBKHRPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglGetSyncAttribKHR;
   }
 
-    else if (strcmp(procname, "eglCreateNativePixmapNDS") == 0) {
-    _eglCreateNativePixmapNDS = __eglGetProcAddress(procname);
-    return __eglCreateNativePixmapNDS;
+  else if (strcmp(procname, "eglCreateNativePixmapNDS") == 0) {
+    _eglCreateNativePixmapNDS =
+        (PFNEGLCREATENATIVEPIXMAPNDSPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglCreateNativePixmapNDS;
   } else if (strcmp(procname, "eglDestroyNativePixmapNDS") == 0) {
-    _eglDestroyNativePixmapNDS = __eglGetProcAddress(procname);
-    return __eglDestroyNativePixmapNDS;
+    _eglDestroyNativePixmapNDS =
+        (PFNEGLDESTROYNATIVEPIXMAPNDSPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglDestroyNativePixmapNDS;
   } else if (strcmp(procname, "eglFlushNativePixmapNDS") == 0) {
-    _eglFlushNativePixmapNDS = __eglGetProcAddress(procname);
-    return __eglFlushNativePixmapNDS;
+    _eglFlushNativePixmapNDS =
+        (PFNEGLFLUSHNATIVEPIXMAPNDSPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglFlushNativePixmapNDS;
   } else if (strcmp(procname, "eglQueryNativePixmapNDS") == 0) {
-    _eglQueryNativePixmapNDS = __eglGetProcAddress(procname);
-    return __eglQueryNativePixmapNDS;
+    _eglQueryNativePixmapNDS =
+        (PFNEGLQUERYNATIVEPIXMAPNDSPROC)__eglGetProcAddress(procname);
+    return (void (*)())__eglQueryNativePixmapNDS;
   }
 
   void (*a)() = __eglGetProcAddress(procname);

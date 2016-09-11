@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #define PNG_DEBUG 3
 #include <png.h>
 

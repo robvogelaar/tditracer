@@ -1,3 +1,5 @@
+#ifndef NOLIBC
+
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <malloc.h>
@@ -1604,4 +1606,6 @@ int raise(int sig) {
 
   return __raise(sig);
 }
+#endif
+
 #endif

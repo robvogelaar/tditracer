@@ -16,6 +16,32 @@ AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
+
+AC_ARG_ENABLE([egl],
+[  --disable-egl disable egl interposing],
+[egl=${enableval}], [egl=yes])
+AM_CONDITIONAL(NOEGL, test x$egl = xno)
+
+AC_ARG_ENABLE([gles2],
+[  --disable-gles2 disable gles2 interposing],
+[gles2=${enableval}], [gles2=yes])
+AM_CONDITIONAL(NOGLES2, test x$gles2 = xno)
+
+AC_ARG_ENABLE([libc],
+[  --disable-libc disable libc interposing],
+[libc=${enableval}], [libc=yes])
+AM_CONDITIONAL(NOLIBC, test x$libc = xno)
+
+AC_ARG_ENABLE([libpthread],
+[  --disable-libpthread disable libpthread interposing],
+[libpthread=${enableval}], [libpthread=yes])
+AM_CONDITIONAL(NOLIBPTHREAD, test x$libpthread = xno)
+
+AC_ARG_ENABLE([sgx],
+[  --disable-sgx disable sgx interposing],
+[sgx=${enableval}], [sgx=no])
+AM_CONDITIONAL(NOSGX, test x$sgx = xno)
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/time.h unistd.h refsw/nexus_config.h])
 
