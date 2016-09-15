@@ -159,22 +159,6 @@ static int nr_notes = 0;
 static char agents_array[1024][128];
 static int nr_agents = 0;
 
-static _u64 timestamp_timeofday_nsec(void) {
-  struct timeval mytime;
-
-  gettimeofday(&mytime, 0);
-  return ((_u64)((_u64)mytime.tv_usec * (_u64)1000 +
-                 (_u64)mytime.tv_sec * (_u64)1000000000));
-}
-
-static _u64 timestamp_monotonic_nsec(void) {
-  struct timespec mytime;
-
-  clock_gettime(CLOCK_MONOTONIC, &mytime);
-  return (
-      (_u64)((_u64)mytime.tv_nsec + (_u64)mytime.tv_sec * (_u64)1000000000));
-}
-
 static void tditrace_rewind();
 
 static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
@@ -802,8 +786,9 @@ typedef struct {
   int bufsize;
   char *ptr;
   unsigned int *dword_ptr;
-  _u64 timeofday_offset;
-  _u64 monotonic_offset;
+  _u64 timeofday_start;
+  _u64 monotonic_start;
+  _u64 monotonic_first;
   _u64 monotonic_timestamp;
   unsigned short identifier;
   int nr_numbers;
@@ -818,6 +803,16 @@ typedef struct {
 tracebuffer_t tracebuffers[10];
 
 static void parse(int bid) {
+  /*
+   * [    ]marker, lower 2 bytes is total length in dwords, upper byte is
+   * identifier,
+   *       middle byte is nr numbers
+   * [    ]clock_monotonic_timestamp.tv_nsec
+   * [    ]clock_monotonic_timestamp.tv_sec
+   * [    ]<optional> numbers
+   * [    ]<optional> text, padded with 0's to multiple of 4 bytes
+   */
+
   // fprintf(stderr, "parse %d, tracebuffers[bid].dword_ptr = 0x%08x\n", bid,
   //       (int)tracebuffers[bid].dword_ptr);
 
@@ -920,7 +915,7 @@ static void dump_proc_self_maps(void) {
   int fd;
   int bytes;
 
-  fprintf(stderr, "tdi: [%s][%d], maps...\n", gprocname, gpid);
+  fprintf(stderr, "tdi: maps...[%s,%d]\n", gprocname, gpid);
 
   tditrace("MAPS [%s][%d] begin", gprocname, gpid);
 
@@ -977,6 +972,8 @@ static int offload_over50 = 0;
 
 static int do_wrap = 0;
 
+static int do_maps = 0;
+
 static int do_dump_proc_self_maps = 0;
 
 extern void shadercapture_writeshaders(void) __attribute__((weak));
@@ -985,26 +982,24 @@ extern void texturecapture_deletetextures(void) __attribute__((weak));
 extern void framecapture_writepngframes(void) __attribute__((weak));
 extern void framecapture_deleteframes(void) __attribute__((weak));
 
-extern void capture_dump(void) __attribute__((weak));
-
 static void tmpfs_message(void) {
   fprintf(stderr, "\n");
   fprintf(stderr,
-          "tdi: [%s][%d], "
+          "tdi: init[%s,%d], "
           "----------------------------------------------------------------"
           "\n",
           gprocname, gpid);
-  fprintf(stderr, "tdi: [%s][%d], adjust the trace buffer size:\n", gprocname,
+  fprintf(stderr, "tdi: init[%s,%d], adjust the trace buffer size:\n",
+          gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s,%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
           gpid);
-  fprintf(stderr, "tdi: [%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
-          gpid);
-  fprintf(stderr, "tdi: [%s][%d], adjust the /tmp size:\n", gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s,%d], adjust the /tmp size:\n", gprocname, gpid);
   fprintf(stderr,
-          "tdi: [%s][%d],     \"mount -o "
+          "tdi: init[%s,%d],     \"mount -o "
           "remount,noexec,nosuid,nr_blocks=15000 /tmp\"\n",
           gprocname, gpid);
   fprintf(stderr,
-          "tdi: [%s][%d], "
+          "tdi: init[%s,%d], "
           "----------------------------------------------------------------"
           "\n",
           gprocname, gpid);
@@ -1018,13 +1013,15 @@ static void *monitor_thread(void *param) {
   usleep(1 * 1000 * 1000);
   dump_proc_self_maps();
 
-  fprintf(stderr, "tdi: [%s][%d], monitoring...\n", gprocname, gpid);
+  fprintf(stderr, "tdi: monitoring...[%s][%d]\n", gprocname, gpid);
   while (1) {
     seconds_counter++;
 
-    if (do_dump_proc_self_maps) {
-      dump_proc_self_maps();
-      do_dump_proc_self_maps = 0;
+    if (do_maps) {
+      if (do_dump_proc_self_maps) {
+        dump_proc_self_maps();
+        do_dump_proc_self_maps = 0;
+      }
     }
 
     if (do_heap) {
@@ -1131,20 +1128,20 @@ static void *monitor_thread(void *param) {
         //"frames"   // 0x00000008
 
         if (gtouch & 0x1) {
-          fprintf(stderr, "tdi: [%s][%d], rewinding...\n", gprocname, gpid);
+          fprintf(stderr, "tdi: rewinding...[%s,%d]\n", gprocname, gpid);
           tditrace_rewind();
           do_dump_proc_self_maps = 1;
         }
 
         if (gtouch & 0x2) {
-          fprintf(stderr, "tdi: [%s][%d], dump shaders...\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump shaders...[%s,%d]\n", gprocname, gpid);
           if (shadercapture_writeshaders != NULL) {
             shadercapture_writeshaders();
           }
         }
 
         if (gtouch & 0x4) {
-          fprintf(stderr, "tdi: [%s][%d], dump textures...\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump textures...[%s,%d]\n", gprocname, gpid);
 
           if (texturecapture_writepngtextures != NULL) {
             texturecapture_writepngtextures();
@@ -1155,7 +1152,7 @@ static void *monitor_thread(void *param) {
         }
 
         if (gtouch & 0x8) {
-          fprintf(stderr, "tdi: [%s][%d], dump frames...\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump frames[%s,%d]\n", gprocname, gpid);
 
           if (framecapture_writepngframes != NULL) {
             framecapture_writepngframes();
@@ -1180,7 +1177,7 @@ static void *monitor_thread(void *param) {
 
         if (check) {
           offload_over50 = 1;
-          fprintf(stderr, "tdi: [%d][%s], at 50%%...\n", gpid, gprocname);
+          fprintf(stderr, "tdi: at 50%%...[%d,%s]\n", gpid, gprocname);
           // create a new file and fill with 0..50% data
 
           offload_counter++;
@@ -1234,8 +1231,8 @@ static void *monitor_thread(void *param) {
           memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
 
           fprintf(stderr,
-                  "tdi: [%d][%s], copied 0..50%% to "
-                  "offloadfile: \"%s\" \n",
+                  "tdi: copied 0..50%% to "
+                  "offloadfile: \"%s\" [%d,%s]\n",
                   gpid, gprocname, offloadfilename);
         }
 
@@ -1247,7 +1244,7 @@ static void *monitor_thread(void *param) {
 
         if (check) {
           offload_over50 = 0;
-          fprintf(stderr, "tdi: [%d][%s], at 100%%...\n", gpid, gprocname);
+          fprintf(stderr, "tdi: at 100%%...[%d,%s]\n", gpid, gprocname);
           // fill remaining 50..100% data to existing file and close
           // file
 
@@ -1257,8 +1254,8 @@ static void *monitor_thread(void *param) {
           fclose(offload_file);
 
           fprintf(stderr,
-                  "tdi: [%d][%s], copied 50..100%% to "
-                  "offloadfile: \"%s\" \n",
+                  "tdi: copied 50..100%% to "
+                  "offloadfile: \"%s\" [%d,%s]\n",
                   gpid, gprocname, offloadfilename);
         }
       }
@@ -1274,10 +1271,10 @@ static int create_trace_buffer(void) {
   /*
    * [TDIT]
    * [RACE]
-   * [    ]timeofday_offset.tv_usec
-   * [    ]timeofday_offset.tv_sec
-   * [    ]clock_monotonic_offset.tv_nsec
-   * [    ]clock_monotonic_offset.tv_sec
+   * [    ]timeofday_start.tv_usec
+   * [    ]timeofday_start.tv_sec
+   * [    ]clock_monotonic_start.tv_nsec
+   * [    ]clock_monotonic_start.tv_sec
    * ------
    * [    ]marker, lower 2 bytes is total length in dwords, upper 2bytes is nr
    * numbers
@@ -1336,8 +1333,8 @@ static int create_trace_buffer(void) {
     gtrace_buffer[i] = 0;
   }
 
-  fprintf(stderr, "tdi: [%s][%d], allocated \"%s\" (%dMB)\n", gprocname, gpid,
-          gtracebufferfilename, gtracebuffersize / (1024 * 1024));
+  fprintf(stderr, "tdi: init[%s,%d], allocated \"%s\" (%dMB)\n", gprocname,
+          gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
   trace_buffer_byte_ptr = gtrace_buffer;
   trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
@@ -1356,19 +1353,21 @@ static int create_trace_buffer(void) {
   clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
   trace_buffer_dword_ptr += 2;
 
-  _u64 atimeofday_offset = (_u64)*p++ * 1000000000;
-  atimeofday_offset += (_u64)*p++ * 1000;
+  _u64 atimeofday_start = (_u64)*p++ * 1000000000;
+  atimeofday_start += (_u64)*p++ * 1000;
 
-  _u64 amonotonic_offset = (_u64)*p++ * 1000000000;
-  amonotonic_offset += (_u64)*p++;
-
-  fprintf(stderr,
-          "tdi: [%s][%d], timeofday_timestamp:%lld, "
-          "monotonic_timestamp:%lld\n",
-          gprocname, gpid, atimeofday_offset, amonotonic_offset);
+  _u64 amonotonic_start = (_u64)*p++ * 1000000000;
+  amonotonic_start += (_u64)*p++;
 
   /*
-   * rewind ptr is used for offloading set to after timestamp offsets
+  fprintf(stderr,
+          "tdi: [%s][%d], timeofday_start:%lld, "
+          "monotonic_start:%lld\n",
+          gprocname, gpid, atimeofday_start, amonotonic_start);
+  */
+
+  /*
+   * rewind ptr is used for offloading set to after start timestamps
    */
   gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
   *trace_buffer_dword_ptr = 0;
@@ -1388,7 +1387,7 @@ static void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
   int delay = *pdelay;
 
-  fprintf(stderr, "tdi: [%s][%d], delay is %d\n", gprocname, gpid, delay);
+  fprintf(stderr, "tdi: init[%s,%d], delay is %d\n", gprocname, gpid, delay);
 
   if (delay == -1) {
     /*
@@ -1404,7 +1403,7 @@ static void *delayed_init_thread(void *param) {
 
       if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
         fprintf(stderr,
-                "tdi: [%s][%d], delay until timeofday is set, \"%s\", "
+                "tdi: init[%s,%d], delay until timeofday is set, \"%s\", "
                 "timeofday is set\n",
                 gprocname, gpid, time_string);
         break;
@@ -1413,7 +1412,7 @@ static void *delayed_init_thread(void *param) {
       ptm = localtime(&tv.tv_sec);
       strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", ptm);
       fprintf(stderr,
-              "tdi: [%s][%d], delay until timeofday is set, \"%s\", "
+              "tdi: init[%s,%d], delay until timeofday is set, \"%s\", "
               "timeofday "
               "is not set\n",
               gprocname, gpid, time_string);
@@ -1428,7 +1427,7 @@ static void *delayed_init_thread(void *param) {
      */
 
     while (1) {
-      fprintf(stderr, "tdi: [%s][%d], paused...\n", gprocname, gpid);
+      fprintf(stderr, "tdi: init[%s,%d], paused...\n", gprocname, gpid);
       usleep(1 * 1000000);
 
       struct stat st;
@@ -1444,7 +1443,7 @@ static void *delayed_init_thread(void *param) {
       */
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-        fprintf(stderr, "tdi: [%s][%d], started...\n", gprocname, gpid);
+        fprintf(stderr, "tdi: init[%s,%d], started...\n", gprocname, gpid);
 
         stat(gtracebufferfilename, &gtrace_buffer_st);
         break;
@@ -1453,23 +1452,21 @@ static void *delayed_init_thread(void *param) {
 
   } else {
     while (delay > 0) {
-      fprintf(stderr, "tdi: [%s][%d], delay %d second(s)...\n", gprocname, gpid,
-              delay);
+      fprintf(stderr, "tdi: init[%s,%d], delay %d second(s)...\n", gprocname,
+              gpid, delay);
       usleep(1 * 1000 * 000);
 
       delay--;
     }
   }
 
-  fprintf(stderr, "tdi: [%s][%d], delay finished...\n", gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s,%d], delay finished...\n", gprocname, gpid);
 
   if (create_trace_buffer() == -1) {
     pthread_exit(NULL);
   }
 
-  pthread_t monitor_thread_id;
-  pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
-
+  start_monitor_thread();
   pthread_exit(NULL);
 }
 
@@ -1494,6 +1491,15 @@ const char *touches[] = {"rewind",    // 0x00000001
                          "textures",  // 0x00000004
                          "frames"};   // 0x00000008
 
+void start_monitor_thread(void) {
+  static pthread_t monitor_thread_id;
+
+  if (do_vmsize | do_rss | do_heap | do_maxrss | do_majflt | do_minflt |
+      do_maps | gtouch) {
+    pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
+  }
+}
+
 int tditrace_init(void) {
   struct timeval mytime;
   int i;
@@ -1506,23 +1512,24 @@ int tditrace_init(void) {
   get_process_name_by_pid(gpid, gprocname);
 
   if (strcmp(gprocname, "mkdir") == 0) {
-    fprintf(stderr, "tdi: [%s][%d], procname is \"mkdir\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s,%d], procname is \"mkdir\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strncmp(gprocname, "sh", 2) == 0) {
-    fprintf(stderr, "tdi: [%s][%d], procname is \"sh*\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s,%d], procname is \"sh*\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "strace") == 0) {
-    fprintf(stderr, "tdi: [%s][%d], procname is \"strace\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s,%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "gdbserver") == 0) {
-    fprintf(stderr, "tdi: [%s][%d], procname is \"gdbserver\" ; not tracing\n",
+    fprintf(stderr,
+            "tdi: init[%s,%d], procname is \"gdbserver\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else {
-    // fprintf(stderr, "tdi: [%s][%d]\n", gprocname, gpid);
+    // fprintf(stderr, "tdi: init[%s,%d]\n", gprocname, gpid);
   }
 
   char *env;
@@ -1542,15 +1549,19 @@ int tditrace_init(void) {
     }
     if (gmask == 0x0) gmask = strtoul(env, 0, 16);
   }
-  fprintf(stderr, "tdi: [%s][%d], MASK = 0x%08x (", gprocname, gpid, gmask);
-  int d = 0;
-  for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
-    if (gmask & (1 << i)) {
-      fprintf(stderr, "%s%s", d ? "+" : "", instruments[i]);
-      d = 1;
+
+  if (gmask) {
+    fprintf(stderr, "tdi: init[%s,%d], MASK = 0x%08x (", gprocname, gpid,
+            gmask);
+    int d = 0;
+    for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
+      if (gmask & (1 << i)) {
+        fprintf(stderr, "%s%s", d ? "+" : "", instruments[i]);
+        d = 1;
+      }
     }
+    fprintf(stderr, ")\n");
   }
-  fprintf(stderr, ")\n");
 
   gtouch = 0x0;
   if (env = getenv("TOUCH")) {
@@ -1559,15 +1570,18 @@ int tditrace_init(void) {
     }
     if (gtouch == 0x0) gtouch = strtoul(env, 0, 16);
   }
-  fprintf(stderr, "tdi: [%s][%d], TOUCH = 0x%08x (", gprocname, gpid, gtouch);
-  d = 0;
-  for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
-    if (gtouch & (1 << i)) {
-      fprintf(stderr, "%s%s", d ? "+" : "", touches[i]);
-      d = 1;
+  if (gtouch) {
+    fprintf(stderr, "tdi: init[%s,%d], TOUCH = 0x%08x (", gprocname, gpid,
+            gtouch);
+    int d = 0;
+    for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
+      if (gtouch & (1 << i)) {
+        fprintf(stderr, "%s%s", d ? "+" : "", touches[i]);
+        d = 1;
+      }
     }
+    fprintf(stderr, ")\n");
   }
-  fprintf(stderr, ")\n");
 
   do_persecond = 1;
 
@@ -1613,6 +1627,11 @@ int tditrace_init(void) {
     do_wrap = (atoi(env) >= 1);
   }
 
+  do_maps = 0;
+  if (env = getenv("MAPS")) {
+    do_maps = (atoi(env) >= 1);
+  }
+
   report_tid = 0;
   if (env = getenv("TID")) {
     report_tid = (atoi(env) >= 1);
@@ -1651,10 +1670,10 @@ int tditrace_init(void) {
 
           if (stat(procpid, &sts) == -1) {
             unlink(fullname);
-            fprintf(stderr, "tdi: [%s][%d], removed \"%s\"\n", gprocname, gpid,
-                    fullname);
+            fprintf(stderr, "tdi: init[%s,%d], removed \"%s\"\n", gprocname,
+                    gpid, fullname);
           } else {
-            fprintf(stderr, "tdi: [%s][%d], not removed \"%s\"\n", gprocname,
+            fprintf(stderr, "tdi: init[%s,%d], not removed \"%s\"\n", gprocname,
                     gpid, fullname);
           }
         }
@@ -1671,9 +1690,7 @@ int tditrace_init(void) {
       return -1;
     }
 
-    pthread_t monitor_thread_id;
-    pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
-
+    start_monitor_thread();
     return 0;
   }
 
@@ -1761,16 +1778,20 @@ void check_trace_buffer(int b) {
     tracebuffers[b].dword_ptr += 2;
     unsigned int *p = tracebuffers[b].dword_ptr;
 
-    tracebuffers[b].timeofday_offset = (_u64)*p++ * (_u64)1000000000;
-    tracebuffers[b].timeofday_offset += (_u64)*p++ * (_u64)1000;
+    tracebuffers[b].timeofday_start = (_u64)*p++ * (_u64)1000000000;
+    tracebuffers[b].timeofday_start += (_u64)*p++ * (_u64)1000;
 
-    tracebuffers[b].monotonic_offset = (_u64)*p++ * (_u64)1000000000;
-    tracebuffers[b].monotonic_offset += (_u64)*p++;
-    // fprintf(stderr,
-    //        "timeofday_offset:%lld, "
-    //        "monotonic_offset:%lld\n",
-    //        tracebuffers[buffers].timeofday_offset,
-    //        tracebuffers[buffers].monotonic_offset);
+    tracebuffers[b].monotonic_start = (_u64)*p++ * (_u64)1000000000;
+    tracebuffers[b].monotonic_start += (_u64)*p++;
+
+    /*
+    fprintf(stderr,
+            "\"%s\" "
+            "timeofday_start:%lld, "
+            "monotonic_start:%lld\n",
+            tracebuffers[b].filename, tracebuffers[b].timeofday_start,
+            tracebuffers[b].monotonic_start);
+    */
     tracebuffers[b].dword_ptr += 4;
 
     fclose(file);
@@ -1815,22 +1836,23 @@ void tditrace_exit(int argc, char *argv[]) {
     return;
   }
 
-  _u64 abs_timeofday = 0;
   _u64 last_timestamp = 0;
 
   for (i = 0; i < buffers; i++) {
     parse(i);
-
-    if (abs_timeofday == 0) {
-      abs_timeofday = tracebuffers[i].timeofday_offset;
-    } else if (tracebuffers[i].timeofday_offset < abs_timeofday) {
-      abs_timeofday = tracebuffers[i].timeofday_offset;
+    if (tracebuffers[i].valid) {
+      tracebuffers[i].monotonic_first = tracebuffers[i].monotonic_timestamp;
     }
   }
 
   fprintf(stdout, "TIME %d\n", 1000000000);
   fprintf(stdout, "SPEED %d\n", 1000000000);
+  fprintf(stdout, "MEMSPEED %d\n", 1000000000);
 
+  /*
+   * play out all entries from all buffers in order of monotonic timestamp
+   *
+   */
   nr_entries = 0;
   while (1) {
     int pctused;
@@ -1843,28 +1865,29 @@ void tditrace_exit(int argc, char *argv[]) {
       }
     }
 
+    /*
+     * if no more valid entries in all buffers
+     * then be done
+     */
     if (d == -1) {
       break;
     }
 
+    /*
+     * select the entry with the lowest monotonic timestamp
+     */
     for (i = 0; i < buffers; i++) {
       if (tracebuffers[i].valid) {
-        if ((tracebuffers[i].timeofday_offset - abs_timeofday +
-             tracebuffers[i].monotonic_timestamp -
-             tracebuffers[i].monotonic_offset) <
-            (tracebuffers[d].timeofday_offset - abs_timeofday +
-             tracebuffers[d].monotonic_timestamp -
-             tracebuffers[d].monotonic_offset)) {
+        if (tracebuffers[i].monotonic_timestamp <
+            tracebuffers[d].monotonic_timestamp) {
           d = i;
         }
       }
     }
 
     addentry(stdout, tracebuffers[d].text, tracebuffers[d].text_len,
-             tracebuffers[d].timeofday_offset - abs_timeofday +
-                 tracebuffers[d].monotonic_timestamp -
-                 tracebuffers[d].monotonic_offset,
-             tracebuffers[d].procname, tracebuffers[d].pid, tracebuffers[d].tid,
+             tracebuffers[d].monotonic_timestamp, tracebuffers[d].procname,
+             tracebuffers[d].pid, tracebuffers[d].tid,
              tracebuffers[d].nr_numbers, tracebuffers[d].numbers,
              tracebuffers[d].identifier);
 
@@ -1875,10 +1898,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     nr_entries++;
 
-    last_timestamp = tracebuffers[d].timeofday_offset - abs_timeofday +
-                     tracebuffers[d].monotonic_timestamp -
-                     tracebuffers[d].monotonic_offset;
-
+    last_timestamp = tracebuffers[d].monotonic_timestamp;
     parse(d);
 
     if (!tracebuffers[d].valid) {
@@ -1893,11 +1913,14 @@ void tditrace_exit(int argc, char *argv[]) {
 
   struct timespec atime;
 
-  atime.tv_sec = abs_timeofday / 1000000000;
-  atime.tv_nsec = abs_timeofday - atime.tv_sec * 1000000000;
-
-  fprintf(stdout, "END %lld UTC %s", abs_timeofday,
-          asctime(gmtime((const time_t *)&atime)));
+  for (i = 0; i < buffers; i++) {
+    atime.tv_sec = tracebuffers[i].timeofday_start / 1000000000;
+    atime.tv_nsec = tracebuffers[i].timeofday_start - atime.tv_sec * 1000000000;
+    fprintf(stdout, "END %d %lld %lld %lld %s", i,
+            tracebuffers[i].timeofday_start, tracebuffers[i].monotonic_start,
+            tracebuffers[i].monotonic_first,
+            asctime(gmtime((const time_t *)&atime)));
+  }
 }
 
 static void tditrace_internal(va_list args, const char *format);
@@ -1927,10 +1950,10 @@ void tditrace_ex(int mask, const char *format, ...) {
 /*
  * [TDIT]
  * [RACE]
- * [    ]timeofday_offset.tv_usec
- * [    ]timeofday_offset.tv_sec
- * [    ]clock_monotonic_offset.tv_nsec
- * [    ]clock_monotonic_offset.tv_sec
+ * [    ]timeofday_start.tv_usec
+ * [    ]timeofday_start.tv_sec
+ * [    ]clock_monotonic_start.tv_nsec
+ * [    ]clock_monotonic_start.tv_sec
  * ------
  * [    ]marker, lower 2 bytes is total length in dwords, upper byte is
  * identifier,
@@ -2112,7 +2135,7 @@ void tditrace_internal(va_list args, const char *format) {
       (gtracebuffersize - 1024)) {
     if (do_offload || do_wrap) {
       // clear unused and rewind to rewind ptr
-      fprintf(stderr, "tdi: [%d][%s], rewind\n", gpid, gprocname);
+      fprintf(stderr, "tdi: rewind[%d,%s]\n", gpid, gprocname);
       int i;
       for (i = (char *)trace_buffer_dword_ptr - gtrace_buffer;
            i < gtracebuffersize; i++) {
@@ -2121,7 +2144,7 @@ void tditrace_internal(va_list args, const char *format) {
       trace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
       if (!do_offload) do_dump_proc_self_maps = 1;
     } else {
-      fprintf(stderr, "tdi: [%s][%d], full\n", gprocname, gpid);
+      fprintf(stderr, "tdi: full[%s,%d]\n", gprocname, gpid);
       tditrace_inited = 0;
     }
   }

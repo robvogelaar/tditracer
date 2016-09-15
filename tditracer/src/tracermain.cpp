@@ -287,6 +287,8 @@ static void init(void) {
     shaderrecording = atoi(getenv("SR"));
   }
 
+  fprintf(stderr, "tditracer: init[%d]\n", getpid());
+
   gosd = 0x0;
   int i;
   if (env = getenv("OSD")) {
@@ -295,16 +297,19 @@ static void init(void) {
     }
     if (gosd == 0x0) gosd = strtoul(env, 0, 16);
   }
-  fprintf(stderr, "tditracer: [%d], OSD = 0x%08x (", getpid(), gosd);
-  int d = 0;
-  for (i = 0; i < sizeof(osds) / sizeof(char *); i++) {
-    if (gosd & (1 << i)) {
-      fprintf(stderr, "%s%s", d ? "+" : "", osds[i]);
-      d = 1;
+  if (gosd) {
+    fprintf(stderr, "tditracer: [%d], OSD = 0x%08x (", getpid(), gosd);
+    int d = 0;
+    for (i = 0; i < sizeof(osds) / sizeof(char *); i++) {
+      if (gosd & (1 << i)) {
+        fprintf(stderr, "%s%s", d ? "+" : "", osds[i]);
+        d = 1;
+      }
     }
+    fprintf(stderr, ")\n");
   }
-  fprintf(stderr, ")\n");
 
+  /*
   fprintf(stderr,
           "tditracer: [%d], libc:%s, pthread:%s, shaders:%s, "
           "textures:%s, "
@@ -313,6 +318,6 @@ static void init(void) {
           pthreadrecording ? "yes" : "no", shaderrecording ? "yes" : "no",
           texturerecording ? "yes" : "no", renderbufferrecording ? "yes" : "no",
           framerecording);
-
+  */
   inited = true;
 }

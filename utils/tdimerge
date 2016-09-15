@@ -127,14 +127,26 @@ def build(tdifilename):
    global first_tstamp
    global ref_offset
 
-   sys.stderr.write('%s\n' % tdifilename)
-
    f = open(tdifilename)
 
    for line in f:
       if line.startswith('END'):
-         offset = int(line.split()[1])
 
+         #
+         # Obtained from tdidump
+         # END 0 1301636265522843000 20281195856967 20281196250458 Fri Apr  1 05:37:45 2011
+         #
+         # Obtained from log2tdi - time stamp with a date
+         # END 0 1301636265522843000 20281090149000 20281090149000 Fri Apr  1 05:37:45 2011
+         #
+         # Obtained from log2tdi - time stamp without a date
+         # END 0 0 20281090149000 20281090149000 1970-01-01 00:00:00
+         #
+
+         offset = int(line.split()[4])
+         #sys.stderr.write('%s, offset is %d\n' % (tdifilename, offset))
+
+         '''
          if ref_offset == 0:
             ref_offset = offset
          else:
@@ -151,12 +163,30 @@ def build(tdifilename):
             else:
                sys.stderr.write('abs is %d, hours is %d, flattening...\n' % (abs(ref_offset - offset), hours))
                offset = ref_offset
+         '''
+
+         '''
+         if ref_offset == 0:
+            ref_offset = offset
+            sys.stderr.write('\'%s\' first file, it\'s offset is %d, applying offset %d\n' % (tdifilename, offset, offset))
+
+         else:
+            if offset < ref_offset:
+               old_offset = offset
+               offset-= ref_offset - old_offset
+               sys.stderr.write('\'%s\' next file, it\'s offset is %d ( < first offset ), applying offset %d\n' % (tdifilename, old_offset, offset))
+            else:
+               old_offset = offset
+               offset-= old_offset - ref_offset
+               sys.stderr.write('\'%s\' next file, it\'s offset is %d ( >= first offset ), applying offset %d\n' % (tdifilename, old_offset, offset))
+         '''
+         offset = 0
+
 
    f.seek(0)
    qvals = []
    qnams = []
    qtstamps = []
-
 
    localnams = []
 
@@ -168,8 +198,8 @@ def build(tdifilename):
          occwords = line.split()
          tstamp = int(occwords[3])
 
-         if first_tstamp == 0:
-            first_tstamp = tstamp
+         #if first_tstamp == 0:
+         #   first_tstamp = tstamp
 
          dscwords = f.next().split()
 
@@ -188,8 +218,8 @@ def build(tdifilename):
          stawords = line.split()
          tstamp = int(stawords[3])
 
-         if first_tstamp == 0:
-            first_tstamp = tstamp
+         #if first_tstamp == 0:
+         #   first_tstamp = tstamp
 
          if int(stawords[1]) == TASKS or int(stawords[1]) == ISRS or int(stawords[1]) == AGENTS:
 
@@ -224,8 +254,8 @@ def build(tdifilename):
          stowords = line.split()
          tstamp = int(stowords[3])
 
-         if first_tstamp == 0:
-            first_tstamp = tstamp
+         #if first_tstamp == 0:
+         #   first_tstamp = tstamp
 
          if int(stowords[1]) == TASKS or int(stowords[1]) == ISRS or int(stowords[1]) == AGENTS: # @T+ STO DSC
 
@@ -278,7 +308,6 @@ def build(tdifilename):
       #print evts[-1]
       #'307521273736370 3 STO [qtbrowser][26409][0]mi.fordblks 11568']
 
-
    f.close()
 
 def sortby(x):
@@ -322,14 +351,15 @@ def main():
 
       print('TIME 1000000000')
       print('SPEED 1000000000')
+      print('SPEED 1000000000')
 
       first_tstamp = 0
 
       for evt in evts:
          evtwords = evt.split()
 
-         if offset_nsec == 0:
-            offset_nsec = int(evtwords[0])
+         #if offset_nsec == 0:
+         #   offset_nsec = int(evtwords[0])
 
          if int(evtwords[1]) == NOTES:
             addnote(evtwords)
@@ -352,7 +382,7 @@ def main():
          elif int(evtwords[1]) == QUEUES:
             addqueue(evtwords)
 
-      print 'END %d UTC' % (offset_nsec), datetime.utcfromtimestamp(offset_nsec / 1000000000).strftime('%Y-%m-%d %H:%M:%S')
+      print('END %d %d %d %s' % (offset_nsec, 0, 0, datetime.utcfromtimestamp(offset_nsec / 1000000000).strftime('%Y-%m-%d %H:%M:%S')))
 
    else:
       print("Usage: %s <-f> tdifile1 tdifile2..." % sys.argv[0])

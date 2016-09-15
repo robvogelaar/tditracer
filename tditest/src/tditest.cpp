@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <linux/futex.h>
 #include <malloc.h>
@@ -75,6 +76,7 @@ void run_1(void) {
   struct timeval mytimeval;
   struct timespec mytimespec;
   int i;
+  unsigned int num;
 
   if (tditrace != NULL) tditrace("@T+CLOCK_REALTIMEx1000000");
   for (i = 0; i < 1000000; i++) {
@@ -82,11 +84,31 @@ void run_1(void) {
   }
   if (tditrace != NULL) tditrace("@T-CLOCK_REALTIMEx1000000");
 
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
+  usleep(1 * 1000 * 1000);
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
   if (tditrace != NULL) tditrace("@T+CLOCK_MONOTONICx1000000");
   for (i = 0; i < 1000000; i++) {
     clock_gettime(CLOCK_MONOTONIC, &mytimespec);
   }
   if (tditrace != NULL) tditrace("@T-CLOCK_MONOTONICx1000000");
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
+  usleep(2 * 1000 * 1000);
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
 
   if (tditrace != NULL) tditrace("@T+CLOCK_PROCESS_CPUTIME_IDx1000000");
   for (i = 0; i < 1000000; i++) {
@@ -94,11 +116,31 @@ void run_1(void) {
   }
   if (tditrace != NULL) tditrace("@T-CLOCK_PROCESS_CPUTIME_IDx1000000");
 
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
+  usleep(3 * 1000 * 1000);
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
   if (tditrace != NULL) tditrace("@T+CLOCK_THREAD_CPUTIME_IDx1000000");
   for (i = 0; i < 1000000; i++) {
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &mytimespec);
   }
   if (tditrace != NULL) tditrace("@T-CLOCK_THREAD_CPUTIME_IDx1000000");
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
+
+  usleep(4 * 1000 * 1000);
+
+  if (tditrace != NULL) tditrace("@T+syscall(SYS_gettid)x1000000");
+  num = (int)syscall(SYS_gettid);
+  if (tditrace != NULL) tditrace("@T-syscall(SYS_gettid)x1000000");
 
   if (tditrace != NULL) tditrace("@T+GETTIMEOFDAYx1000000");
   for (i = 0; i < 1000000; i++) {
@@ -448,8 +490,7 @@ void *worker(void *arg) {
   int i = 0;
   int t = syscall(SYS_gettid);
   while (1) {
-    if (tditrace)
-      tditrace("%d %d", t, i++);
+    if (tditrace) tditrace("%d %d", t, i++);
   }
   return NULL;
 }
@@ -467,6 +508,40 @@ void run_10(void) {
   for (int i = 0; i < nthreads; i++) pthread_join(threads[i], NULL);
 }
 
+void ftrace_write(int ftrace_fd, const char *fmt, ...) {
+  va_list ap;
+  char buf[256];
+  int n;
+
+  if (ftrace_fd < 0) return;
+
+  va_start(ap, fmt);
+  n = vsnprintf(buf, 256, fmt, ap);
+  va_end(ap);
+
+  write(ftrace_fd, buf, n);
+}
+
+void run_11(void) {
+  int ftrace_fd = open("/debug/tracing/trace_marker", O_WRONLY);
+
+  if (ftrace_fd < 0) {
+    fprintf(stderr, "could not open \"/debug/tracing/trace_marker\"");
+    goto exit;
+  }
+
+  int i;
+  for (i = 1; i < 10; i++) {
+    if (tditrace) tditrace("@A+TEST_%d", i);
+    ftrace_write(ftrace_fd, "%s%d", "TEST", i);
+    if (tditrace) tditrace("@A-TEST_%d", i);
+
+    usleep(1 * 1000 * 1000);
+  }
+
+exit:;
+}
+
 #if 1
 int main(int argc, char **argv) {
   run_1();
@@ -476,6 +551,8 @@ int main(int argc, char **argv) {
   // run_5();
   // run_6();
   // run_10();
+
+  // run_11();
 }
 
 #endif
