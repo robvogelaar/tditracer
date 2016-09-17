@@ -1,0 +1,223 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import time
+from datetime import datetime
+import os
+import fnmatch
+
+TASKS = 0
+ISRS = 1
+SEMAS = 2
+QUEUES = 3
+EVENTS = 4
+NOTES = 7
+AGENTS = 8
+
+tasksnames = []
+isrsnames = []
+semasnames = []
+queuesnames = []
+eventsnames = []
+notesnames = []
+agentsnames = []
+
+
+def addtask(enter, nam, stamp, dsc):
+   global tasksnames
+   if nam not in tasksnames:
+      tasksnames.append(nam)
+      print('NAM ' + str(TASKS) + ' %d %s' %((TASKS * 1000 + tasksnames.index(nam)) , nam))
+   if enter:
+      print('STA' + ' ' + str(TASKS) + ' %d %d' %((TASKS * 1000 + tasksnames.index(nam)), stamp))
+   else:
+      print('STO' + ' ' + str(TASKS) + ' %d %d' %((TASKS * 1000 + tasksnames.index(nam)), stamp))
+   print('DSC 0 0 %s' % dsc)
+
+def addisr(enter, nam, stamp, dsc):
+   global isrsnames
+   if nam not in isrsnames:
+      isrsnames.append(nam)
+      print('NAM ' + str(ISRS) + ' %d %s' %((ISRS * 1000 + isrsnames.index(nam)) , nam))
+   if enter:
+      print('STA' + ' ' + str(ISRS) + ' %d %d' %((ISRS * 1000 + isrsnames.index(nam)), stamp))
+   else:
+      print('STO' + ' ' + str(ISRS) + ' %d %d' %((ISRS * 1000 + isrsnames.index(nam)), stamp))
+   print('DSC 0 0 %s' % dsc)
+
+def addsema(evtwords):
+   global semasnames
+   global offset_nsec
+
+   if evtwords[3] not in semasnames:
+      semasnames.append(evtwords[3])
+      print('NAM ' + str(SEMAS) + ' %d %s' %((SEMAS * 1000 + semasnames.index(evtwords[3])) , evtwords[3]))
+
+   print('OCC ' + str(SEMAS) + ' %d %d' %((SEMAS * 1000 + semasnames.index(evtwords[3])), int(evtwords[0])))
+   print('DSC 0 0 %s' % evtwords[4])
+
+def addqueue(evtwords):
+   global queuesnames
+
+   if evtwords[3] not in queuesnames:
+      queuesnames.append(evtwords[3])
+      print('NAM ' + str(QUEUES) + ' %d %s' %((QUEUES * 1000 + queuesnames.index(evtwords[3])) , evtwords[3]))
+
+   print(evtwords[2] + ' ' + str(QUEUES) + ' %d %d %s' %((QUEUES * 1000 + queuesnames.index(evtwords[3])), int(evtwords[0]), evtwords[4]))
+
+def addevent(nam, stamp, dsc):
+   global eventsnames
+   if nam not in eventsnames:
+      eventsnames.append(nam)
+      print('NAM ' + str(EVENTS) + ' %d %s' %((EVENTS * 1000 + eventsnames.index(nam)) , nam))
+   print('OCC ' + str(EVENTS) + ' %d %d' %((EVENTS * 1000 + eventsnames.index(nam)), stamp))
+   print('DSC 0 0 %s' % dsc)
+
+def addnote(nam, stamp, dsc):
+   global notesnames
+   if nam not in notesnames:
+      notesnames.append(nam)
+      print('NAM ' + str(NOTES) + ' %d %s' %((NOTES * 1000 + notesnames.index(nam)), nam))
+   print('OCC ' + str(NOTES) + ' %d %d' %((NOTES * 1000 + notesnames.index(nam)), stamp))
+   print('DSC 0 0 %s' % dsc)
+
+def addagent(enter, nam, stamp, dsc):
+   global agentsnames
+   if nam not in agentsnames:
+      agentsnames.append(nam)
+      print('NAM ' + str(AGENTS) + ' %d %s' %((AGENTS * 1000 + agentsnames.index(nam)) , nam))
+   if enter:
+      print('STA' + ' ' + str(AGENTS) + ' %d %d' %((AGENTS * 1000 + agentsnames.index(nam)), stamp))
+   else:
+      print('STO' + ' ' + str(AGENTS) + ' %d %d' %((AGENTS * 1000 + agentsnames.index(nam)), stamp))
+   print('DSC 0 0 %s' % dsc)
+
+
+def main():
+
+   if len(sys.argv) == 2:
+
+      print('TIME 1000000000')
+      print('SPEED 1000000000')
+      print('MEMSPEED 1000000000')
+
+      f = open(sys.argv[1])
+
+      for line in f:
+
+
+         ##           TASK-PID    CPU#    TIMESTAMP  FUNCTION
+         ##              | |       |          |         |
+         #
+         #       gles2app3-1330  [001] 25144.528200: sys_ioctl(fd: 9, cmd: 401c6440, arg: 739331e4)
+         #
+         #          <idle>-0     [001] 25184.906682: softirq_entry: vec=7 [action=SCHED]
+         #          <idle>-0     [001] 25184.906685: softirq_exit: vec=7 [action=SCHED]
+         #
+         #          <idle>-0     [000] 25184.912186: irq_handler_entry: irq=24 name=pvrsrvkm
+         #          <idle>-0     [000] 25184.912190: irq_handler_exit: irq=24 ret=handled
+         #
+
+         match = re.match(r"\s+(.*-\d+)\s+(\[\d+\])\s+(\d+.\d+):\s+(.*)$", line)
+         if match:
+
+            task_pid = match.group(1)
+            cpu = match.group(2)
+            timestamp = match.group(3)
+            function = match.group(4)
+
+            #sys.stderr.write('task-pid:%s,cpu:%s,timestamp:%s,function:%s\n' % (task_pid, cpu, timestamp, function))
+
+            if function.startswith('sys_ioctl'):
+               #       gles2app3-1330  [001] 25144.528200: sys_ioctl(fd: 9, cmd: 401c6440, arg: 739331e4)
+               nam = cpu + ':' + task_pid + ':' + function.split('(')[0]
+               dsc = cpu + ':' + task_pid + ':' + function.replace(' ', '_')
+
+               addevent(nam, int(float(timestamp) * 1000000000.0), dsc)
+
+            elif function.startswith('softirq'):
+               #          <idle>-0     [001] 25184.906682: softirq_entry: vec=7 [action=SCHED]
+               #          <idle>-0     [001] 25184.906685: softirq_exit: vec=7 [action=SCHED]
+               nam = 'softirq_' + function.split(': ')[1].replace(' ', '_')
+               dsc = (task_pid + function + cpu).replace(' ', '_') + '@' + timestamp
+               enter = function.startswith('softirq_entry')
+               addisr(enter, nam, int(float(timestamp) * 1000000000.0), dsc)
+
+            elif function.startswith('irq_handler'):
+               #          <idle>-0     [000] 25184.912186: irq_handler_entry: irq=24 name=pvrsrvkm
+               #          <idle>-0     [000] 25184.912190: irq_handler_exit: irq=24 ret=handled
+               nam = 'irq_handler_' + function.split(': ')[1].split()[0]
+               dsc = (task_pid + function + cpu).replace(' ', '_')
+               enter = function.startswith('irq_handler_entry')
+               addisr(enter, nam, int(float(timestamp) * 1000000000.0), dsc)
+
+            #elif function.startswith('sched_wakeup'):
+
+               #       Clock_ISR-1640  [001]   242.830814: sched_wakeup: comm=Demux_IO pid=1730 prio=7 success=1 target_cpu=001
+               #       Clock_ISR-1640  [001]   242.830820: sched_switch: prev_comm=Clock_ISR prev_pid=1640 prev_prio=0 prev_state=S ==> next_comm=Demux_IO next_pid=1730 next_prio=7
+               #        Demux_IO-1730  [001]   242.830830: sched_switch: prev_comm=Demux_IO prev_pid=1730 prev_prio=7 prev_state=S ==> next_comm=swapper next_pid=0 next_prio=120
+               #          <idle>-0     [000]   242.832801: sched_wakeup: comm=Clock_ISR pid=1640 prio=0 success=1 target_cpu=001
+               #          <idle>-0     [001]   242.832805: sched_switch: prev_comm=swapper prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=Clock_ISR next_pid=1640 next_prio=0
+               #       Clock_ISR-1640  [001]   242.832815: sched_wakeup: comm=Demux_IO pid=1730 prio=7 success=1 target_cpu=001
+               #       Clock_ISR-1640  [001]   242.832821: sched_switch: prev_comm=Clock_ISR prev_pid=1640 prev_prio=0 prev_state=S ==> next_comm=Demux_IO next_pid=1730 next_prio=7
+               #        Demux_IO-1730  [001]   242.832831: sched_switch: prev_comm=Demux_IO prev_pid=1730 prev_prio=7 prev_state=S ==> next_comm=swapper next_pid=0 next_prio=120
+               #          <idle>-0     [000]   242.834801: sched_wakeup: comm=Clock_ISR pid=1640 prio=0 success=1 target_cpu=001
+               #          <idle>-0     [001]   242.834804: sched_switch: prev_comm=swapper prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=Clock_ISR next_pid=1640 next_prio=0
+
+            elif function.startswith('sched_switch'):
+
+               prev_comm = function.split('prev_comm=')[1].split()[0]
+               prev_pid = function.split('prev_pid=')[1].split()[0]
+               nam = cpu + ':' + prev_comm + '_' + prev_pid
+               dsc = cpu + ':' + function.replace(' ', '_')
+               addtask(False, nam, int(float(timestamp) * 1000000000.0), dsc)
+
+               next_comm = function.split('next_comm=')[1].split()[0]
+               next_pid = function.split('next_pid=')[1].split()[0]
+               nam = cpu + ':' + next_comm + '_' + next_pid
+               dsc = cpu + ':' + function.replace(' ', '_')
+               addtask(True, nam, int(float(timestamp) * 1000000000.0), dsc)
+
+            elif function.startswith('sys_'):
+
+               #       gles2app3-2476  [001]  6955.032692: sys_clock_gettime(which_clock: 1, tp: 739a1168)
+               #       gles2app3-2476  [001]  6955.032695: sys_clock_gettime -> 0x0
+               #       gles2app3-2476  [001]  6955.032699: sys_ioctl(fd: 9, cmd: 401c6440, arg: 739a11e4)
+               #       gles2app3-2476  [001]  6955.038970: sys_ioctl -> 0x0
+
+               if ' -> ' in function:
+                  nam = cpu + ':' + task_pid + ':' + function.split(' -> ')[0]
+                  dsc = cpu + ':' + task_pid + ':' + function.replace(' ', '_')
+                  addagent(False, nam, int(float(timestamp) * 1000000000.0), dsc)
+               else:
+                  nam = cpu + ':' + task_pid + ':' + function.split('(')[0]
+                  dsc = cpu + ':' + task_pid + ':' + function.replace(' ', '_')
+                  addagent(True, nam, int(float(timestamp) * 1000000000.0), dsc)
+
+            else:
+               #  gles2app3-465c-1324  [000]  1367.508367: SGXDoKickBW <-BridgedDispatchKM
+               #  gles2app3-465c-1324  [000]  1367.508372: SGXDoKickKM <-SGXDoKickBW
+               #  gles2app3-465c-1324  [000]  1367.508380: SGXScheduleCCBCommandKM <-SGXDoKickKM
+               #  gles2app3-465c-1324  [000]  1367.508384: SGXScheduleCCBCommand <-SGXScheduleCCBCommandKM
+               #  gles2app3-465c-1324  [000]  1367.508414: SGX_ISRHandler <-PVRSRVSystemLISR_ForEachVaCb
+               #  gles2app3-465c-1324  [000]  1367.508420: SGX_MISRHandler <-PVRSRVMISR_ForEachCb
+               nam = function.split(' ')[0]
+               dsc = (task_pid + function + cpu).replace (' ', '_')
+               addnote(nam, int(float(timestamp) * 1000000000.0), dsc)
+
+         else:
+            sys.stderr.write('NO MATCH:\"%s\"\n' % line[:-1])
+
+      # Obtained from log2tdi - time stamp without a date
+      # END 0 0 20281090149000 20281090149000 1970-01-01 00:00:00
+
+      print('END 0 %d %d %d %s' % (0, 0, 0, datetime.utcfromtimestamp(0).strftime('%Y-%m-%d %H:%M:%S')))
+
+      f.close()
+
+   else:
+      print("Usage: %s ftracefile" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

@@ -351,7 +351,7 @@ def main():
 
       print('TIME 1000000000')
       print('SPEED 1000000000')
-      print('SPEED 1000000000')
+      print('MEMSPEED 1000000000')
 
       first_tstamp = 0
 
