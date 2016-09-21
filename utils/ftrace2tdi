@@ -139,16 +139,16 @@ def main():
             elif function.startswith('softirq'):
                #          <idle>-0     [001] 25184.906682: softirq_entry: vec=7 [action=SCHED]
                #          <idle>-0     [001] 25184.906685: softirq_exit: vec=7 [action=SCHED]
-               nam = 'softirq_' + function.split(': ')[1].replace(' ', '_')
-               dsc = (task_pid + function + cpu).replace(' ', '_') + '@' + timestamp
+               nam = cpu + ':' + 'softirq_' + function.split(': ')[1].replace(' ', '_')
+               dsc = (cpu + ':' + task_pid + ':' + function).replace(' ', '_') + '@' + timestamp
                enter = function.startswith('softirq_entry')
                addisr(enter, nam, int(float(timestamp) * 1000000000.0), dsc)
 
             elif function.startswith('irq_handler'):
                #          <idle>-0     [000] 25184.912186: irq_handler_entry: irq=24 name=pvrsrvkm
                #          <idle>-0     [000] 25184.912190: irq_handler_exit: irq=24 ret=handled
-               nam = 'irq_handler_' + function.split(': ')[1].split()[0]
-               dsc = (task_pid + function + cpu).replace(' ', '_')
+               nam = cpu + ':' + 'irq_handler_' + function.split(': ')[1].split()[0]
+               dsc = (cpu + ':' + task_pid + ':' + function).replace(' ', '_') + '@' + timestamp
                enter = function.startswith('irq_handler_entry')
                addisr(enter, nam, int(float(timestamp) * 1000000000.0), dsc)
 

@@ -51,146 +51,157 @@ def addnes (type, logfilename, logline, matches):
 
       #attempt to detect multiple timestamp formats
 
-      #ftrace
-      #   qtbrowser-765   [000] ..s.   493.812000: softirq_entry: vec=1 [action=TIMER]
-      tstamp = re.findall(r"\s+\d+\.\d{6}:", logline)
+      #using timestamp utility
+      #[75461479497255]Generated JIT code for Baseline put_by_
+      tstamp = re.match(r"^\[(\d+)\].*", logline)
       if tstamp:
          no_timeofday = True;
-         #sys.stderr.write('timestamp detected=\"[\\w+\\d+\\.\\d+]\"\n');
-         if tstamp[0]:
-            #sys.stderr.write('logline = %s\n' % (logline))
-            #sys.stderr.write('tstamp[0] = %s\n' % (tstamp[0][:-1]))
-            #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
-            if tstamp[0]:
-               #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
-               stamp = float(tstamp[0][:-1]) * 1000000000
-               #sys.stderr.write('stamp = %f\n' % stamp)
-               sec = stamp / 1000000000
-               nsec = stamp - (sec * 1000000000)
-  
+         #sys.stderr.write('tstamp=[%s]:[%s]' %(tstamp.group(1), logline))
+         stamp = int(tstamp.group(1))
+         sec = stamp / 1000000000
+         nsec = stamp - (sec * 1000000000)
+
       else:
-         #printk
-         #[   91.187046] pfnprepower
-         tstamp = re.findall(r"\[\s?\d+\.\d+\]", logline)
+         #ftrace
+         #   qtbrowser-765   [000] ..s.   493.812000: softirq_entry: vec=1 [action=TIMER]
+         tstamp = re.findall(r"\s+\d+\.\d{6}:", logline)
          if tstamp:
             no_timeofday = True;
             #sys.stderr.write('timestamp detected=\"[\\w+\\d+\\.\\d+]\"\n');
             if tstamp[0]:
                #sys.stderr.write('logline = %s\n' % (logline))
-               #sys.stderr.write('tstamp[0] = %s\n' % (tstamp[0][1:][:-1]))
+               #sys.stderr.write('tstamp[0] = %s\n' % (tstamp[0][:-1]))
                #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
                if tstamp[0]:
                   #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
-                  stamp = float(tstamp[0][1:][:-1]) * 1000000000
+                  stamp = float(tstamp[0][:-1]) * 1000000000
                   #sys.stderr.write('stamp = %f\n' % stamp)
                   sec = stamp / 1000000000
                   nsec = stamp - (sec * 1000000000)
      
          else:
-            tstamp = re.findall("\d{6}-\d{2}:\d{2}:\d{2}\.\d+", logline)
+            #printk
+            #[   91.187046] pfnprepower
+            tstamp = re.findall(r"\[\s?\d+\.\d+\]", logline)
             if tstamp:
-               sys.stderr.write('timestamp detected=\"\\d{6}-\\d{2}:\\d{2}:\\d{2}\\.\\d+\"\n');
+               no_timeofday = True;
+               #sys.stderr.write('timestamp detected=\"[\\w+\\d+\\.\\d+]\"\n');
                if tstamp[0]:
-                  t = datetime.strptime(tstamp[0], '%y%m%d-%H:%M:%S.%f')
-                  sec = int((t - datetime(1970, 1, 1)).total_seconds())
-                  nsec = int(t.microsecond * 1000)
-                  stamp = long(sec * 1000000000 + nsec)
-
-            else:
-               #20150610 22:41:36.082
-               tstamp = re.findall("\d{8} \d{2}:\d{2}:\d{2}\.\d+", logline)
-               if tstamp:
-                  sys.stderr.write('timestamp detected=\"\\d{8} \\d{2}:\\d{2}:\\d{2}\\.\\d+\"');
+                  #sys.stderr.write('logline = %s\n' % (logline))
+                  #sys.stderr.write('tstamp[0] = %s\n' % (tstamp[0][1:][:-1]))
+                  #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
                   if tstamp[0]:
-                     t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
+                     #sys.stderr.write('tstamp[0] = %f\n' % (float(tstamp[0][1:][:-1])))
+                     stamp = float(tstamp[0][1:][:-1]) * 1000000000
+                     #sys.stderr.write('stamp = %f\n' % stamp)
+                     sec = stamp / 1000000000
+                     nsec = stamp - (sec * 1000000000)
+        
+            else:
+               tstamp = re.findall("\d{6}-\d{2}:\d{2}:\d{2}\.\d+", logline)
+               if tstamp:
+                  sys.stderr.write('timestamp detected=\"\\d{6}-\\d{2}:\\d{2}:\\d{2}\\.\\d+\"\n');
+                  if tstamp[0]:
+                     t = datetime.strptime(tstamp[0], '%y%m%d-%H:%M:%S.%f')
                      sec = int((t - datetime(1970, 1, 1)).total_seconds())
                      nsec = int(t.microsecond * 1000)
                      stamp = long(sec * 1000000000 + nsec)
 
                else:
-                  #DAWN 08-20T22:16:45.281Z
-                  tstamp = re.findall("DAWN \d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
+                  #20150610 22:41:36.082
+                  tstamp = re.findall("\d{8} \d{2}:\d{2}:\d{2}\.\d+", logline)
                   if tstamp:
-                     sys.stderr.write('timestamp detected="DAWN \\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+"\n');
+                     sys.stderr.write('timestamp detected=\"\\d{8} \\d{2}:\\d{2}:\\d{2}\\.\\d+\"');
                      if tstamp[0]:
-                        t = datetime.strptime('2016-' + tstamp[0][5:], '%Y-%m-%dT%H:%M:%S.%f')
+                        t = datetime.strptime(tstamp[0], '%Y%m%d %H:%M:%S.%f')
                         sec = int((t - datetime(1970, 1, 1)).total_seconds())
                         nsec = int(t.microsecond * 1000)
                         stamp = long(sec * 1000000000 + nsec)
 
                   else:
-                     #2015-06-10T20:04:27.941
-                     tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
+                     #DAWN 08-20T22:16:45.281Z
+                     tstamp = re.findall("DAWN \d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
                      if tstamp:
-                        sys.stderr.write('timestamp detected=\"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+\"\n');
+                        sys.stderr.write('timestamp detected="DAWN \\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+"\n');
                         if tstamp[0]:
-                           t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+                           t = datetime.strptime('2016-' + tstamp[0][5:], '%Y-%m-%dT%H:%M:%S.%f')
                            sec = int((t - datetime(1970, 1, 1)).total_seconds())
                            nsec = int(t.microsecond * 1000)
                            stamp = long(sec * 1000000000 + nsec)
 
                      else:
-                        # 1434754719      168720
-                        tstamp = re.findall("\d{8,}[ ]+\d+", logline)
+                        #2015-06-10T20:04:27.941
+                        tstamp = re.findall("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", logline)
                         if tstamp:
-                           sys.stderr.write('timestamp detected=\"\\d{8,}[ ]+\\d+\"\n');
+                           sys.stderr.write('timestamp detected=\"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+\"\n');
                            if tstamp[0]:
-                              pat = re.compile("\s*")
-                              fields = pat.split(tstamp[0])
-                              sec = int(fields[0])
-                              nsec = int(fields[1]) * 1000
+                              t = datetime.strptime(tstamp[0], '%Y-%m-%dT%H:%M:%S.%f')
+                              sec = int((t - datetime(1970, 1, 1)).total_seconds())
+                              nsec = int(t.microsecond * 1000)
                               stamp = long(sec * 1000000000 + nsec)
-                              #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
                         else:
-                           # cat /proc/timer_list | grep -E -m 2 '(.offset:.*[0-9]{2,}|.expires_next.*[0-9]{2,})' | grep -E -o [0-9]{3,} | awk 1 ORS=' ' | awk '{ print $1":"$2 }'
-                           # 1469479936731376489:4865988000000
-                           tstamp = re.findall("\d{12,}:\d{1,}", logline)
+                           # 1434754719      168720
+                           tstamp = re.findall("\d{8,}[ ]+\d+", logline)
                            if tstamp:
-                              sys.stderr.write('timestamp detected=\"\\d{9,}:\\d{1,}\"');
+                              sys.stderr.write('timestamp detected=\"\\d{8,}[ ]+\\d+\"\n');
                               if tstamp[0]:
-                                 stamp = long(tstamp[0].split(':')[0]) + long(tstamp[0].split(':')[1])
-                                 sec = stamp / 1000000000
-                                 nsec = stamp - (sec * 1000000000)
+                                 pat = re.compile("\s*")
+                                 fields = pat.split(tstamp[0])
+                                 sec = int(fields[0])
+                                 nsec = int(fields[1]) * 1000
+                                 stamp = long(sec * 1000000000 + nsec)
                                  #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
                            else:
-                              # 10027688000000
-                              tstamp = re.findall("\d{9,}", logline)
+                              # cat /proc/timer_list | grep -E -m 2 '(.offset:.*[0-9]{2,}|.expires_next.*[0-9]{2,})' | grep -E -o [0-9]{3,} | awk 1 ORS=' ' | awk '{ print $1":"$2 }'
+                              # 1469479936731376489:4865988000000
+                              tstamp = re.findall("\d{12,}:\d{1,}", logline)
                               if tstamp:
-                                 sys.stderr.write('timestamp detected=\"\\d{9,}\"\n');
+                                 sys.stderr.write('timestamp detected=\"\\d{9,}:\\d{1,}\"');
                                  if tstamp[0]:
-                                    sec = int(tstamp[0]) / 1000000000
-                                    nsec = int(tstamp[0]) - sec * 1000000000
-                                    stamp = long(sec * 1000000000 + nsec)
-                                    sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
+                                    stamp = long(tstamp[0].split(':')[0]) + long(tstamp[0].split(':')[1])
+                                    sec = stamp / 1000000000
+                                    nsec = stamp - (sec * 1000000000)
+                                    #sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
                               else:
-                                 # strace - 24 hour wraps
-                                 # 00:15:12.023290
-                                 tstamp = re.findall("\d{2}:\d{2}:\d{2}.\d+", logline)
+                                 # 10027688000000
+                                 tstamp = re.findall("\d{9,}", logline)
                                  if tstamp:
-                                    sys.stderr.write('timestamp detected=\"\\d{2}:\\d{2}:\\d{2}.\\d+\"\n');
+                                    sys.stderr.write('timestamp detected=\"\\d{9,}\"\n');
                                     if tstamp[0]:
-
-                                       t = datetime.strptime('2016' + '-' + 
-                                                              str(datetime.now().month) + '-' +
-                                                              str(datetime.now().day) + '-' +
-                                                              tstamp[0], '%Y-%m-%d-%H:%M:%S.%f')
-
-                                       sec = int((t - datetime(1970, 1, 1)).total_seconds())
-                                       nsec = int(t.microsecond * 1000)
-                                       sec += strace_add_day
+                                       sec = int(tstamp[0]) / 1000000000
+                                       nsec = int(tstamp[0]) - sec * 1000000000
                                        stamp = long(sec * 1000000000 + nsec)
+                                       sys.stderr.write('sec %d nsec %d \n' % (sec, nsec))
 
-                                       if prev_strace_stamp:
-                                          if stamp < prev_strace_stamp:
-                                             sys.stderr.write('strace_stamp < strace_prev_stamp\n')
-                                             strace_add_day = 24 * 3600
-                                             sec += strace_add_day
-                                             stamp = long(sec * 1000000000 + nsec)
+                                 else:
+                                    # strace - 24 hour wraps
+                                    # 00:15:12.023290
+                                    tstamp = re.findall("\d{2}:\d{2}:\d{2}.\d+", logline)
+                                    if tstamp:
+                                       sys.stderr.write('timestamp detected=\"\\d{2}:\\d{2}:\\d{2}.\\d+\"\n');
+                                       if tstamp[0]:
 
-                                       prev_strace_stamp = stamp
+                                          t = datetime.strptime('2016' + '-' + 
+                                                                 str(datetime.now().month) + '-' +
+                                                                 str(datetime.now().day) + '-' +
+                                                                 tstamp[0], '%Y-%m-%d-%H:%M:%S.%f')
+
+                                          sec = int((t - datetime(1970, 1, 1)).total_seconds())
+                                          nsec = int(t.microsecond * 1000)
+                                          sec += strace_add_day
+                                          stamp = long(sec * 1000000000 + nsec)
+
+                                          if prev_strace_stamp:
+                                             if stamp < prev_strace_stamp:
+                                                sys.stderr.write('strace_stamp < strace_prev_stamp\n')
+                                                strace_add_day = 24 * 3600
+                                                sec += strace_add_day
+                                                stamp = long(sec * 1000000000 + nsec)
+
+                                          prev_strace_stamp = stamp
 
 
       if (tstamp):
@@ -208,7 +219,6 @@ def addnes (type, logfilename, logline, matches):
 
          names_counts[names.index(name)] += 1
 
-
          #for timestamp without a date keep original timestamp
 
          if no_timeofday:
@@ -216,7 +226,7 @@ def addnes (type, logfilename, logline, matches):
          else:
             print('OCC %d %d %d' %(type, (type * 1000 + names.index(name)), (sec * 1000000000 + nsec) - (offset_sec * 1000000000 + offset_nsec)))
 
-         print('DSC 0 0 %s#%d,%s' % (name, names_counts[names.index(name)], logline.replace(" ", "_").replace("\t", "_")))
+         print('DSC 0 0 %s#%d,%s' % (name.replace(" ", "_"), names_counts[names.index(name)], logline[:200].replace(" ", "_").replace("\t", "_")))
 
       else:
          sys.stderr.write('no timestamp found, skipping logline: \'%s\'\n' % logline)
