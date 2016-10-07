@@ -6,6 +6,10 @@ typedef void* EGLSurface;
 typedef void* EGLContext;
 typedef void* EGLConfig;
 
+typedef void* NativeWindowType;
+typedef void* NativePixmapType;
+
+
 typedef unsigned char GLboolean;
 typedef char GLchar;
 typedef unsigned int GLenum;
@@ -318,6 +322,80 @@ typedef unsigned char GLubyte;
        ? "GL_ARRAY_BUFFER"                                             \
        : target == GL_ELEMENT_ARRAY_BUFFER ? "GL_ELEMENT_ARRAY_BUFFER" \
                                            : "???")
+
+
+
+/*
+** Config attributes
+*/
+
+#define EGL_BUFFER_SIZE          0x3020
+#define EGL_ALPHA_SIZE           0x3021
+#define EGL_BLUE_SIZE          0x3022
+#define EGL_GREEN_SIZE           0x3023
+#define EGL_RED_SIZE           0x3024
+#define EGL_DEPTH_SIZE           0x3025
+#define EGL_STENCIL_SIZE         0x3026
+#define EGL_CONFIG_CAVEAT        0x3027
+#define EGL_CONFIG_ID          0x3028
+#define EGL_LEVEL          0x3029
+#define EGL_MAX_PBUFFER_HEIGHT         0x302A
+#define EGL_MAX_PBUFFER_PIXELS         0x302B
+#define EGL_MAX_PBUFFER_WIDTH        0x302C
+#define EGL_NATIVE_RENDERABLE        0x302D
+#define EGL_NATIVE_VISUAL_ID         0x302E
+#define EGL_NATIVE_VISUAL_TYPE         0x302F
+/*#define EGL_PRESERVED_RESOURCES  0x3030*/
+#define EGL_SAMPLES          0x3031
+#define EGL_SAMPLE_BUFFERS         0x3032
+#define EGL_SURFACE_TYPE         0x3033
+#define EGL_TRANSPARENT_TYPE         0x3034
+#define EGL_TRANSPARENT_BLUE_VALUE     0x3035
+#define EGL_TRANSPARENT_GREEN_VALUE    0x3036
+#define EGL_TRANSPARENT_RED_VALUE      0x3037
+#define EGL_NONE           0x3038 /* Also a config value */
+#define EGL_BIND_TO_TEXTURE_RGB        0x3039
+#define EGL_BIND_TO_TEXTURE_RGBA       0x303A
+#define EGL_MIN_SWAP_INTERVAL        0x303B
+#define EGL_MAX_SWAP_INTERVAL        0x303C
+#define EGL_RENDERABLE_TYPE            0x3040
+
+
+
+#define CONFIGATTRIBUTESSTRING(attribute)  \
+  (attribute == EGL_BUFFER_SIZE        \
+       ? "EGL_BUFFER_SIZE"    \
+       : attribute == EGL_ALPHA_SIZE ? "EGL_ALPHA_SIZE" \
+       : attribute == EGL_BLUE_SIZE ? "EGL_BLUE_SIZE" \
+       : attribute == EGL_GREEN_SIZE ? "EGL_GREEN_SIZE" \
+       : attribute == EGL_RED_SIZE ? "EGL_RED_SIZE" \
+       : attribute == EGL_DEPTH_SIZE ? "EGL_DEPTH_SIZE" \
+       : attribute == EGL_STENCIL_SIZE ? "EGL_STENCIL_SIZE" \
+       : attribute == EGL_CONFIG_CAVEAT ? "EGL_CONFIG_CAVEAT" \
+       : attribute == EGL_CONFIG_ID ? "EGL_CONFIG_ID" \
+       : attribute == EGL_LEVEL ? "EGL_LEVEL" \
+       : attribute == EGL_MAX_PBUFFER_HEIGHT ? "EGL_MAX_PBUFFER_HEIGHT" \
+       : attribute == EGL_MAX_PBUFFER_PIXELS ? "EGL_MAX_PBUFFER_PIXELS" \
+       : attribute == EGL_MAX_PBUFFER_WIDTH ? "EGL_MAX_PBUFFER_WIDTH" \
+       : attribute == EGL_NATIVE_RENDERABLE ? "EGL_NATIVE_RENDERABLE" \
+       : attribute == EGL_NATIVE_VISUAL_ID ? "EGL_NATIVE_VISUAL_ID" \
+       : attribute == EGL_NATIVE_VISUAL_TYPE ? "EGL_NATIVE_VISUAL_TYPE" \
+       : attribute == EGL_SAMPLES ? "EGL_SAMPLES" \
+       : attribute == EGL_SAMPLE_BUFFERS ? "EGL_SAMPLE_BUFFERS" \
+       : attribute == EGL_SURFACE_TYPE ? "EGL_SURFACE_TYPE" \
+       : attribute == EGL_TRANSPARENT_TYPE ? "EGL_TRANSPARENT_TYPE" \
+       : attribute == EGL_TRANSPARENT_BLUE_VALUE ? "EGL_TRANSPARENT_BLUE_VALUE" \
+       : attribute == EGL_TRANSPARENT_GREEN_VALUE ? "EGL_TRANSPARENT_GREEN_VALUE" \
+       : attribute == EGL_TRANSPARENT_RED_VALUE ? "EGL_TRANSPARENT_RED_VALUE" \
+       : attribute == EGL_NONE ? "EGL_NONE" \
+       : attribute == EGL_BIND_TO_TEXTURE_RGB ? "EGL_BIND_TO_TEXTURE_RGB" \
+       : attribute == EGL_BIND_TO_TEXTURE_RGBA ? "EGL_BIND_TO_TEXTURE_RGBA" \
+       : attribute == EGL_MIN_SWAP_INTERVAL ? "EGL_MIN_SWAP_INTERVAL" \
+       : attribute == EGL_MAX_SWAP_INTERVAL ? "EGL_MAX_SWAP_INTERVAL" \
+       : attribute == EGL_RENDERABLE_TYPE ? "EGL_RENDERABLE_TYPE" \
+                                           : "???")
+
+
 
 #ifdef __cplusplus
 extern "C" {

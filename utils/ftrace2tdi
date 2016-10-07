@@ -119,15 +119,22 @@ def main():
          #          <idle>-0     [000] 25184.912190: irq_handler_exit: irq=24 ret=handled
          #
 
-         match = re.match(r"\s+(.*-\d+)\s+(\[\d+\])\s+(\d+.\d+):\s+(.*)$", line)
+
+         #        nx_sched-822   [000] d...  2846.424000: sched_switch: prev_comm=nx_sched prev_pid=822 prev_prio=120 prev_state=S ==> next_comm=swapper/0 next_pid=0 next_prio=120
+         #  Qt HTTP thread-788   [000] ..s.   218.453000: softirq_entry: vec=6 [action=TASKLET]
+
+         #match = re.match(r"\s+(.*-\d+)\s+(\[\d+\])\s+(\d+.\d+):\s+(.*)$", line)
+
+         match = re.match(r"\s+(.*-\d+)\s+(\[\d+\])\s+....\s+(\d+.\d+):\s+(.*)$", line)
+
          if match:
 
-            task_pid = match.group(1)
+            task_pid = match.group(1).replace(' ', '-')
             cpu = match.group(2)
             timestamp = match.group(3)
             function = match.group(4)
 
-            #sys.stderr.write('task-pid:%s,cpu:%s,timestamp:%s,function:%s\n' % (task_pid, cpu, timestamp, function))
+            #sys.stderr.write('task-pid:\"%s\",cpu:%s,timestamp:%s,function:%s\n' % (task_pid, cpu, timestamp, function))
 
             if function.startswith('sys_ioctl'):
                #       gles2app3-1330  [001] 25144.528200: sys_ioctl(fd: 9, cmd: 401c6440, arg: 739331e4)
@@ -167,13 +174,16 @@ def main():
 
             elif function.startswith('sched_switch'):
 
-               prev_comm = function.split('prev_comm=')[1].split()[0]
+               #spaces:
+               #sched_switch: prev_comm=Qt HTTP thread prev_pid=788
+
+               prev_comm = function.split('prev_comm=')[1].split('prev_pid')[0].replace(' ', '-')
                prev_pid = function.split('prev_pid=')[1].split()[0]
                nam = cpu + ':' + prev_comm + '_' + prev_pid
                dsc = cpu + ':' + function.replace(' ', '_')
                addtask(False, nam, int(float(timestamp) * 1000000000.0), dsc)
 
-               next_comm = function.split('next_comm=')[1].split()[0]
+               next_comm = function.split('next_comm=')[1].split('next_pid')[0].replace(' ', '-')
                next_pid = function.split('next_pid=')[1].split()[0]
                nam = cpu + ':' + next_comm + '_' + next_pid
                dsc = cpu + ':' + function.replace(' ', '_')

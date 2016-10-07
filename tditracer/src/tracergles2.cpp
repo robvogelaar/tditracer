@@ -77,9 +77,71 @@ extern "C" EGLBoolean eglInitialize(EGLDisplay display, EGLint *major,
   return ret;
 }
 
+extern "C" EGLBoolean eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
+                                      EGLConfig *configs, EGLint config_size,
+                                      EGLint *num_config) {
+  save_ra();
+  static EGLBoolean (*__eglChooseConfig)(EGLDisplay, const EGLint *,
+                                         EGLConfig *, EGLint, EGLint *) = NULL;
+  if (__eglChooseConfig == NULL) {
+    __eglChooseConfig =
+        (EGLBoolean(*)(EGLDisplay, const EGLint *, EGLConfig *, EGLint,
+                       EGLint *))dlsym(RTLD_NEXT, "eglChooseConfig");
+    if (__eglChooseConfig == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglChooseConfig");
+    }
+  }
+  if (eglrecording) tditrace("eglChooseConfig()%n", ra);
+  EGLBoolean ret =
+      __eglChooseConfig(dpy, attrib_list, configs, config_size, num_config);
+  return ret;
+}
+
+extern "C" EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config,
+                                         EGLint attribute, EGLint *value) {
+  save_ra();
+  static EGLBoolean (*__eglGetConfigAttrib)(EGLDisplay, EGLConfig, EGLint,
+                                            EGLint *) = NULL;
+  if (__eglGetConfigAttrib == NULL) {
+    __eglGetConfigAttrib =
+        (EGLBoolean(*)(EGLDisplay, EGLConfig, EGLint, EGLint *))dlsym(
+            RTLD_NEXT, "eglGetConfigAttrib");
+    if (__eglGetConfigAttrib == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglGetConfigAttrib");
+    }
+  }
+  EGLBoolean ret = __eglGetConfigAttrib(dpy, config, attribute, value);
+
+  if (eglrecording)
+    tditrace("eglGetConfigAttrib() %s=%d%n", CONFIGATTRIBUTESSTRING(attribute), *value, ra);
+  return ret;
+}
+
+extern "C" EGLBoolean eglGetConfigs(EGLDisplay dpy, EGLConfig *configs,
+                                    EGLint config_size, EGLint *num_config) {
+  save_ra();
+  static EGLBoolean (*__eglGetConfigs)(EGLDisplay, EGLConfig *, EGLint,
+                                       EGLint *) = NULL;
+  if (__eglGetConfigs == NULL) {
+    __eglGetConfigs =
+        (EGLBoolean(*)(EGLDisplay, EGLConfig *, EGLint, EGLint *))dlsym(
+            RTLD_NEXT, "eglGetConfigs");
+    if (__eglGetConfigs == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglGetConfigs");
+    }
+  }
+  if (eglrecording) tditrace("eglGetConfigs()%n", ra);
+  EGLBoolean ret = __eglGetConfigs(dpy, configs, config_size, num_config);
+  return ret;
+}
+
 extern "C" EGLContext eglCreateContext(EGLDisplay display, EGLConfig config,
                                        EGLContext share_context,
                                        const EGLint *attrib_list) {
+  save_ra();
   static EGLContext (*__eglCreateContext)(EGLDisplay, EGLConfig, EGLContext,
                                           const EGLint *) = NULL;
   if (__eglCreateContext == NULL) {
@@ -92,7 +154,63 @@ extern "C" EGLContext eglCreateContext(EGLDisplay display, EGLConfig config,
   }
   EGLContext ret =
       __eglCreateContext(display, config, share_context, attrib_list);
-  if (gles2recording) tditrace("eglCreateContext() =0x%x", ret);
+  if (gles2recording) tditrace("eglCreateContext() =0x%x%n", ret, ra);
+  return ret;
+}
+
+extern "C" EGLSurface eglCreatePbufferSurface(EGLDisplay dpy, EGLConfig config,
+                                              const EGLint *attrib_list) {
+  static EGLSurface (*__eglCreatePbufferSurface)(EGLDisplay, EGLConfig,
+                                                 const EGLint *) = NULL;
+  if (__eglCreatePbufferSurface == NULL) {
+    __eglCreatePbufferSurface =
+        (EGLSurface(*)(EGLDisplay, EGLConfig, const EGLint *))dlsym(
+            RTLD_NEXT, "eglCreatePbufferSurface");
+    if (__eglCreatePbufferSurface == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglCreatePbufferSurface");
+    }
+  }
+  if (eglrecording) tditrace("eglCreatePbufferSurface()");
+  EGLSurface ret = __eglCreatePbufferSurface(dpy, config, attrib_list);
+  return ret;
+}
+
+extern "C" EGLSurface eglCreatePixmapSurface(EGLDisplay dpy, EGLConfig config,
+                                             NativePixmapType pixmap,
+                                             const EGLint *attrib_list) {
+  static EGLSurface (*__eglCreatePixmapSurface)(
+      EGLDisplay, EGLConfig, NativePixmapType, const EGLint *) = NULL;
+  if (__eglCreatePixmapSurface == NULL) {
+    __eglCreatePixmapSurface = (EGLSurface(*)(
+        EGLDisplay, EGLConfig, NativePixmapType,
+        const EGLint *))dlsym(RTLD_NEXT, "eglCreatePixmapSurface");
+    if (__eglCreatePixmapSurface == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglCreatePixmapSurface");
+    }
+  }
+  if (eglrecording) tditrace("eglCreatePixmapSurface()");
+  EGLSurface ret = __eglCreatePixmapSurface(dpy, config, pixmap, attrib_list);
+  return ret;
+}
+
+extern "C" EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
+                                             NativeWindowType window,
+                                             const EGLint *attrib_list) {
+  static EGLSurface (*__eglCreateWindowSurface)(
+      EGLDisplay, EGLConfig, NativeWindowType, const EGLint *) = NULL;
+  if (__eglCreateWindowSurface == NULL) {
+    __eglCreateWindowSurface = (EGLSurface(*)(
+        EGLDisplay, EGLConfig, NativeWindowType,
+        const EGLint *))dlsym(RTLD_NEXT, "eglCreateWindowSurface");
+    if (__eglCreateWindowSurface == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "eglCreateWindowSurface");
+    }
+  }
+  if (eglrecording) tditrace("eglCreateWindowSurface()");
+  EGLSurface ret = __eglCreateWindowSurface(dpy, config, window, attrib_list);
   return ret;
 }
 
@@ -148,6 +266,19 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
   }
 
   // capture_frame();
+  if (framerecording) {
+    tditrace("@A+FR %d", current_frame);
+    static char *framebuffer = 0;
+    if (!framebuffer) {
+      framebuffer = (char *)memalign(4096, 1280 * 720 * 4);
+    }
+
+    glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
+    framecapture_capframe(framebuffer);
+
+    tditrace("@A-FR");
+    frames_captured++;
+  }
 
   EGLBoolean ret = __eglSwapBuffers(display, surface);
 
@@ -169,19 +300,6 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
 
   draw_counter = 0;
   texturebind_counter = 0;
-
-  if (framerecording) {
-    tditrace("@A+FR %d", current_frame);
-    static char *framebuffer = 0;
-    if (!framebuffer) {
-      framebuffer = (char *)memalign(4096, 1280 * 720 * 4);
-    }
-
-    glReadPixels(0, 0, 1280, 720, GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
-
-    tditrace("@A-FR");
-    frames_captured++;
-  }
 
 /*
  */
@@ -519,6 +637,12 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
                glDrawArrays_counter, MODESTRING(mode), count, boundtexture,
                currentprogram, ra);
   }
+
+  #if 0
+  //GL_POINTS, GL_LINE_STRIP, GL_LINE_LOOP, GL_LINES, GL_TRIANGLE_STRIP, GL_TRIANGLE_FAN and GL_TRIANGLES
+  if (count > 4) mode = GL_LINES;
+  #endif
+
   __glDrawArrays(mode, first, count);
 
   if ((boundframebuffer != 0) && renderbufferrecording) {
@@ -1644,4 +1768,151 @@ extern "C" void glUniformMatrix4fv(GLint location, GLsizei count,
              count, value_strs);
   }
   __glUniformMatrix4fv(location, count, transpose, value);
+}
+
+extern "C" void glStencilOp(GLenum fail, GLenum zfail, GLenum zpass) {
+  static void (*__glStencilOp)(GLenum, GLenum, GLenum) = NULL;
+  if (__glStencilOp == NULL) {
+    __glStencilOp =
+        (void (*)(GLenum, GLenum, GLenum))dlsym(RTLD_NEXT, "glStencilOp");
+    if (__glStencilOp == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilOp");
+    }
+  }
+  if (gles2recording) tditrace("glStencilOp()");
+  __glStencilOp(fail, zfail, zpass);
+}
+
+extern "C" void glStencilFunc(GLenum func, GLint ref, GLuint mask) {
+  static void (*__glStencilFunc)(GLenum, GLint, GLuint) = NULL;
+  if (__glStencilFunc == NULL) {
+    __glStencilFunc =
+        (void (*)(GLenum, GLint, GLuint))dlsym(RTLD_NEXT, "glStencilFunc");
+    if (__glStencilFunc == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilFunc");
+    }
+  }
+  if (gles2recording) tditrace("glStencilFunc()");
+  __glStencilFunc(func, ref, mask);
+}
+
+extern "C" void glStencilMask(GLuint mask) {
+  save_ra();
+
+  static void (*__glStencilMask)(GLuint) = NULL;
+  if (__glStencilMask == NULL) {
+    __glStencilMask = (void (*)(GLuint))dlsym(RTLD_NEXT, "glStencilMask");
+    if (__glStencilMask == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilMask");
+    }
+  }
+
+  if (gles2recording) tditrace("glStencilMask() %x%n", mask, ra);
+  __glStencilMask(mask);
+}
+
+extern "C" void glStencilFuncSeparate(GLenum face, GLenum func, GLint ref,
+                                      GLuint mask) {
+  static void (*__glStencilFuncSeparate)(GLenum, GLenum, GLint, GLuint) = NULL;
+  if (__glStencilFuncSeparate == NULL) {
+    __glStencilFuncSeparate = (void (*)(GLenum, GLenum, GLint, GLuint))dlsym(
+        RTLD_NEXT, "glStencilFuncSeparate");
+    if (__glStencilFuncSeparate == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilFuncSeparate");
+    }
+  }
+  if (gles2recording) tditrace("glStencilFuncSeparate()");
+  __glStencilFuncSeparate(face, func, ref, mask);
+}
+
+extern "C" void glStencilMaskSeparate(GLenum face, GLuint mask) {
+  static void (*__glStencilMaskSeparate)(GLenum, GLuint) = NULL;
+  if (__glStencilMaskSeparate == NULL) {
+    __glStencilMaskSeparate =
+        (void (*)(GLenum, GLuint))dlsym(RTLD_NEXT, "glStencilMaskSeparate");
+    if (__glStencilMaskSeparate == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilMaskSeparate");
+    }
+  }
+  if (gles2recording) tditrace("glStencilMaskSeparate() %d %x", face, mask);
+  __glStencilMaskSeparate(face, mask);
+}
+
+extern "C" void glStencilOpSeparate(GLenum face, GLenum sfail, GLenum dpfail,
+                                    GLenum dppass) {
+  static void (*__glStencilOpSeparate)(GLenum, GLenum, GLenum, GLenum) = NULL;
+  if (__glStencilOpSeparate == NULL) {
+    __glStencilOpSeparate = (void (*)(GLenum, GLenum, GLenum, GLenum))dlsym(
+        RTLD_NEXT, "glStencilOpSeparate");
+    if (__glStencilOpSeparate == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glStencilOpSeparate");
+    }
+  }
+  if (gles2recording) tditrace("glStencilOpSeparate()");
+  __glStencilOpSeparate(face, sfail, dpfail, dppass);
+}
+
+extern "C" void glColorMask(GLboolean red, GLboolean green, GLboolean blue,
+                            GLboolean alpha) {
+  save_ra();
+  static void (*__glColorMask)(GLboolean, GLboolean, GLboolean, GLboolean) =
+      NULL;
+  if (__glColorMask == NULL) {
+    __glColorMask = (void (*)(GLboolean, GLboolean, GLboolean, GLboolean))dlsym(
+        RTLD_NEXT, "glColorMask");
+    if (__glColorMask == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glColorMask");
+    }
+  }
+  if (gles2recording)
+    tditrace("glColorMask() %d %d %d %d%n", red, green, blue, alpha, ra);
+  __glColorMask(red, green, blue, alpha);
+}
+
+extern "C" void glDepthRangef(GLfloat n, GLfloat f) {
+  static void (*__glDepthRangef)(GLfloat, GLfloat) = NULL;
+  if (__glDepthRangef == NULL) {
+    __glDepthRangef =
+        (void (*)(GLfloat, GLfloat))dlsym(RTLD_NEXT, "glDepthRangef");
+    if (__glDepthRangef == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glDepthRangef");
+    }
+  }
+  tditrace("glDepthRangef()");
+  __glDepthRangef(n, f);
+}
+
+extern "C" void glDepthFunc(GLenum func) {
+  static void (*__glDepthFunc)(GLenum) = NULL;
+  if (__glDepthFunc == NULL) {
+    __glDepthFunc = (void (*)(GLenum))dlsym(RTLD_NEXT, "glDepthFunc");
+    if (__glDepthFunc == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glDepthFunc");
+    }
+  }
+  if (gles2recording) tditrace("glDepthFunc()");
+  __glDepthFunc(func);
+}
+
+extern "C" void glDepthMask(GLboolean flag) {
+  save_ra();
+  static void (*__glDepthMask)(GLboolean) = NULL;
+  if (__glDepthMask == NULL) {
+    __glDepthMask = (void (*)(GLboolean))dlsym(RTLD_NEXT, "glDepthMask");
+    if (__glDepthMask == NULL) {
+      fprintf(stderr, "Error in dlsym: %s(%s)\n", dlerror() ? dlerror() : "?",
+              "glDepthMask");
+    }
+  }
+  if (gles2recording) tditrace("glDepthMask() %d%n", flag, ra);
+  __glDepthMask(flag);
 }
