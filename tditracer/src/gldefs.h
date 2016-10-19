@@ -129,6 +129,12 @@ typedef unsigned char GLubyte;
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 
+#define GL_FRAMEBUFFER 0x8D40
+#define GL_RENDERBUFFER 0x8D41
+
+#define GL_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_RENDERBUFFER_BINDING 0x8CA7
+
 #define CLEARSTRING(mask)                                                      \
   (mask == GL_DEPTH_BUFFER_BIT                                                 \
        ? "GL_DEPTH_BUFFER_BIT"                                                 \
@@ -412,6 +418,7 @@ void glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset,
                          GLint yoffset, GLint x, GLint y, GLsizei width,
                          GLsizei height);
 extern GLvoid glBindTexture(GLenum target, GLuint texture);
+extern GLenum glCheckFramebufferStatus(GLenum target);
 
 #ifdef __cplusplus
 }

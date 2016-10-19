@@ -29,6 +29,14 @@ extern "C" {
 #define save_ra() int ra = 0;
 #endif
 
+#define check_glerror() \
+  {\
+    GLenum err = GL_NO_ERROR; \
+    while ((err = glGetError()) != GL_NO_ERROR) { \
+      tditrace("@S+GLERROR 0x%x", err); \
+    } \
+  }
+
 extern "C" void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height,
                              GLenum format, GLenum type, GLvoid *data);
 
@@ -249,7 +257,6 @@ extern "C" EGLBoolean eglMakeCurrent(EGLDisplay display, EGLSurface draw,
 extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
   static EGLBoolean (*__eglSwapBuffers)(EGLDisplay display,
                                         EGLSurface surface) = NULL;
-
   if (__eglSwapBuffers == NULL) {
     __eglSwapBuffers = (EGLBoolean(*)(EGLDisplay, EGLSurface))dlsym(
         RTLD_NEXT, "eglSwapBuffers");
@@ -257,6 +264,8 @@ extern "C" EGLBoolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
       fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
     }
   }
+
+  check_glerror();
 
   if (eglrecording) tditrace("@I+eglSwapBuffers()");
 
@@ -612,6 +621,17 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     }
   }
 
+  //check_glerror();
+
+  #if 0
+  {
+    GLint FboId;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FboId);
+    GLenum FbStat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    tditrace("FrameBufferStatus %d %x", FboId, FbStat);
+  }
+  #endif
+
   draw_counter++;
   glDrawArrays_counter++;
 
@@ -675,6 +695,15 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
   save_ra();
   static void (*__glDrawElements)(GLenum, GLsizei, GLenum, const GLvoid *) =
       NULL;
+
+  //check_glerror();
+
+  {
+    GLint FboId = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FboId);
+    GLenum FbStat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    tditrace("FrameBufferStatus %d %x", FboId, FbStat);
+  }
 
   if (__glDrawElements == NULL) {
     __glDrawElements = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *))dlsym(
@@ -814,10 +843,6 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
 
   if (gles2recording || gltexturerecording) tditrace("@I-glTexImage2D()");
 
-  GLenum err = GL_NO_ERROR;
-  while ((err = glGetError()) != GL_NO_ERROR) {
-    tditrace("@S+GLERROR 0x%x", err);
-  }
 }
 
 extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
@@ -1105,6 +1130,8 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     }
   }
 
+  //check_glerror();
+
   if (gles2recording || gldrawrecording || gltexturerecording)
     tditrace("@I+glClear() %s", CLEARSTRING(mask));
 
@@ -1205,6 +1232,20 @@ extern "C" GLvoid glGenFramebuffers(GLsizei n, GLuint *framebuffers) {
 
   __glGenFramebuffers(n, framebuffers);
   if (gles2recording) tditrace("glGenFramebuffers() %d=%d", n, framebuffers[0]);
+}
+
+extern "C" void glDeleteFramebuffers(GLsizei n, const GLuint *framebuffers) {
+  static void (*__glDeleteFramebuffers)(GLsizei, const GLuint *) = NULL;
+  if (__glDeleteFramebuffers == NULL) {
+    __glDeleteFramebuffers = (void (*)(GLsizei, const GLuint *))dlsym(
+        RTLD_NEXT, "glDeleteFramebuffers");
+    if (__glDeleteFramebuffers == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording)
+    tditrace("glDeleteFramebuffers() %d %d", n, framebuffers[0]);
+  __glDeleteFramebuffers(n, framebuffers);
 }
 
 extern "C" GLvoid glBindFramebuffer(GLenum target, GLuint framebuffer) {
