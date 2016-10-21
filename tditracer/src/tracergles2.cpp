@@ -698,12 +698,14 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
 
   //check_glerror();
 
+  #if 0
   {
     GLint FboId = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FboId);
     GLenum FbStat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     tditrace("FrameBufferStatus %d %x", FboId, FbStat);
   }
+  #endif
 
   if (__glDrawElements == NULL) {
     __glDrawElements = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *))dlsym(
@@ -1712,7 +1714,7 @@ extern "C" void glUniform3fv(GLint location, GLsizei count,
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-  tditrace("glUniform3fv()");
+  if (gles2recording) tditrace("glUniform3fv()");
   __glUniform3fv(location, count, value);
 }
 
