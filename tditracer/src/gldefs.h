@@ -128,12 +128,18 @@ typedef unsigned char GLubyte;
 
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
+#define GL_ARRAY_BUFFER_BINDING 0x8894
+#define GL_ELEMENT_ARRAY_BUFFER_BINDING 0x8895
 
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_RENDERBUFFER 0x8D41
 
 #define GL_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_RENDERBUFFER_BINDING 0x8CA7
+
+#define GL_STREAM_DRAW 0x88E0
+#define GL_STATIC_DRAW 0x88E4
+#define GL_DYNAMIC_DRAW 0x88E8
 
 #define CLEARSTRING(mask)                                                      \
   (mask == GL_DEPTH_BUFFER_BIT                                                 \
@@ -328,6 +334,13 @@ typedef unsigned char GLubyte;
        ? "GL_ARRAY_BUFFER"                                             \
        : target == GL_ELEMENT_ARRAY_BUFFER ? "GL_ELEMENT_ARRAY_BUFFER" \
                                            : "???")
+
+#define USAGESTRING(usage)                                                     \
+  (usage == GL_STREAM_DRAW ? "GL_STREAM_DRAW" : usage == GL_STATIC_DRAW        \
+                                                    ? "GL_STATIC_DRAW"         \
+                                                    : usage == GL_DYNAMIC_DRAW \
+                                                          ? "GL_DYNAMIC_DRAW"  \
+                                                          : "???")
 
 
 

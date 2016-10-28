@@ -29,12 +29,12 @@ extern "C" {
 #define save_ra() int ra = 0;
 #endif
 
-#define check_glerror() \
-  {\
-    GLenum err = GL_NO_ERROR; \
+#define check_glerror()                           \
+  {                                               \
+    GLenum err = GL_NO_ERROR;                     \
     while ((err = glGetError()) != GL_NO_ERROR) { \
-      tditrace("@S+GLERROR 0x%x", err); \
-    } \
+      tditrace("@S+GLERROR 0x%x", err);           \
+    }                                             \
   }
 
 extern "C" void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height,
@@ -123,7 +123,8 @@ extern "C" EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config,
   EGLBoolean ret = __eglGetConfigAttrib(dpy, config, attribute, value);
 
   if (eglrecording)
-    tditrace("eglGetConfigAttrib() %s=%d%n", CONFIGATTRIBUTESSTRING(attribute), *value, ra);
+    tditrace("eglGetConfigAttrib() %s=%d%n", CONFIGATTRIBUTESSTRING(attribute),
+             *value, ra);
   return ret;
 }
 
@@ -603,7 +604,7 @@ extern "C" void glVertexAttribPointer(GLuint index, GLint size, GLenum type,
   }
 
   if (gles2recording)
-    tditrace("glVertexAttribPointer() %d,%d,%s,%d,0x%x", index, size,
+    tditrace("glVertexAttribPointer() %d %d %s %d 0x%x", index, size,
              TYPESTRING(type), stride, pointer);
 
   __glVertexAttribPointer(index, size, type, normalized, stride, pointer);
@@ -621,16 +622,16 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     }
   }
 
-  //check_glerror();
+// check_glerror();
 
-  #if 0
+#if 0
   {
     GLint FboId;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FboId);
     GLenum FbStat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     tditrace("FrameBufferStatus %d %x", FboId, FbStat);
   }
-  #endif
+#endif
 
   draw_counter++;
   glDrawArrays_counter++;
@@ -658,10 +659,10 @@ extern "C" GLvoid glDrawArrays(GLenum mode, GLint first, GLsizei count) {
                currentprogram, ra);
   }
 
-  #if 0
+#if 0
   //GL_POINTS, GL_LINE_STRIP, GL_LINE_LOOP, GL_LINES, GL_TRIANGLE_STRIP, GL_TRIANGLE_FAN and GL_TRIANGLES
   if (count > 4) mode = GL_LINES;
-  #endif
+#endif
 
   __glDrawArrays(mode, first, count);
 
@@ -696,16 +697,16 @@ extern "C" GLvoid glDrawElements(GLenum mode, GLsizei count, GLenum type,
   static void (*__glDrawElements)(GLenum, GLsizei, GLenum, const GLvoid *) =
       NULL;
 
-  //check_glerror();
+// check_glerror();
 
-  #if 0
+#if 0
   {
     GLint FboId = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FboId);
     GLenum FbStat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     tditrace("FrameBufferStatus %d %x", FboId, FbStat);
   }
-  #endif
+#endif
 
   if (__glDrawElements == NULL) {
     __glDrawElements = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *))dlsym(
@@ -803,12 +804,25 @@ extern "C" GLvoid glBindTexture(GLenum target, GLuint texture) {
 
   if (gles2recording) {
     if (texture) glBindTexture_counter++;
-    tditrace("glBindTexture() #%d,%u", glBindTexture_counter, texture);
+    tditrace("glBindTexture() #%d %u", glBindTexture_counter, texture);
   }
 
   __glBindTexture(target, texture);
 
   boundtexture = texture;
+}
+
+extern "C" void glDeleteTextures(GLsizei n, const GLuint *textures) {
+  static void (*__glDeleteTextures)(GLsizei, const GLuint *) = NULL;
+  if (__glDeleteTextures == NULL) {
+    __glDeleteTextures =
+        (void (*)(GLsizei, const GLuint *))dlsym(RTLD_NEXT, "glDeleteTextures");
+    if (__glDeleteTextures == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+  if (gles2recording) tditrace("glDeleteTextures() %d %d", n, textures[0]);
+  __glDeleteTextures(n, textures);
 }
 
 extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
@@ -844,7 +858,6 @@ extern "C" GLvoid glTexImage2D(GLenum target, GLint level, GLint internalformat,
                  type, pixels);
 
   if (gles2recording || gltexturerecording) tditrace("@I-glTexImage2D()");
-
 }
 
 extern "C" GLvoid glTexSubImage2D(GLenum target, GLint level, GLint xoffset,
@@ -1132,7 +1145,7 @@ extern "C" GLvoid glClear(GLbitfield mask) {
     }
   }
 
-  //check_glerror();
+  // check_glerror();
 
   if (gles2recording || gldrawrecording || gltexturerecording)
     tditrace("@I+glClear() %s", CLEARSTRING(mask));
@@ -1179,10 +1192,30 @@ extern "C" GLvoid glBindBuffer(GLenum target, GLuint buffer) {
     }
   }
 
+#if 0
+  {
+    GLint abb;
+    GLint eab;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &abb);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eab);
+    tditrace("buffer_binding abb=%d eab=%d", abb, eab);
+  }
+#endif
+
   if (gles2recording)
     tditrace("glBindBuffer() %s,%u", TARGETSTRING(target), buffer);
   __glBindBuffer(target, buffer);
   currentbuffer = buffer;
+
+#if 0
+  {
+    GLint abb;
+    GLint eab;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &abb);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eab);
+    tditrace("buffer_binding abb=%d eab=%d", abb, eab);
+  }
+#endif
 }
 
 extern "C" void glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data,
@@ -1196,9 +1229,14 @@ extern "C" void glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data,
       fprintf(stderr, "Error in dlsym: %s\n", dlerror());
     }
   }
-  if (gles2recording)
-    tditrace("glBufferData() b=%d,%s,%d", currentbuffer, TARGETSTRING(target),
-             size);
+  if (gles2recording) {
+    GLint abb;
+    GLint eab;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &abb);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eab);
+    tditrace("glBufferData() abb=%d,eab=%d,%s,%d,0x%x,%s", abb, eab,
+             TARGETSTRING(target), size, data, USAGESTRING(usage));
+  }
   __glBufferData(target, size, data, usage);
 }
 
@@ -1215,9 +1253,14 @@ extern "C" void glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size,
     }
   }
 
-  if (gles2recording)
-    tditrace("glBufferSubData() b=%d,%s,%d,%d", currentbuffer,
-             TARGETSTRING(target), offset, size);
+  if (gles2recording) {
+    GLint abb;
+    GLint eab;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &abb);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eab);
+    tditrace("glBufferSubData() abb=%d,eab=%d,%s,%d,%d,0x%x", abb, eab,
+             TARGETSTRING(target), offset, size, data);
+  }
   __glBufferSubData(target, offset, size, data);
 }
 
@@ -1246,7 +1289,7 @@ extern "C" void glDeleteFramebuffers(GLsizei n, const GLuint *framebuffers) {
     }
   }
   if (gles2recording)
-    tditrace("glDeleteFramebuffers() %d %d", n, framebuffers[0]);
+    tditrace("glDeleteFramebuffers() %d,%d", n, framebuffers[0]);
   __glDeleteFramebuffers(n, framebuffers);
 }
 
@@ -1332,7 +1375,7 @@ extern "C" GLvoid glRenderbufferStorage(GLenum target, GLenum internalformat,
   }
 
   if (gles2recording)
-    tditrace("glRenderbufferStorage() %s,0x%x,%dx%d",
+    tditrace("glRenderbufferStorage() %s 0x%x %dx%d",
              IFORMATSTRING(internalformat), internalformat, width, height);
 
   __glRenderbufferStorage(target, internalformat, width, height);
@@ -1357,7 +1400,7 @@ extern "C" GLvoid glFramebufferRenderbuffer(GLenum target, GLenum attachment,
   }
 
   if (gles2recording)
-    tditrace("glFramebufferRenderbuffer() %s,%u", ATTACHMENTSTRING(attachment),
+    tditrace("glFramebufferRenderbuffer() %s %u", ATTACHMENTSTRING(attachment),
              renderbuffer);
 
   __glFramebufferRenderbuffer(target, attachment, renderbuffertarget,

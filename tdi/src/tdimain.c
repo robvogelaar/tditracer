@@ -915,7 +915,7 @@ static void dump_proc_self_maps(void) {
   int fd;
   int bytes;
 
-  fprintf(stderr, "tdi: maps...[%s,%d]\n", gprocname, gpid);
+  fprintf(stderr, "tdi: maps...[%s][%d]\n", gprocname, gpid);
 
   tditrace("MAPS [%s][%d] begin", gprocname, gpid);
 
@@ -985,21 +985,21 @@ extern void framecapture_deleteframes(void) __attribute__((weak));
 static void tmpfs_message(void) {
   fprintf(stderr, "\n");
   fprintf(stderr,
-          "tdi: init[%s,%d], "
+          "tdi: init[%s][%d], "
           "----------------------------------------------------------------"
           "\n",
           gprocname, gpid);
-  fprintf(stderr, "tdi: init[%s,%d], adjust the trace buffer size:\n",
+  fprintf(stderr, "tdi: init[%s][%d], adjust the trace buffer size:\n",
           gprocname, gpid);
-  fprintf(stderr, "tdi: init[%s,%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
+  fprintf(stderr, "tdi: init[%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
           gpid);
-  fprintf(stderr, "tdi: init[%s,%d], adjust the /tmp size:\n", gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s][%d], adjust the /tmp size:\n", gprocname, gpid);
   fprintf(stderr,
-          "tdi: init[%s,%d],     \"mount -o "
+          "tdi: init[%s][%d],     \"mount -o "
           "remount,noexec,nosuid,nr_blocks=15000 /tmp\"\n",
           gprocname, gpid);
   fprintf(stderr,
-          "tdi: init[%s,%d], "
+          "tdi: init[%s][%d], "
           "----------------------------------------------------------------"
           "\n",
           gprocname, gpid);
@@ -1128,20 +1128,20 @@ static void *monitor_thread(void *param) {
         //"frames"   // 0x00000008
 
         if (gtouch & 0x1) {
-          fprintf(stderr, "tdi: rewinding...[%s,%d]\n", gprocname, gpid);
+          fprintf(stderr, "tdi: rewinding...[%s][%d]\n", gprocname, gpid);
           tditrace_rewind();
           do_dump_proc_self_maps = 1;
         }
 
         if (gtouch & 0x2) {
-          fprintf(stderr, "tdi: dump shaders...[%s,%d]\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump shaders...[%s][%d]\n", gprocname, gpid);
           if (shadercapture_writeshaders != NULL) {
             shadercapture_writeshaders();
           }
         }
 
         if (gtouch & 0x4) {
-          fprintf(stderr, "tdi: dump textures...[%s,%d]\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump textures...[%s][%d]\n", gprocname, gpid);
 
           if (texturecapture_writepngtextures != NULL) {
             texturecapture_writepngtextures();
@@ -1152,7 +1152,7 @@ static void *monitor_thread(void *param) {
         }
 
         if (gtouch & 0x8) {
-          fprintf(stderr, "tdi: dump frames[%s,%d]\n", gprocname, gpid);
+          fprintf(stderr, "tdi: dump frames[%s][%d]\n", gprocname, gpid);
 
           if (framecapture_writepngframes != NULL) {
             framecapture_writepngframes();
@@ -1333,7 +1333,7 @@ static int create_trace_buffer(void) {
     gtrace_buffer[i] = 0;
   }
 
-  fprintf(stderr, "tdi: init[%s,%d], allocated \"%s\" (%dMB)\n", gprocname,
+  fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
           gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
   trace_buffer_byte_ptr = gtrace_buffer;
@@ -1387,7 +1387,7 @@ static void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
   int delay = *pdelay;
 
-  fprintf(stderr, "tdi: init[%s,%d], delay is %d\n", gprocname, gpid, delay);
+  fprintf(stderr, "tdi: init[%s][%d], delay is %d\n", gprocname, gpid, delay);
 
   if (delay == -1) {
     /*
@@ -1403,7 +1403,7 @@ static void *delayed_init_thread(void *param) {
 
       if (tv.tv_sec > (45 * 365 * 24 * 3600)) {
         fprintf(stderr,
-                "tdi: init[%s,%d], delay until timeofday is set, \"%s\", "
+                "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
                 "timeofday is set\n",
                 gprocname, gpid, time_string);
         break;
@@ -1412,7 +1412,7 @@ static void *delayed_init_thread(void *param) {
       ptm = localtime(&tv.tv_sec);
       strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", ptm);
       fprintf(stderr,
-              "tdi: init[%s,%d], delay until timeofday is set, \"%s\", "
+              "tdi: init[%s][%d], delay until timeofday is set, \"%s\", "
               "timeofday "
               "is not set\n",
               gprocname, gpid, time_string);
@@ -1427,7 +1427,7 @@ static void *delayed_init_thread(void *param) {
      */
 
     while (1) {
-      fprintf(stderr, "tdi: init[%s,%d], paused...\n", gprocname, gpid);
+      fprintf(stderr, "tdi: init[%s][%d], paused...\n", gprocname, gpid);
       usleep(1 * 1000000);
 
       struct stat st;
@@ -1443,7 +1443,7 @@ static void *delayed_init_thread(void *param) {
       */
 
       if (st.st_mtim.tv_sec != gtrace_buffer_st.st_mtim.tv_sec) {
-        fprintf(stderr, "tdi: init[%s,%d], started...\n", gprocname, gpid);
+        fprintf(stderr, "tdi: init[%s][%d], started...\n", gprocname, gpid);
 
         stat(gtracebufferfilename, &gtrace_buffer_st);
         break;
@@ -1452,7 +1452,7 @@ static void *delayed_init_thread(void *param) {
 
   } else {
     while (delay > 0) {
-      fprintf(stderr, "tdi: init[%s,%d], delay %d second(s)...\n", gprocname,
+      fprintf(stderr, "tdi: init[%s][%d], delay %d second(s)...\n", gprocname,
               gpid, delay);
       usleep(1 * 1000 * 000);
 
@@ -1460,7 +1460,7 @@ static void *delayed_init_thread(void *param) {
     }
   }
 
-  fprintf(stderr, "tdi: init[%s,%d], delay finished...\n", gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s][%d], delay finished...\n", gprocname, gpid);
 
   if (create_trace_buffer() == -1) {
     pthread_exit(NULL);
@@ -1512,24 +1512,24 @@ int tditrace_init(void) {
   get_process_name_by_pid(gpid, gprocname);
 
   if (strcmp(gprocname, "mkdir") == 0) {
-    fprintf(stderr, "tdi: init[%s,%d], procname is \"mkdir\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strncmp(gprocname, "sh", 2) == 0) {
-    fprintf(stderr, "tdi: init[%s,%d], procname is \"sh*\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "strace") == 0) {
-    fprintf(stderr, "tdi: init[%s,%d], procname is \"strace\" ; not tracing\n",
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else if (strcmp(gprocname, "gdbserver") == 0) {
     fprintf(stderr,
-            "tdi: init[%s,%d], procname is \"gdbserver\" ; not tracing\n",
+            "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
             gprocname, gpid);
     return 0;
   } else {
-    // fprintf(stderr, "tdi: init[%s,%d]\n", gprocname, gpid);
+    // fprintf(stderr, "tdi: init[%s][%d]\n", gprocname, gpid);
   }
 
   char *env;
@@ -1551,7 +1551,7 @@ int tditrace_init(void) {
   }
 
   if (gmask) {
-    fprintf(stderr, "tdi: init[%s,%d], MASK = 0x%08x (", gprocname, gpid,
+    fprintf(stderr, "tdi: init[%s][%d], MASK = 0x%08x (", gprocname, gpid,
             gmask);
     int d = 0;
     for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
@@ -1571,7 +1571,7 @@ int tditrace_init(void) {
     if (gtouch == 0x0) gtouch = strtoul(env, 0, 16);
   }
   if (gtouch) {
-    fprintf(stderr, "tdi: init[%s,%d], TOUCH = 0x%08x (", gprocname, gpid,
+    fprintf(stderr, "tdi: init[%s][%d], TOUCH = 0x%08x (", gprocname, gpid,
             gtouch);
     int d = 0;
     for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
@@ -1670,10 +1670,10 @@ int tditrace_init(void) {
 
           if (stat(procpid, &sts) == -1) {
             unlink(fullname);
-            fprintf(stderr, "tdi: init[%s,%d], removed \"%s\"\n", gprocname,
+            fprintf(stderr, "tdi: init[%s][%d], removed \"%s\"\n", gprocname,
                     gpid, fullname);
           } else {
-            fprintf(stderr, "tdi: init[%s,%d], not removed \"%s\"\n", gprocname,
+            fprintf(stderr, "tdi: init[%s][%d], not removed \"%s\"\n", gprocname,
                     gpid, fullname);
           }
         }
@@ -2144,7 +2144,7 @@ void tditrace_internal(va_list args, const char *format) {
       trace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
       if (!do_offload) do_dump_proc_self_maps = 1;
     } else {
-      fprintf(stderr, "tdi: full[%s,%d]\n", gprocname, gpid);
+      fprintf(stderr, "tdi: full[%s][%d]\n", gprocname, gpid);
       tditrace_inited = 0;
     }
   }
