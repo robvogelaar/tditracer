@@ -836,7 +836,7 @@ extern "C" int sendmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen,
   return ret;
 }
 
-#if defined(HAVE_REFSW_NEXUS_CONFIG_H) || defined(__i386)
+#if defined(HAVE_REFSW_NEXUS_CONFIG_H) || defined(__i386) || defined(__arm__)
 #define USE_CONST
 #else
 #define USE_CONST const
