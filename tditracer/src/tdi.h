@@ -1,6 +1,14 @@
 
-extern "C" int tditrace_init(void);
-extern "C" void tditrace(const char* format, ...);
-extern "C" void tditrace_ex(const char* format, ...);
-extern "C" void tditrace_rewind(void);
-extern "C" int tditrace_exit(void);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int tditrace_init(void);
+void tditrace(const char* format, ...);
+void tditrace_ex(const char* format, ...);
+void tditrace_rewind(void);
+int tditrace_exit(void);
+
+#ifdef __cplusplus
+}
+#endif

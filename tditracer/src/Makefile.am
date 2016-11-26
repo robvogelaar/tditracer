@@ -28,6 +28,7 @@ libtditracer_la_SOURCES = \
    tracersem.cpp \
    tracermq.cpp \
    tracerextra.cpp \
+   tracerwayland.c \
    gles2spinner.cpp \
    gles2text.cpp \
    gles2bars.cpp \

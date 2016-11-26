@@ -6,6 +6,7 @@ typedef void* EGLSurface;
 typedef void* EGLContext;
 typedef void* EGLConfig;
 
+typedef void* NativeDisplayType;
 typedef void* NativeWindowType;
 typedef void* NativePixmapType;
 
