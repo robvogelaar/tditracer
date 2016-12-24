@@ -26,7 +26,13 @@ extern "C" {
   int ra;         \
   asm volatile("move %0, $ra" : "=r"(ra));
 #else
+#ifdef __arm__
+#define save_ra() \
+  int ra;         \
+  asm volatile("mov %0, r14" : "=r"(ra));
+#else
 #define save_ra() int ra = 0;
+#endif
 #endif
 
 #define check_glerror()                           \
