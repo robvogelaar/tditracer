@@ -1,6 +1,6 @@
 unsigned int font_atlas_width = 509;
 unsigned int font_atlas_height = 134;
-struct {
+static struct {
   float ax;  // advance.x
   float ay;  // advance.y
 

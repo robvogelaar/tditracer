@@ -6,7 +6,13 @@ typedef void* EGLSurface;
 typedef void* EGLContext;
 typedef void* EGLConfig;
 
+#ifdef __i386__
+typedef int EGLNativeDisplayType;
+typedef EGLNativeDisplayType NativeDisplayType;
+#else
 typedef void* NativeDisplayType;
+#endif
+
 typedef void* NativeWindowType;
 typedef void* NativePixmapType;
 
