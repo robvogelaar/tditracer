@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <malloc.h>
 #include <stdio.h>
 
@@ -159,3 +161,5 @@ extern "C" void capture_dump_textures() {
     }
   }
 }
+
+#endif

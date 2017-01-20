@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -312,3 +314,5 @@ static int create_program(const char *v, const char *f) {
 
     return programhandle;
 }
+
+#endif

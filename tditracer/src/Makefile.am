@@ -21,6 +21,7 @@ libtditracer_la_SOURCES = \
    gldefs.h \
    tracermain.cpp \
    tracerutils.cpp \
+   traceregl.cpp \
    tracergles2.cpp \
    tracerlibc.cpp \
    tracersgx.cpp \

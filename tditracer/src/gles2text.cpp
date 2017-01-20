@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <algorithm>
 
 #include <GLES2/gl2.h>
@@ -172,3 +174,5 @@ void text_render(float x, float y, const char *s, ...) {
   glDisableVertexAttribArray(attribute_coord);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+#endif

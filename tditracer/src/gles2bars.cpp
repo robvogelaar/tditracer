@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <math.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -103,3 +105,5 @@ void bars_render(void) {
   glDrawArrays(GL_LINE_STRIP, 0, 360 * 2);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+#endif

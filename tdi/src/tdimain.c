@@ -1231,8 +1231,8 @@ static void *monitor_thread(void *param) {
           memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
 
           fprintf(stderr,
-                  "tdi: copied 0..50%% to "
-                  "offloadfile: \"%s\" [%d,%s]\n",
+                  "tdi: [%d,%s], copied 0..50%% to "
+                  "offloadfile: \"%s\"\n",
                   gpid, gprocname, offloadfilename);
         }
 
@@ -1244,7 +1244,7 @@ static void *monitor_thread(void *param) {
 
         if (check) {
           offload_over50 = 0;
-          fprintf(stderr, "tdi: at 100%%...[%d,%s]\n", gpid, gprocname);
+          fprintf(stderr, "tdi: [%d,%s], at 100%%...\n", gpid, gprocname);
           // fill remaining 50..100% data to existing file and close
           // file
 
@@ -1254,8 +1254,8 @@ static void *monitor_thread(void *param) {
           fclose(offload_file);
 
           fprintf(stderr,
-                  "tdi: copied 50..100%% to "
-                  "offloadfile: \"%s\" [%d,%s]\n",
+                  "tdi: [%d,%s], copied 50..100%% to "
+                  "offloadfile: \"%s\"\n",
                   gpid, gprocname, offloadfilename);
         }
       }
@@ -1382,6 +1382,8 @@ static int create_trace_buffer(void) {
 }
 
 static int thedelay;
+
+void start_monitor_thread(void);
 
 static void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
@@ -1807,7 +1809,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     while (--tracebufferid) {
       if (strstr(argv[tracebufferid], "tditracebuffer@")) {
-        sprintf(tracebuffers[buffers].filename, argv[tracebufferid]);
+        sprintf(tracebuffers[buffers].filename, "%s", argv[tracebufferid]);
         check_trace_buffer(buffers);
         buffers++;
       }

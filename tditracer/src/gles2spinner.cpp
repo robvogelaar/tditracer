@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <math.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -112,3 +114,4 @@ void spinner_render(int f) {
   }
   prev_timestamp = timestamp;
 }
+#endif

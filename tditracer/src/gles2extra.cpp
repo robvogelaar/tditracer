@@ -1,3 +1,5 @@
+#ifndef NOGLES2
+
 #include <math.h>
 #include <stdio.h>
 
@@ -119,3 +121,5 @@ void extra_render(void) {
     fprintf(stderr, "GL ERROR = 0x%x\n", e);
   }
 }
+
+#endif
