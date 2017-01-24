@@ -359,6 +359,7 @@ extern "C" EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval) {
   return ret;
 }
 
+#if 0
 /*
  *
  * eglCreateSyncKHR
@@ -380,8 +381,8 @@ extern "C" EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval) {
  *
  */
 
-//#include <EGL/egl.h>
-//#include <EGL/eglext.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 extern "C" {
 
@@ -561,5 +562,7 @@ extern "C" void (*eglGetProcAddress(const char *procname))() {
   void (*a)() = __eglGetProcAddress(procname);
   return a;
 }
+
+#endif
 
 #endif
