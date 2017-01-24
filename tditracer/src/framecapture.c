@@ -10,9 +10,8 @@
 #include <linux/fb.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
-
-#include <png.h>
 
 #include "framelinkedlist.h"
 

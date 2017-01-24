@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#define PNG_DEBUG 3
-#include <png.h>
 
 #include "gldefs.h"
 #include "shaderlinkedlist.h"
