@@ -2,7 +2,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#if 0
 #include <linux/futex.h>
+#endif
 #include <malloc.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -991,9 +993,10 @@ static void tmpfs_message(void) {
           gprocname, gpid);
   fprintf(stderr, "tdi: init[%s][%d], adjust the trace buffer size:\n",
           gprocname, gpid);
-  fprintf(stderr, "tdi: init[%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n", gprocname,
+  fprintf(stderr, "tdi: init[%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n",
+          gprocname, gpid);
+  fprintf(stderr, "tdi: init[%s][%d], adjust the /tmp size:\n", gprocname,
           gpid);
-  fprintf(stderr, "tdi: init[%s][%d], adjust the /tmp size:\n", gprocname, gpid);
   fprintf(stderr,
           "tdi: init[%s][%d],     \"mount -o "
           "remount,noexec,nosuid,nr_blocks=15000 /tmp\"\n",
@@ -1675,8 +1678,8 @@ int tditrace_init(void) {
             fprintf(stderr, "tdi: init[%s][%d], removed \"%s\"\n", gprocname,
                     gpid, fullname);
           } else {
-            fprintf(stderr, "tdi: init[%s][%d], not removed \"%s\"\n", gprocname,
-                    gpid, fullname);
+            fprintf(stderr, "tdi: init[%s][%d], not removed \"%s\"\n",
+                    gprocname, gpid, fullname);
           }
         }
       }

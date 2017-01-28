@@ -1,7 +1,9 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
+#if 0
 #include <linux/futex.h>
+#endif
 #include <malloc.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -19,6 +21,7 @@
 
 extern "C" void tditrace(const char *format, ...) __attribute__((weak));
 
+#if 0
 struct simplefu_semaphore {
   int avail;
   int waiters;
@@ -71,6 +74,7 @@ void simplefu_up(simplefu who) {
     syscall(__NR_futex, &who->avail, FUTEX_WAKE, nval, NULL, 0, 0);
   }
 }
+#endif
 
 void run_1(void) {
   struct timeval mytimeval;
@@ -149,6 +153,7 @@ void run_1(void) {
   if (tditrace != NULL) tditrace("@T-GETTIMEOFDAYx1000000");
 }
 
+#if 0
 void run_2(void) {
   struct simplefu_mutex futex;
   pthread_spinlock_t spinlock;
@@ -179,6 +184,7 @@ void run_2(void) {
   }
   if (tditrace != NULL) tditrace("@T-spinlockx1000000");
 }
+#endif
 
 void run_3(void) {
   int i;
@@ -545,7 +551,7 @@ exit:;
 #if 1
 int main(int argc, char **argv) {
   run_1();
-  run_2();
+  // run_2();
   run_3();
   run_4();
   // run_5();
