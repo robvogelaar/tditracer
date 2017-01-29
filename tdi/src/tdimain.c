@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <syscall.h>
@@ -28,7 +29,6 @@ pid_t gpid;
 char gprocname[128];
 
 #if 0
-
 
 struct simplefu_semaphore {
   int avail;
@@ -961,6 +961,7 @@ static int do_heap = 0;
 static int do_maxrss = 0;
 static int do_majflt = 0;
 static int do_minflt = 0;
+static int do_sysinfo = 0;
 static int do_persecond = 0;
 
 static int gtouch = 0x0;
@@ -1009,17 +1010,224 @@ static void tmpfs_message(void) {
   fprintf(stderr, "\n");
 }
 
+static void sample_info(void) {
+  if (do_sysinfo) {
+    char line[256];
+    FILE *f = NULL;
+
+    struct sysinfo systemInfo;
+    sysinfo(&systemInfo);
+
+    // struct sysinfo {
+    //         long uptime;             /* Seconds since boot */
+    //         unsigned long loads[3];  /* 1, 5, and 15 minute load averages
+    //         */
+    //         unsigned long totalram;  /* Total usable main memory size */
+    //         unsigned long freeram;   /* Available memory size */
+    //         unsigned long sharedram; /* Amount of shared memory */
+    //         unsigned long bufferram; /* Memory used by buffers */
+    //         unsigned long totalswap; /* Total swap space size */
+    //         unsigned long freeswap;  /* Swap space still available */
+    //         unsigned short procs;    /* Number of current processes */
+    //         unsigned long totalhigh; /* Total high memory size */
+    //         unsigned long freehigh;  /* Available high memory size */
+    //         unsigned int mem_unit;   /* Memory unit size in bytes */
+    //         char _f[20-2*sizeof(long)-sizeof(int)];
+    //                                  /* Padding to 64 bytes */
+    //     };
+
+    f = fopen("/proc/vmstat", "r");
+    int pswpin = 0;
+    int pswpout = 0;
+    int pgpgin = 0;
+    int pgpgout = 0;
+    int pgfault = 0;
+    int pgmajfault = 0;
+    static int pswpin_base = 0;
+    static int pswpout_base = 0;
+    static int pgpgin_base = 0;
+    static int pgpgout_base = 0;
+    static int pgfault_base = 0;
+    static int pgmajfault_base = 0;
+
+    if (f) {
+      while (fgets(line, 256, f)) {
+        sscanf(line, "pswpin %d", &pswpin);
+        sscanf(line, "pswpout %d", &pswpout);
+        sscanf(line, "pgpgin %d", &pgpgin);
+        sscanf(line, "pgpgout %d", &pgpgout);
+        sscanf(line, "pgfault %d", &pgfault);
+        sscanf(line, "pgmajfault %d", &pgmajfault);
+      }
+      if (pswpin_base == 0) pswpin_base = pswpin;
+      if (pswpout_base == 0) pswpout_base = pswpout;
+      if (pgpgin_base == 0) pgpgin_base = pgpgin;
+      if (pgpgout_base == 0) pgpgout_base = pgpgout;
+      if (pgfault_base == 0) pgfault_base = pgfault;
+      if (pgmajfault_base == 0) pgmajfault_base = pgmajfault;
+      fclose(f);
+    }
+
+    f = fopen("/proc/meminfo", "r");
+    int cached = 0;
+    int active_anon = 0;
+    int inactive_anon = 0;
+    int active_file = 0;
+    int inactive_file = 0;
+    int mapped = 0;
+    if (f) {
+      while (fgets(line, 256, f)) {
+        sscanf(line, "Cached: %d", &cached);
+        sscanf(line, "Active(anon): %d", &active_anon);
+        sscanf(line, "Inactive(anon): %d", &inactive_anon);
+        sscanf(line, "Active(file): %d", &active_file);
+        sscanf(line, "Inactive(file): %d", &inactive_file);
+        // sscanf(line, "Mapped: %d", &mapped);
+      }
+      fclose(f);
+    }
+
+    f = fopen("/proc/tvbcm/meminfo", "r");
+    int free0 = 0;
+    int free1 = 0;
+    if (f) {
+      while (fgets(line, 256, f)) {
+        if (free0 == 0)
+          sscanf(line, "free %d", &free0);
+        else if (free1 == 0)
+          sscanf(line, "free %d", &free1);
+      }
+      fclose(f);
+    }
+
+    tditrace("FREE~%u",
+             (unsigned int)((systemInfo.freeram / 1024) * systemInfo.mem_unit));
+    tditrace("BUFF~%u", (unsigned int)((systemInfo.bufferram / 1024) *
+                                       systemInfo.mem_unit));
+    tditrace("CACH~%u", (unsigned int)cached);
+    tditrace(
+        "SWAP~%u",
+        (unsigned int)(((systemInfo.totalswap - systemInfo.freeswap) / 1024)) *
+            systemInfo.mem_unit);
+
+
+    tditrace("PSWPIN~%u", (unsigned int)pswpin - pswpin_base);
+    tditrace("PSWPOUT~%u", (unsigned int)pswpout - pswpout_base);
+    tditrace("PGPGIN~%u", (unsigned int)pgpgin - pgpgin_base);
+    tditrace("PGPGOUT~%u", (unsigned int)pgpgout - pgpgout_base);
+    tditrace("PGFAULT~%u", (unsigned int)pgfault - pgfault_base);
+    tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault - pgmajfault_base);
+
+    tditrace("A_ANON~%u", (unsigned int)active_anon);
+    tditrace("I_ANON~%u", (unsigned int)inactive_anon);
+    tditrace("A_FILE~%u", (unsigned int)active_file);
+    tditrace("I_FILE~%u", (unsigned int)inactive_file);
+    // tditrace("MAPPED~%d", (unsigned int)mapped);
+
+    tditrace("HEAP0FREE~%u", (unsigned int)(free0 / 1024));
+    tditrace("HEAP1FREE~%u", (unsigned int)(free1 / 1024));
+  }
+
+  if (do_heap) {
+    struct mallinfo mi;
+
+    mi = mallinfo();
+
+    // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
+    // printf("# of free chunks (ordblks):            %d\n",
+    // mi.ordblks);
+    // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+    // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
+    // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+    // printf("Max. total allocated space (usmblks):  %d\n",
+    // mi.usmblks);
+    // printf("Free bytes held in fastbins (fsmblks): %d\n",
+    // mi.fsmblks);
+    // printf("Total allocated space (uordblks):      %d\n",
+    // mi.uordblks);
+    // printf("Total free space (fordblks):           %d\n",
+    // mi.fordblks);
+    // printf("Topmost releasable block (keepcost):   %d\n",
+    // mi.keepcost);
+
+    tditrace("BRK~%u", mi.arena / 1024);
+    tditrace("MMAP~%u", mi.hblkhd / 1024);
+    // tditrace("mi_ordblks~%d", mi.ordblks);
+    // tditrace("mi_smblks~%d", mi.smblks);
+
+    // tditrace("hblks~%d", mi.hblks);
+    // tditrace("hblkhd~%d", mi.hblkhd);
+
+    // tditrace("mi_usmblks~%d", mi.usmblks);
+    // tditrace("mi_fsmblks~%d", mi.fsmblks);
+    // tditrace("mi_uordblks~%d", mi.uordblks);
+    // tditrace("mi_fordblks~%d", mi.fordblks);
+    // tditrace("mi_keepcost~%d", mi.keepcost);
+  }
+
+  if (do_vmsize || do_rss) {
+    unsigned long vmsize = 0L;
+    unsigned long rss = 0L;
+
+    int fh = 0;
+    char buffer[65];
+    int gotten;
+    fh = open("/proc/self/statm", O_RDONLY);
+    gotten = read(fh, buffer, 64);
+    buffer[gotten] = '\0';
+    if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
+      if (do_vmsize) tditrace("VM~%u", (unsigned int)(vmsize * 4));
+      if (do_rss) tditrace("RSS~%u", (unsigned int)(rss * 4));
+    }
+    close(fh);
+  }
+
+  if (1 || do_maxrss || do_minflt || do_majflt) {
+    struct rusage resourceUsage;
+    getrusage(RUSAGE_SELF, &resourceUsage);
+
+    // struct rusage {
+    //       struct timeval ru_utime; /* user CPU time used */
+    //       struct timeval ru_stime; /* system CPU time used */
+    //       long   ru_maxrss;        /* maximum resident set size */
+    //       long   ru_ixrss;         /* integral shared memory size */
+    //       long   ru_idrss;         /* integral unshared data size */
+    //       long   ru_isrss;         /* integral unshared stack size */
+    //       long   ru_minflt;        /* page reclaims (soft page faults) */
+    //       long   ru_majflt;        /* page faults (hard page faults) */
+    //       long   ru_nswap;         /* swaps */
+    //       long   ru_inblock;       /* block input operations */
+    //       long   ru_oublock;       /* block output operations */
+    //       long   ru_msgsnd;        /* IPC messages sent */
+    //       long   ru_msgrcv;        /* IPC messages received */
+    //       long   ru_nsignals;      /* signals received */
+    //       long   ru_nvcsw;         /* voluntary context switches */
+    //       long   ru_nivcsw;        /* involuntary context switches */
+    //   };
+
+    if (do_maxrss)
+      tditrace("MAXRSS~%u", (unsigned int)(resourceUsage.ru_maxrss / 1024));
+    if (do_minflt) tditrace("MINFLT~%u", (unsigned int)resourceUsage.ru_minflt);
+    if (do_majflt) tditrace("MAJFLT~%u", (unsigned int)resourceUsage.ru_majflt);
+
+    if (1) tditrace("BI~%u", (unsigned int)resourceUsage.ru_inblock);
+    if (1) tditrace("BO~%u", (unsigned int)resourceUsage.ru_oublock);
+
+  }
+}
+
 static void *monitor_thread(void *param) {
-  static int seconds_counter = 0;
+  sample_info();
 
   stat(gtracebufferfilename, &gtrace_buffer_st);
-  usleep(1 * 1000 * 1000);
-  dump_proc_self_maps();
 
-  fprintf(stderr, "tdi: monitoring...[%s][%d]\n", gprocname, gpid);
+  if (do_maps) {
+    usleep(1 * 1000 * 1000);
+    dump_proc_self_maps();
+  }
+
+  fprintf(stderr, "tdi: monitoring[%s][%d]\n", gprocname, gpid);
   while (1) {
-    seconds_counter++;
-
     if (do_maps) {
       if (do_dump_proc_self_maps) {
         dump_proc_self_maps();
@@ -1027,91 +1235,12 @@ static void *monitor_thread(void *param) {
       }
     }
 
-    if (do_heap) {
-      struct mallinfo mi;
-
-      mi = mallinfo();
-
-      // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
-      // printf("# of free chunks (ordblks):            %d\n",
-      // mi.ordblks);
-      // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-      // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
-      // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-      // printf("Max. total allocated space (usmblks):  %d\n",
-      // mi.usmblks);
-      // printf("Free bytes held in fastbins (fsmblks): %d\n",
-      // mi.fsmblks);
-      // printf("Total allocated space (uordblks):      %d\n",
-      // mi.uordblks);
-      // printf("Total free space (fordblks):           %d\n",
-      // mi.fordblks);
-      // printf("Topmost releasable block (keepcost):   %d\n",
-      // mi.keepcost);
-
-      tditrace("HEAP~%d", mi.arena + mi.hblkhd);
-      // tditrace("mi_ordblks~%d", mi.ordblks);
-      // tditrace("mi_smblks~%d", mi.smblks);
-
-      // tditrace("hblks~%d", mi.hblks);
-      // tditrace("hblkhd~%d", mi.hblkhd);
-
-      // tditrace("mi_usmblks~%d", mi.usmblks);
-      // tditrace("mi_fsmblks~%d", mi.fsmblks);
-      // tditrace("mi_uordblks~%d", mi.uordblks);
-      // tditrace("mi_fordblks~%d", mi.fordblks);
-      // tditrace("mi_keepcost~%d", mi.keepcost);
-    }
-
-    if (do_vmsize || do_rss) {
-      unsigned long vmsize = 0L;
-      unsigned long rss = 0L;
-
-      int fh = 0;
-      char buffer[65];
-      int gotten;
-      fh = open("/proc/self/statm", O_RDONLY);
-      gotten = read(fh, buffer, 64);
-      buffer[gotten] = '\0';
-      if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
-        if (do_vmsize) tditrace("VMSIZE~%d", (int)(vmsize * 4096));
-        if (do_rss) tditrace("RSS~%d", (int)(rss * 4096));
-      }
-      close(fh);
-    }
-
-    if (do_maxrss || do_minflt || do_majflt) {
-      struct rusage resourceUsage;
-      getrusage(RUSAGE_SELF, &resourceUsage);
-
-      // struct rusage {
-      //       struct timeval ru_utime; /* user CPU time used */
-      //       struct timeval ru_stime; /* system CPU time used */
-      //       long   ru_maxrss;        /* maximum resident set size */
-      //       long   ru_ixrss;         /* integral shared memory size */
-      //       long   ru_idrss;         /* integral unshared data size */
-      //       long   ru_isrss;         /* integral unshared stack size */
-      //       long   ru_minflt;        /* page reclaims (soft page faults) */
-      //       long   ru_majflt;        /* page faults (hard page faults) */
-      //       long   ru_nswap;         /* swaps */
-      //       long   ru_inblock;       /* block input operations */
-      //       long   ru_oublock;       /* block output operations */
-      //       long   ru_msgsnd;        /* IPC messages sent */
-      //       long   ru_msgrcv;        /* IPC messages received */
-      //       long   ru_nsignals;      /* signals received */
-      //       long   ru_nvcsw;         /* voluntary context switches */
-      //       long   ru_nivcsw;        /* involuntary context switches */
-      //   };
-
-      if (do_maxrss) tditrace("MAXRSS~%d", resourceUsage.ru_maxrss);
-      if (do_minflt) tditrace("MINFLT~%d", resourceUsage.ru_minflt);
-      if (do_majflt) tditrace("MAJFLT~%d", resourceUsage.ru_majflt);
-    }
-
-    struct stat st;
-    stat(gtracebufferfilename, &st);
+    sample_info();
 
     if (gtouch) {
+      struct stat st;
+      stat(gtracebufferfilename, &st);
+
       // fprintf(stderr, "tdi-check: %s atim=%d gatim=%d\n",
       // gtracebufferfilename,
       //        st.st_atim.tv_sec, gtrace_buffer_st.st_atim.tv_sec);
@@ -1500,13 +1629,12 @@ void start_monitor_thread(void) {
   static pthread_t monitor_thread_id;
 
   if (do_vmsize | do_rss | do_heap | do_maxrss | do_majflt | do_minflt |
-      do_maps | gtouch) {
+      do_sysinfo | do_maps | gtouch) {
     pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
   }
 }
 
 int tditrace_init(void) {
-  struct timeval mytime;
   int i;
 
   if (tditrace_inited) {
@@ -1519,20 +1647,33 @@ int tditrace_init(void) {
   if (strcmp(gprocname, "mkdir") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
             gprocname, gpid);
-    return 0;
+    return -1;
   } else if (strncmp(gprocname, "sh", 2) == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
             gprocname, gpid);
-    return 0;
+    return -1;
+  } else if (strncmp(gprocname, "rm", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"rm\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strcmp(gprocname, "iptables") == 0) {
+    fprintf(stderr,
+            "tdi: init[%s][%d], procname is \"iptables\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strcmp(gprocname, "route") == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"route\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
   } else if (strcmp(gprocname, "strace") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
-    return 0;
+    return -1;
   } else if (strcmp(gprocname, "gdbserver") == 0) {
     fprintf(stderr,
             "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
             gprocname, gpid);
-    return 0;
+    return -1;
   } else {
     // fprintf(stderr, "tdi: init[%s][%d]\n", gprocname, gpid);
   }
@@ -1619,6 +1760,11 @@ int tditrace_init(void) {
   if (env = getenv("MAJFLT")) {
     do_majflt = atoi(env);
     if (do_majflt > do_persecond) do_persecond = do_majflt;
+  }
+  do_sysinfo = 0;
+  if (env = getenv("SYSINFO")) {
+    do_sysinfo = atoi(env);
+    if (do_sysinfo > do_persecond) do_persecond = do_sysinfo;
   }
 
   do_offload = 0;
@@ -1710,9 +1856,6 @@ int tditrace_init(void) {
 }
 
 static void tditrace_rewind() {
-  struct timeval mytime;
-  int i;
-
   LOCK();
   tditrace_inited = 0;
   UNLOCK();
