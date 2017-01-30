@@ -25,8 +25,8 @@
 void tditrace(const char *format, ...);
 void tditrace_ex(int mask, const char *format, ...);
 
-pid_t gpid;
-char gprocname[128];
+static pid_t gpid;
+static char gprocname[128];
 
 #if 0
 
@@ -72,31 +72,30 @@ static void simplefu_mutex_init(simplemu mx) {
 static void simplefu_mutex_lock(simplemu mx) { simplefu_down(&mx->sema); }
 static void simplefu_mutex_unlock(simplemu mx) { simplefu_up(&mx->sema); }
 
-void LOCK_init(void) {
+static void LOCK_init(void) {
   simplefu_mutex_init(&myMutex);
 } 
 
-void LOCK(void) {
+static void LOCK(void) {
   simplefu_mutex_lock(&myMutex);
 } 
 
-void UNLOCK(void) {
+static void UNLOCK(void) {
   simplefu_mutex_unlock(&myMutex);
 }
 
 #else
 
-pthread_mutex_t lock;
+static pthread_mutex_t lock;
 
-void LOCK_init(void) {
+static void LOCK_init(void) {
   if (pthread_mutex_init(&lock, NULL) != 0) {
     fprintf(stderr, "\n mutex init failed\n");
   }
 }
 
-void LOCK(void) { pthread_mutex_lock(&lock); }
-
-void UNLOCK(void) { pthread_mutex_unlock(&lock); }
+static void LOCK(void) { pthread_mutex_lock(&lock); }
+static void UNLOCK(void) { pthread_mutex_unlock(&lock); }
 
 #endif
 
@@ -113,8 +112,8 @@ void UNLOCK(void) { pthread_mutex_unlock(&lock); }
 
 static unsigned int gtracebuffersize = 16 * 1024 * 1024;
 
-char gtracebufferfilename[128];
-struct stat gtrace_buffer_st;
+static char gtracebufferfilename[128];
+static struct stat gtrace_buffer_st;
 
 static char *gtrace_buffer;
 static char *trace_buffer_byte_ptr;
@@ -802,7 +801,7 @@ typedef struct {
   int valid;
 } tracebuffer_t;
 
-tracebuffer_t tracebuffers[10];
+static tracebuffer_t tracebuffers[10];
 
 static void parse(int bid) {
   /*
@@ -911,7 +910,7 @@ static void get_process_name_by_pid(const int pid, char *name) {
   }
 }
 
-char proc_self_maps[16 * 1024 + 1];
+static char proc_self_maps[16 * 1024 + 1];
 
 static void dump_proc_self_maps(void) {
   int fd;
@@ -955,13 +954,8 @@ static void dump_proc_self_maps(void) {
 
 static int gmask = 0x0;
 
-static int do_vmsize = 0;
-static int do_rss = 0;
-static int do_heap = 0;
-static int do_maxrss = 0;
-static int do_majflt = 0;
-static int do_minflt = 0;
 static int do_sysinfo = 0;
+static int do_selfinfo = 0;
 static int do_persecond = 0;
 
 static int gtouch = 0x0;
@@ -1011,12 +1005,20 @@ static void tmpfs_message(void) {
 }
 
 static void sample_info(void) {
-  if (do_sysinfo) {
-    char line[256];
-    FILE *f = NULL;
+  char line[256];
+  FILE *f = NULL;
 
-    struct sysinfo systemInfo;
-    sysinfo(&systemInfo);
+  int do_structsysinfo = do_sysinfo;
+  int do_structmallinfo = do_selfinfo;
+  int do_structgetrusage = 0;  // do_selfinfo;
+  int do_procvmstat = do_sysinfo;
+  int do_procmeminfo = do_sysinfo;
+  int do_proctvbcmmeminfo = do_sysinfo;
+  int do_procselfstatm = do_selfinfo;
+
+  struct sysinfo si;
+  if (do_structsysinfo) {
+    sysinfo(&si);
 
     // struct sysinfo {
     //         long uptime;             /* Seconds since boot */
@@ -1035,14 +1037,60 @@ static void sample_info(void) {
     //         char _f[20-2*sizeof(long)-sizeof(int)];
     //                                  /* Padding to 64 bytes */
     //     };
+  }
 
+  struct mallinfo mi;
+  if (do_structmallinfo) {
+    mi = mallinfo();
+
+    // struct mallinfo {
+    //       int arena;     /* Non-mmapped space allocated (bytes) */
+    //       int ordblks;   /* Number of free chunks */
+    //       int smblks;    /* Number of free fastbin blocks */
+    //       int hblks;     /* Number of mmapped regions */
+    //       int hblkhd;    /* Space allocated in mmapped regions
+    //       (bytes) */
+    //       int usmblks;   /* Maximum total allocated space (bytes) */
+    //       int fsmblks;   /* Space in freed fastbin blocks (bytes) */
+    //       int uordblks;  /* Total allocated space (bytes) */
+    //       int fordblks;  /* Total free space (bytes) */
+    //       int keepcost;  /* Top-most, releasable space (bytes) */
+    //    };
+  }
+
+  struct rusage ru;
+  if (do_structgetrusage) {
+    getrusage(RUSAGE_SELF, &ru);
+
+    // struct rusage {
+    //       struct timeval ru_utime; /* user CPU time used */
+    //       struct timeval ru_stime; /* system CPU time used */
+    //       long   ru_maxrss;        /* maximum resident set size */
+    //       long   ru_ixrss;         /* integral shared memory size */
+    //       long   ru_idrss;         /* integral unshared data size */
+    //       long   ru_isrss;         /* integral unshared stack size */
+    //       long   ru_minflt;        /* page reclaims (soft page faults) */
+    //       long   ru_majflt;        /* page faults (hard page faults) */
+    //       long   ru_nswap;         /* swaps */
+    //       long   ru_inblock;       /* block input operations */
+    //       long   ru_oublock;       /* block output operations */
+    //       long   ru_msgsnd;        /* IPC messages sent */
+    //       long   ru_msgrcv;        /* IPC messages received */
+    //       long   ru_nsignals;      /* signals received */
+    //       long   ru_nvcsw;         /* voluntary context switches */
+    //       long   ru_nivcsw;        /* involuntary context switches */
+    //   };
+  }
+
+  int pswpin = 0;
+  int pswpout = 0;
+  int pgpgin = 0;
+  int pgpgout = 0;
+  int pgfault = 0;
+  int pgmajfault = 0;
+
+  if (do_procvmstat) {
     f = fopen("/proc/vmstat", "r");
-    int pswpin = 0;
-    int pswpout = 0;
-    int pgpgin = 0;
-    int pgpgout = 0;
-    int pgfault = 0;
-    int pgmajfault = 0;
     static int pswpin_base = 0;
     static int pswpout_base = 0;
     static int pgpgin_base = 0;
@@ -1065,16 +1113,26 @@ static void sample_info(void) {
       if (pgpgout_base == 0) pgpgout_base = pgpgout;
       if (pgfault_base == 0) pgfault_base = pgfault;
       if (pgmajfault_base == 0) pgmajfault_base = pgmajfault;
+      pswpin -= pswpin_base;
+      pswpout -= pswpout_base;
+      pgpgin -= pgpgin_base;
+      pgpgout -= pgpgout_base;
+      pgfault -= pgfault_base;
+      pgmajfault -= pgmajfault_base;
+
       fclose(f);
     }
+  }
 
+  int cached = 0;
+  int active_anon = 0;
+  int inactive_anon = 0;
+  int active_file = 0;
+  int inactive_file = 0;
+  int mapped = 0;
+
+  if (do_procmeminfo) {
     f = fopen("/proc/meminfo", "r");
-    int cached = 0;
-    int active_anon = 0;
-    int inactive_anon = 0;
-    int active_file = 0;
-    int inactive_file = 0;
-    int mapped = 0;
     if (f) {
       while (fgets(line, 256, f)) {
         sscanf(line, "Cached: %d", &cached);
@@ -1086,37 +1144,51 @@ static void sample_info(void) {
       }
       fclose(f);
     }
+  }
 
+  int heap0free = 0;
+  int heap1free = 0;
+
+  if (do_proctvbcmmeminfo) {
     f = fopen("/proc/tvbcm/meminfo", "r");
-    int free0 = 0;
-    int free1 = 0;
     if (f) {
       while (fgets(line, 256, f)) {
-        if (free0 == 0)
-          sscanf(line, "free %d", &free0);
-        else if (free1 == 0)
-          sscanf(line, "free %d", &free1);
+        if (heap0free == 0)
+          sscanf(line, "free %d", &heap0free);
+        else if (heap1free == 0)
+          sscanf(line, "free %d", &heap1free);
       }
       fclose(f);
     }
+  }
 
-    tditrace("FREE~%u",
-             (unsigned int)((systemInfo.freeram / 1024) * systemInfo.mem_unit));
-    tditrace("BUFF~%u", (unsigned int)((systemInfo.bufferram / 1024) *
-                                       systemInfo.mem_unit));
+  unsigned long vmsize = 0;
+  unsigned long rss = 0;
+
+  if (do_procselfstatm) {
+    int fh = 0;
+    char buffer[65];
+    int gotten;
+    fh = open("/proc/self/statm", O_RDONLY);
+    gotten = read(fh, buffer, 64);
+    buffer[gotten] = '\0';
+    sscanf(buffer, "%lu %lu", &vmsize, &rss);
+    close(fh);
+  }
+
+  if (do_sysinfo) {
+    tditrace("FREE~%u", (unsigned int)((si.freeram / 1024) * si.mem_unit));
+    tditrace("BUFF~%u", (unsigned int)((si.bufferram / 1024) * si.mem_unit));
     tditrace("CACH~%u", (unsigned int)cached);
-    tditrace(
-        "SWAP~%u",
-        (unsigned int)(((systemInfo.totalswap - systemInfo.freeswap) / 1024)) *
-            systemInfo.mem_unit);
+    tditrace("SWAP~%u", (unsigned int)(((si.totalswap - si.freeswap) / 1024)) *
+                            si.mem_unit);
 
-
-    tditrace("PSWPIN~%u", (unsigned int)pswpin - pswpin_base);
-    tditrace("PSWPOUT~%u", (unsigned int)pswpout - pswpout_base);
-    tditrace("PGPGIN~%u", (unsigned int)pgpgin - pgpgin_base);
-    tditrace("PGPGOUT~%u", (unsigned int)pgpgout - pgpgout_base);
-    tditrace("PGFAULT~%u", (unsigned int)pgfault - pgfault_base);
-    tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault - pgmajfault_base);
+    tditrace("PSWPIN~%u", (unsigned int)pswpin);
+    tditrace("PSWPOUT~%u", (unsigned int)pswpout);
+    tditrace("PGPGIN~%u", (unsigned int)pgpgin);
+    tditrace("PGPGOUT~%u", (unsigned int)pgpgout);
+    tditrace("PGFAULT~%u", (unsigned int)pgfault);
+    tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault);
 
     tditrace("A_ANON~%u", (unsigned int)active_anon);
     tditrace("I_ANON~%u", (unsigned int)inactive_anon);
@@ -1124,95 +1196,20 @@ static void sample_info(void) {
     tditrace("I_FILE~%u", (unsigned int)inactive_file);
     // tditrace("MAPPED~%d", (unsigned int)mapped);
 
-    tditrace("HEAP0FREE~%u", (unsigned int)(free0 / 1024));
-    tditrace("HEAP1FREE~%u", (unsigned int)(free1 / 1024));
+    tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
+    tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
   }
 
-  if (do_heap) {
-    struct mallinfo mi;
-
-    mi = mallinfo();
-
-    // printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
-    // printf("# of free chunks (ordblks):            %d\n",
-    // mi.ordblks);
-    // printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-    // printf("# of mapped regions (hblks):           %d\n", mi.hblks);
-    // printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-    // printf("Max. total allocated space (usmblks):  %d\n",
-    // mi.usmblks);
-    // printf("Free bytes held in fastbins (fsmblks): %d\n",
-    // mi.fsmblks);
-    // printf("Total allocated space (uordblks):      %d\n",
-    // mi.uordblks);
-    // printf("Total free space (fordblks):           %d\n",
-    // mi.fordblks);
-    // printf("Topmost releasable block (keepcost):   %d\n",
-    // mi.keepcost);
-
+  if (do_selfinfo) {
+    tditrace("RSS~%u", (unsigned int)(rss * 4));
     tditrace("BRK~%u", mi.arena / 1024);
     tditrace("MMAP~%u", mi.hblkhd / 1024);
-    // tditrace("mi_ordblks~%d", mi.ordblks);
-    // tditrace("mi_smblks~%d", mi.smblks);
-
-    // tditrace("hblks~%d", mi.hblks);
-    // tditrace("hblkhd~%d", mi.hblkhd);
-
-    // tditrace("mi_usmblks~%d", mi.usmblks);
-    // tditrace("mi_fsmblks~%d", mi.fsmblks);
-    // tditrace("mi_uordblks~%d", mi.uordblks);
-    // tditrace("mi_fordblks~%d", mi.fordblks);
-    // tditrace("mi_keepcost~%d", mi.keepcost);
-  }
-
-  if (do_vmsize || do_rss) {
-    unsigned long vmsize = 0L;
-    unsigned long rss = 0L;
-
-    int fh = 0;
-    char buffer[65];
-    int gotten;
-    fh = open("/proc/self/statm", O_RDONLY);
-    gotten = read(fh, buffer, 64);
-    buffer[gotten] = '\0';
-    if (sscanf(buffer, "%lu %lu", &vmsize, &rss) != 1) {
-      if (do_vmsize) tditrace("VM~%u", (unsigned int)(vmsize * 4));
-      if (do_rss) tditrace("RSS~%u", (unsigned int)(rss * 4));
-    }
-    close(fh);
-  }
-
-  if (1 || do_maxrss || do_minflt || do_majflt) {
-    struct rusage resourceUsage;
-    getrusage(RUSAGE_SELF, &resourceUsage);
-
-    // struct rusage {
-    //       struct timeval ru_utime; /* user CPU time used */
-    //       struct timeval ru_stime; /* system CPU time used */
-    //       long   ru_maxrss;        /* maximum resident set size */
-    //       long   ru_ixrss;         /* integral shared memory size */
-    //       long   ru_idrss;         /* integral unshared data size */
-    //       long   ru_isrss;         /* integral unshared stack size */
-    //       long   ru_minflt;        /* page reclaims (soft page faults) */
-    //       long   ru_majflt;        /* page faults (hard page faults) */
-    //       long   ru_nswap;         /* swaps */
-    //       long   ru_inblock;       /* block input operations */
-    //       long   ru_oublock;       /* block output operations */
-    //       long   ru_msgsnd;        /* IPC messages sent */
-    //       long   ru_msgrcv;        /* IPC messages received */
-    //       long   ru_nsignals;      /* signals received */
-    //       long   ru_nvcsw;         /* voluntary context switches */
-    //       long   ru_nivcsw;        /* involuntary context switches */
-    //   };
-
-    if (do_maxrss)
-      tditrace("MAXRSS~%u", (unsigned int)(resourceUsage.ru_maxrss / 1024));
-    if (do_minflt) tditrace("MINFLT~%u", (unsigned int)resourceUsage.ru_minflt);
-    if (do_majflt) tditrace("MAJFLT~%u", (unsigned int)resourceUsage.ru_majflt);
-
-    if (1) tditrace("BI~%u", (unsigned int)resourceUsage.ru_inblock);
-    if (1) tditrace("BO~%u", (unsigned int)resourceUsage.ru_oublock);
-
+    //tditrace("VM~%u", (unsigned int)(vmsize * 4));
+    //tditrace("MAXRSS~%u", (unsigned int)(ru.ru_maxrss / 1024));
+    //tditrace("MINFLT~%u", (unsigned int)ru.ru_minflt);
+    //tditrace("MAJFLT~%u", (unsigned int)ru.ru_majflt);
+    tditrace("BI~%u", (unsigned int)ru.ru_inblock);
+    tditrace("BO~%u", (unsigned int)ru.ru_oublock);
   }
 }
 
@@ -1515,7 +1512,7 @@ static int create_trace_buffer(void) {
 
 static int thedelay;
 
-void start_monitor_thread(void);
+static void start_monitor_thread(void);
 
 static void *delayed_init_thread(void *param) {
   int *pdelay = (int *)param;
@@ -1604,32 +1601,31 @@ static void *delayed_init_thread(void *param) {
   pthread_exit(NULL);
 }
 
-const char *instruments[] = {"console",     // 0x00000001
-                             "render",      // 0x00000002
-                             "css",         // 0x00000004
-                             "dom",         // 0x00000008
-                             "canvas",      // 0x00000010
-                             "webgl",       // 0x00000020
-                             "image",       // 0x00000040
-                             "graphics",    // 0x00000080
-                             "graphicsqt",  // 0x00000100
-                             "texmap",      // 0x00000200
-                             "opengl",      // 0x00000400
-                             "qweb",        // 0x00000800
-                             "resource",    // 0x00001000
-                             "javascript",  // 0x00002000
-                             "allocator"};  // 0x00004000
+static const char *instruments[] = {"console",     // 0x00000001
+                                    "render",      // 0x00000002
+                                    "css",         // 0x00000004
+                                    "dom",         // 0x00000008
+                                    "canvas",      // 0x00000010
+                                    "webgl",       // 0x00000020
+                                    "image",       // 0x00000040
+                                    "graphics",    // 0x00000080
+                                    "graphicsqt",  // 0x00000100
+                                    "texmap",      // 0x00000200
+                                    "opengl",      // 0x00000400
+                                    "qweb",        // 0x00000800
+                                    "resource",    // 0x00001000
+                                    "javascript",  // 0x00002000
+                                    "allocator"};  // 0x00004000
 
-const char *touches[] = {"rewind",    // 0x00000001
-                         "shaders",   // 0x00000002
-                         "textures",  // 0x00000004
-                         "frames"};   // 0x00000008
+static const char *touches[] = {"rewind",    // 0x00000001
+                                "shaders",   // 0x00000002
+                                "textures",  // 0x00000004
+                                "frames"};   // 0x00000008
 
 void start_monitor_thread(void) {
   static pthread_t monitor_thread_id;
 
-  if (do_vmsize | do_rss | do_heap | do_maxrss | do_majflt | do_minflt |
-      do_sysinfo | do_maps | gtouch) {
+  if (do_sysinfo | do_selfinfo | do_maps | gtouch) {
     pthread_create(&monitor_thread_id, NULL, monitor_thread, &monitor);
   }
 }
@@ -1731,40 +1727,16 @@ int tditrace_init(void) {
 
   do_persecond = 1;
 
-  do_vmsize = 0;
-  if (env = getenv("VMSIZE")) {
-    do_vmsize = atoi(env);
-    if (do_vmsize > do_persecond) do_persecond = do_vmsize;
-  }
-  do_rss = 0;
-  if (env = getenv("RSS")) {
-    do_rss = atoi(env);
-    if (do_rss > do_persecond) do_persecond = do_rss;
-  }
-  do_heap = 0;
-  if (env = getenv("HEAP")) {
-    do_heap = atoi(env);
-    if (do_heap > do_persecond) do_persecond = do_heap;
-  }
-  do_maxrss = 0;
-  if (env = getenv("MAXRSS")) {
-    do_maxrss = atoi(env);
-    if (do_maxrss > do_persecond) do_persecond = do_maxrss;
-  }
-  do_minflt = 0;
-  if (env = getenv("MINFLT")) {
-    do_minflt = atoi(env);
-    if (do_minflt > do_persecond) do_persecond = do_minflt;
-  }
-  do_majflt = 0;
-  if (env = getenv("MAJFLT")) {
-    do_majflt = atoi(env);
-    if (do_majflt > do_persecond) do_persecond = do_majflt;
-  }
   do_sysinfo = 0;
   if (env = getenv("SYSINFO")) {
     do_sysinfo = atoi(env);
     if (do_sysinfo > do_persecond) do_persecond = do_sysinfo;
+  }
+
+  do_selfinfo = 0;
+  if (env = getenv("SELFINFO")) {
+    do_selfinfo = atoi(env);
+    if (do_selfinfo > do_persecond) do_persecond = do_selfinfo;
   }
 
   do_offload = 0;
@@ -1887,7 +1859,7 @@ static void tditrace_rewind() {
   UNLOCK();
 }
 
-void check_trace_buffer(int b) {
+static void check_trace_buffer(int b) {
   FILE *file;
 
   if ((file = fopen(tracebuffers[b].filename, "r")) != NULL) {

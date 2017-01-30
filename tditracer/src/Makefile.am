@@ -9,50 +9,76 @@ libtditracer_la_LIBADD = \
    ../../tdi/src/libtdi.la -ldl
 
 libtditracer_la_SOURCES = \
-   framecapture.c \
-   framelinkedlist.c \
-   framelinkedlist.h \
-   shadercapture.c \
-   shaderlinkedlist.c \
-   shaderlinkedlist.h \
-   texturecapture.c \
-   texturelinkedlist.c \
-   texturelinkedlist.h \
-   gldefs.h \
    tracermain.cpp \
-   tracerutils.cpp \
-   traceregl.cpp \
+   tracerextra.cpp
+
+#   tracerwayland.c
+
+######################################################
+
+if NOEGL
+   libtditracer_la_CPPFLAGS += -DNOEGL
+endif
+
+if !NOEGL
+   libtditracer_la_SOURCES += 
+   traceregl.cpp
+endif
+
+######################################################
+
+if NOGLES2
+libtditracer_la_CPPFLAGS += -DNOGLES2
+endif
+
+if !NOGLES2
+   libtditracer_la_SOURCES += 
    tracergles2.cpp \
-   tracerlibc.cpp \
-   tracersgx.cpp \
-   tracerpthread.cpp \
-   tracersem.cpp \
-   tracermq.cpp \
-   tracerextra.cpp \
-   tracerwayland.c \
    gles2spinner.cpp \
    gles2text.cpp \
    gles2bars.cpp \
    gles2capture.cpp \
    gles2extra.cpp \
    gles2util.cpp
-
-if NOEGL
-libtditracer_la_CPPFLAGS += -DNOEGL
+   framecapture.c \
+   framelinkedlist.c \
+   shadercapture.c \
+   shaderlinkedlist.c \
+   texturecapture.c \
+   texturelinkedlist.c
 endif
 
-if NOGLES2
-libtditracer_la_CPPFLAGS += -DNOGLES2
-endif
+######################################################
 
 if NOLIBC
 libtditracer_la_CPPFLAGS += -DNOLIBC
 endif
 
-if NOLIBPTHREAD
-libtditracer_la_CPPFLAGS += -DNOLIBPTHREAD
+if !NOLIBC
+   libtditracer_la_SOURCES +=
+   tracerlibc.cpp
 endif
 
+######################################################
+
+if NOLIBPTHREAD
+   libtditracer_la_CPPFLAGS += -DNOLIBPTHREAD
+endif
+
+if !NOLIBPTHREAD
+   libtditracer_la_SOURCES +=
+   tracerpthread.cpp \
+   tracersem.cpp \
+   tracermq.cpp
+endif
+
+######################################################
+
 if NOSGX
-libtditracer_la_CPPFLAGS += -DNOSGX
+   libtditracer_la_CPPFLAGS += -DNOSGX
+endif
+
+if !NOSGX
+   libtditracer_la_SOURCES +=
+      tracersgx.cpp
 endif

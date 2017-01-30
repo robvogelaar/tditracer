@@ -45,9 +45,9 @@ AM_CONDITIONAL(NOSGX, test x$sgx = xno)
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/time.h unistd.h refsw/nexus_config.h])
 
-# Checks for pkg-config
-PKG_PROG_PKG_CONFIG
-PKG_CHECK_MODULES([libpng], [libpng >= 1.2.0], [], [AC_MSG_ERROR([Unable to find libpng])])
+### Checks for pkg-config
+##PKG_PROG_PKG_CONFIG
+##PKG_CHECK_MODULES([libpng], [libpng >= 1.2.0], [], [AC_MSG_ERROR([Unable to find libpng])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
