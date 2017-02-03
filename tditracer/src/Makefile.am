@@ -2,7 +2,7 @@
 
 lib_LTLIBRARIES = libtditracer.la
 
-libtditracer_la_CPPFLAGS = -fpermissive -O2 -g \
+libtditracer_la_CPPFLAGS = -O2 \
     $(libpng_CFLAGS)
 
 libtditracer_la_LIBADD = \

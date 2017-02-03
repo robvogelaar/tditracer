@@ -1015,6 +1015,8 @@ static void sample_info(void) {
   int do_procmeminfo = do_sysinfo;
   int do_proctvbcmmeminfo = do_sysinfo;
   int do_procselfstatm = do_selfinfo;
+  int do_procselfstatus = do_selfinfo;
+  int do_procselfsmaps = do_selfinfo;
 
   struct sysinfo si;
   if (do_structsysinfo) {
@@ -1059,8 +1061,13 @@ static void sample_info(void) {
   }
 
   struct rusage ru;
+  static int ru_bi_base = 0;
+  static int ru_bo_base = 0;
   if (do_structgetrusage) {
     getrusage(RUSAGE_SELF, &ru);
+
+    if (ru_bi_base == 0) ru_bi_base = ru.ru_inblock;
+    if (ru_bo_base == 0) ru_bo_base = ru.ru_oublock;
 
     // struct rusage {
     //       struct timeval ru_utime; /* user CPU time used */
@@ -1176,40 +1183,227 @@ static void sample_info(void) {
     close(fh);
   }
 
+  int smapsswap = 0;
+
+  if (do_procselfsmaps) {
+    static char proc_self_smaps[16 * 1024 + 1];
+
+    int fd;
+    int bytes;
+
+    fd = open("/proc/self/smaps", O_RDONLY);
+    if (fd >= 0) {
+      while (1) {
+        bytes = read(fd, proc_self_smaps, sizeof(proc_self_smaps) - 1);
+        if ((bytes == -1) && (errno == EINTR))
+          /* keep trying */;
+        else if (bytes > 0) {
+          proc_self_smaps[bytes] = '\0';
+
+          char *saveptr;
+          char *line = strtok_r(proc_self_smaps, "\n", &saveptr);
+
+          while (line) {
+            int swap = 0;
+            if (sscanf(line, "Swap: %d", &swap)) {
+              smapsswap += swap;
+            }
+            line = strtok_r(NULL, "\n", &saveptr);
+          }
+
+        } else
+          break;
+      }
+      close(fd);
+    }
+  }
+
+  int vmswap = 0;
+  if (do_procselfstatus) {
+    int fd;
+    int bytes;
+    static char proc_self_status[16 * 1024 + 1];
+
+    fd = open("/proc/self/status", O_RDONLY);
+    if (fd >= 0) {
+      while (1) {
+        bytes = read(fd, proc_self_status, sizeof(proc_self_status) - 1);
+        if ((bytes == -1) && (errno == EINTR))
+          /* keep trying */;
+        else if (bytes > 0) {
+          proc_self_status[bytes] = '\0';
+          char *saveptr;
+          char *line = strtok_r(proc_self_status, "\n", &saveptr);
+          while (line) {
+            if (sscanf(line, "VmSwap: %d", &vmswap)) break;
+            line = strtok_r(NULL, "\n", &saveptr);
+          }
+
+        } else
+          break;
+      }
+    }
+    close(fd);
+  }
+
   if (do_sysinfo) {
-    tditrace("FREE~%u", (unsigned int)((si.freeram / 1024) * si.mem_unit));
-    tditrace("BUFF~%u", (unsigned int)((si.bufferram / 1024) * si.mem_unit));
-    tditrace("CACH~%u", (unsigned int)cached);
-    tditrace("SWAP~%u", (unsigned int)(((si.totalswap - si.freeswap) / 1024)) *
-                            si.mem_unit);
+    static unsigned int _free_seen = 0;
+    static unsigned int _free_prev;
+    unsigned int _free = (unsigned int)((si.freeram / 1024) * si.mem_unit);
+    if (!_free_seen) {
+      _free_seen = 1;
+      tditrace("FREE~%u", _free);
+    } else if (_free_prev != _free) {
+      tditrace("FREE~%u", _free);
+    }
+    _free_prev = _free;
 
-    tditrace("PSWPIN~%u", (unsigned int)pswpin);
-    tditrace("PSWPOUT~%u", (unsigned int)pswpout);
-    tditrace("PGPGIN~%u", (unsigned int)pgpgin);
-    tditrace("PGPGOUT~%u", (unsigned int)pgpgout);
-    tditrace("PGFAULT~%u", (unsigned int)pgfault);
-    tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault);
+    static unsigned int _buff_seen = 0;
+    static unsigned int _buff_prev;
+    unsigned int _buff = (unsigned int)((si.bufferram / 1024) * si.mem_unit);
+    if (!_buff_seen) {
+      _buff_seen = 1;
+      tditrace("BUFF~%u", _buff);
+    } else if (_buff_prev != _buff) {
+      tditrace("BUFF~%u", _buff);
+    }
+    _buff_prev = _buff;
 
-    tditrace("A_ANON~%u", (unsigned int)active_anon);
-    tditrace("I_ANON~%u", (unsigned int)inactive_anon);
-    tditrace("A_FILE~%u", (unsigned int)active_file);
-    tditrace("I_FILE~%u", (unsigned int)inactive_file);
+    static unsigned int _cach_seen = 0;
+    static unsigned int _cach_prev;
+    unsigned int _cach = (unsigned int)cached;
+    if (!_cach_seen) {
+      _cach_seen = 1;
+      tditrace("CACH~%u", _cach);
+    } else if (_cach_prev != _cach) {
+      tditrace("CACH~%u", _cach);
+    }
+    _cach_prev = _cach;
+
+    static unsigned int _swap_seen = 0;
+    static unsigned int _swap_prev;
+    unsigned int _swap =
+        (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit);
+    if (!_swap_seen) {
+      _swap_seen = 1;
+      tditrace("SWAP~%u", _swap);
+    } else if (_swap_prev != _swap) {
+      tditrace("SWAP~%u", _swap);
+    }
+    _swap_prev = _swap;
+
+
+    static unsigned int _pswpin_seen = 0;
+    static unsigned int _pswpin_prev;
+    unsigned int _pswpin = (unsigned int)pswpin;
+    if (!_pswpin_seen) {
+      _pswpin_seen = 1;
+      tditrace("PSWPIN~%u", _pswpin);
+    } else if (_pswpin_prev != _pswpin) {
+      tditrace("PSWPIN~%u", _pswpin);
+    }
+    _pswpin_prev = _pswpin;
+
+
+    static unsigned int _pswpout_seen = 0;
+    static unsigned int _pswpout_prev;
+    unsigned int _pswpout = (unsigned int)pswpout;
+    if (!_pswpout_seen) {
+      _pswpout_seen = 1;
+      tditrace("PSWPOUT~%u", _pswpout);
+    } else if (_pswpout_prev != _pswpout) {
+      tditrace("PSWPOUT~%u", _pswpout);
+    }
+    _pswpout_prev = _pswpout;
+
+    static unsigned int _pgpgin_seen = 0;
+    static unsigned int _pgpgin_prev;
+    unsigned int _pgpgin = (unsigned int)pgpgin;
+    if (!_pgpgin_seen) {
+      _pgpgin_seen = 1;
+      tditrace("PGPGIN~%u", _pgpgin);
+    } else if (_pgpgin_prev != _pgpgin) {
+      tditrace("PGPGIN~%u", _pgpgin);
+    }
+    _pgpgin_prev = _pgpgin;
+
+    static unsigned int _pgpgout_seen = 0;
+    static unsigned int _pgpgout_prev;
+    unsigned int _pgpgout = (unsigned int)pgpgout;
+    if (!_pgpgout_seen) {
+      _pgpgout_seen = 1;
+      tditrace("PGPGOUT~%u", _pgpgout);
+    } else if (_pgpgout_prev != _pgpgout) {
+      tditrace("PGPGOUT~%u", _pgpgout);
+    }
+    _pgpgout_prev = _pgpgout;
+
+    // tditrace("PGFAULT~%u", (unsigned int)pgfault);
+    // tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault);
+
+    // tditrace("A_ANON~%u", (unsigned int)active_anon);
+    // tditrace("I_ANON~%u", (unsigned int)inactive_anon);
+    // tditrace("A_FILE~%u", (unsigned int)active_file);
+    // tditrace("I_FILE~%u", (unsigned int)inactive_file);
+
     // tditrace("MAPPED~%d", (unsigned int)mapped);
 
-    tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
-    tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
+    // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
+    // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
   }
 
   if (do_selfinfo) {
-    tditrace("RSS~%u", (unsigned int)(rss * 4));
-    tditrace("BRK~%u", mi.arena / 1024);
-    tditrace("MMAP~%u", mi.hblkhd / 1024);
-    //tditrace("VM~%u", (unsigned int)(vmsize * 4));
-    //tditrace("MAXRSS~%u", (unsigned int)(ru.ru_maxrss / 1024));
-    //tditrace("MINFLT~%u", (unsigned int)ru.ru_minflt);
-    //tditrace("MAJFLT~%u", (unsigned int)ru.ru_majflt);
-    tditrace("BI~%u", (unsigned int)ru.ru_inblock);
-    tditrace("BO~%u", (unsigned int)ru.ru_oublock);
+
+    static unsigned int _rss_seen = 0;
+    static unsigned int _rss_prev;
+    unsigned int _rss = (rss * 4);
+    if (!_rss_seen) {
+      _rss_seen = 1;
+      tditrace(":RSS~%u", _rss);
+    } else if (_rss_prev != _rss) {
+      tditrace(":RSS~%u", _rss);
+    }
+    _rss_prev = _rss;
+
+    static unsigned int _brk_seen = 0;
+    static unsigned int _brk_prev;
+    unsigned int _brk = (mi.arena / 1024);
+    if (!_brk_seen) {
+      _brk_seen = 1;
+      tditrace(":BRK~%u", _brk);
+    } else if (_brk_prev != _brk) {
+      tditrace(":BRK~%u", _brk);
+    }
+    _brk_prev = _brk;
+
+    static unsigned int _mmap_seen = 0;
+    static unsigned int _mmap_prev;
+    unsigned int _mmap = (mi.hblkhd / 1024);
+    if (!_mmap_seen) {
+      _mmap_seen = 1;
+      tditrace(":MMAP~%u", _mmap);
+    } else if (_mmap_prev != _mmap) {
+      tditrace(":MMAP~%u", _mmap);
+    }
+    _mmap_prev = _mmap;
+
+    static unsigned int _swap_seen = 0;
+    static unsigned int _swap_prev;
+    unsigned int _swap = smapsswap;
+    if (!_swap_seen) {
+      _swap_seen = 1;
+      tditrace(":SWAP~%u", _swap);
+    } else if (_swap_prev != _swap) {
+      tditrace(":SWAP~%u", _swap);
+    }
+    _swap_prev = _swap;
+
+    // tditrace("VM~%u", (unsigned int)(vmsize * 4));
+    // tditrace("MAXRSS~%u", (unsigned int)(ru.ru_maxrss / 1024));
+    // tditrace("MINFLT~%u", (unsigned int)ru.ru_minflt);
+    // tditrace("MAJFLT~%u", (unsigned int)ru.ru_majflt);
+    // tditrace("_BI~%u", ((unsigned int)ru.ru_inblock - ru_bi_base));
+    // tditrace("_BO~%u", ((unsigned int)ru.ru_oublock - ru_bo_base));
   }
 }
 
@@ -1644,8 +1838,24 @@ int tditrace_init(void) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
             gprocname, gpid);
     return -1;
+  } else if (strncmp(gprocname, "crypto", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"crypto\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
   } else if (strncmp(gprocname, "sh", 2) == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strncmp(gprocname, "bahsh", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"bash\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strncmp(gprocname, "ls", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"ls\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strncmp(gprocname, "genkey", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"genkey\" ; not tracing\n",
             gprocname, gpid);
     return -1;
   } else if (strncmp(gprocname, "rm", 2) == 0) {
