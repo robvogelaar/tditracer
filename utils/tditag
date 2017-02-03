@@ -64,7 +64,11 @@ def main():
             i = 0
             for match in matches:
 
+               #sys.stderr.write('match is:%s\n' % match)
+
                if re.compile(match).findall(dscwords[3]):
+
+                  #sys.stderr.write('matched:%s\n' % dscwords[3])
 
                   if not match in nams:
                      agentnams.append("NAM 8 %d %s" % ( (nextagentid + i), match))
@@ -97,34 +101,46 @@ def main():
 
          print line,
 
-         if line.startswith('OCC') or line.startswith('STA') or line.startswith('STO'):
-            last_tstamp = line.split()[3]
 
          if line.startswith('OCC') or line.startswith('STA'):
+            last_tstamp = line.split()[3]
+            #sys.stderr.write('line: %s %s\n' % (last_tstamp, line))
+
+         if line.startswith('OCC') or (line.startswith('STA') and not line.startswith('STA 3')):
 
             line = f.next()
             print line,
-            dscwords = line.split()
-            
-            i = 0
-            for match in matches:
 
-               result = re.compile(match).findall(dscwords[3])
-               if result:
-                  if first:
-                     first = False
-                     print 'STA 8 %d' % (nextagentid + i), last_tstamp
-                     print 'DSC 0 0', result
-                     print 'DSC 3 0', 1 + colors[i]
-                  else:
-                     print 'STO 8 %d' % (nextagentid + i), last_tstamp
-                     print 'STA 8 %d' % (nextagentid + i), last_tstamp
-                     print 'DSC 0 0', result
-                     print 'DSC 3 0', 1 + colors[i]
+            if line.startswith('DSC'):
 
-                  colors[i] = colors[i] ^ 7
+               #sys.stderr.write('line is: %s %s\n' % (last_tstamp, line))
 
-               i = i + 1
+               dscwords = line.split()
+               
+               i = 0
+               for match in matches:
+
+                  #sys.stderr.write('match is: %d %s %s\n' % (i, match, last_tstamp))
+
+                  result = re.compile(match).findall(dscwords[3])
+                  if result:
+
+                     #sys.stderr.write('%s dscwords is:%s\n' % (last_tstamp, dscwords[3]))
+
+                     if first:
+                        first = False
+                        print 'STA 8 %d' % (nextagentid + i), last_tstamp
+                        print 'DSC 3 0', 0 + colors[i]
+
+                     else:
+                        print 'STO 8 %d' % (nextagentid + i), last_tstamp
+
+                        colors[i] = colors[i] ^ 7
+
+                        print 'STA 8 %d' % (nextagentid + i), last_tstamp
+                        print 'DSC 3 0', 0 + colors[i]
+
+                  i = i + 1
 
       f.close()
 
