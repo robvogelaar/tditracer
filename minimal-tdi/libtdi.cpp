@@ -1,3 +1,5 @@
+extern "C" {
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -143,10 +145,13 @@ static char queues_array[1024][128];
 static int nr_queues = 0;
 static int prev_queues[128];
 
-// 128 queues of 1024 chars each
+// 128 values of 1024 chars each
 static char values_array[1024][128];
 static int nr_values = 0;
-static _u64 cum_values[128];
+
+// 128 cycles of 1024 chars each
+static char cycles_array[1024][128];
+static int nr_cycles = 0;
 
 // 128 events of 1024 chars each
 static char events_array[1024][128];
@@ -162,9 +167,10 @@ static int nr_agents = 0;
 
 static void tditrace_rewind();
 
-static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
-                     char *procname, int pid, int tid, int nr_numbers,
-                     unsigned int *numbers, unsigned short identifier) {
+static void addentry(FILE *stdout, const char *text_in, int text_len,
+                     _u64 timestamp, const char *procname, int pid, int tid,
+                     int nr_numbers, unsigned int *numbers,
+                     unsigned short identifier) {
   int i;
   int entry;
   char fullentry[1024];
@@ -697,16 +703,76 @@ static void addentry(FILE *stdout, char *text_in, int text_len, _u64 timestamp,
         sprintf(fullentry, "NAM %d %d %s\n", VALUES, VALUES * 1000 + entry,
                 values_array[entry]);
         fwrite(fullentry, strlen(fullentry), 1, stdout);
-        cum_values[entry] = 0;
       }
 
       // fill in the value
       // add a TIM and a VAL
       sprintf(fullentry, "TIM %lld\n", timestamp);
       fwrite(fullentry, strlen(fullentry), 1, stdout);
-      cum_values[entry] += value;
-      sprintf(fullentry, "VAL %d %d %lld\n", VALUES, VALUES * 1000 + entry,
-              cum_values[entry]);
+      sprintf(fullentry, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry,
+              value);
+      fwrite(fullentry, strlen(fullentry), 1, stdout);
+
+      return;
+    }
+  }
+
+  /*
+     * CYCLES entry
+     *
+     * if text is of the form name^cycle then interpret this as a cycle and add
+     * a cycle entry for it.
+     * check whether '^' exists and pull out the name and cycle
+     */
+
+  name[0] = 0;
+  char *c;
+  c = strchr(text, '^');
+  if (c && isdigit(c[1])) {
+    for (i = 0; i < (int)strlen(text); i++) {
+      if (text[i] == 32) break;
+      if (text[i] == 94) {
+        // fprintf(stderr, "text1=\"%s\"\n", text);
+
+        strncpy(name, text, i);
+        name[i] = 0;
+        value = atoi(text + i + 1);
+        text[i] = 32;  // create split marker
+
+        // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
+      }
+    }
+
+    if (strlen(name)) {
+      // check to see if we need to add this cycle entry (first occurrence)
+      entry = -1;
+
+      for (i = 0; i < nr_cycles; i++) {
+        if (strcmp(cycles_array[i], name) == 0) {
+          // found the entry
+          entry = i;
+          break;
+        }
+      }
+
+      // Do we need to add the entry?
+      if (entry == -1) {
+        strcpy(cycles_array[nr_cycles], name);
+        entry = nr_cycles;
+        nr_cycles++;
+
+        // Since we added a new entry we need to create a NAM
+        sprintf(fullentry, "NAM %d %d %s\n", CYCLES, CYCLES * 1000 + entry,
+                cycles_array[entry]);
+        fwrite(fullentry, strlen(fullentry), 1, stdout);
+      }
+
+      // fill in the value
+      // add a TIM and a CYCLE
+      sprintf(fullentry, "TIM %lld\n", timestamp);
+      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      sprintf(fullentry, "VAL %d %d %lld\n", CYCLES, CYCLES * 1000 + entry,
+              value * 10000000LL);
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       return;
@@ -851,6 +917,7 @@ static void parse(int bid) {
   //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
 }
 
+#if 0
 static unsigned int find_process_name(char *p_processname) {
   DIR *dir_p;
   struct dirent *dir_entry_p;
@@ -885,6 +952,7 @@ static unsigned int find_process_name(char *p_processname) {
   closedir(dir_p);
   return result;
 }
+#endif
 
 static void get_process_name_by_pid(const int pid, char *name) {
   char fullname[1024];
@@ -1014,6 +1082,8 @@ static void sample_info(void) {
   int do_procvmstat = do_sysinfo;
   int do_procmeminfo = do_sysinfo;
   int do_proctvbcmmeminfo = do_sysinfo;
+  int do_procstat = do_sysinfo;
+
   int do_procselfstatm = do_selfinfo;
   int do_procselfstatus = do_selfinfo;
   int do_procselfsmaps = do_selfinfo;
@@ -1136,7 +1206,7 @@ static void sample_info(void) {
   int inactive_anon = 0;
   int active_file = 0;
   int inactive_file = 0;
-  int mapped = 0;
+  //int mapped = 0;
 
   if (do_procmeminfo) {
     f = fopen("/proc/meminfo", "r");
@@ -1165,6 +1235,35 @@ static void sample_info(void) {
         else if (heap1free == 0)
           sscanf(line, "free %d", &heap1free);
       }
+      fclose(f);
+    }
+  }
+
+  struct cpu_t {
+    int user;
+    int nice;
+    int system;
+    int idle;
+    int iowait;
+    int irq;
+    int softirq;
+  };
+  cpu_t cpu, cpu0, cpu1;
+
+  if (do_procstat) {
+    f = fopen("/proc/stat", "r");
+    if (f) {
+      if (fgets(line, 256, f))
+        sscanf(line, "cpu %u %u %u %u %u %u %u", &cpu.user, &cpu.nice,
+               &cpu.system, &cpu.idle, &cpu.iowait, &cpu.irq, &cpu.softirq);
+      if (fgets(line, 256, f))
+        sscanf(line, "cpu0 %u %u %u %u %u %u %u", &cpu0.user, &cpu0.nice,
+               &cpu0.system, &cpu0.idle, &cpu0.iowait, &cpu0.irq,
+               &cpu0.softirq);
+      if (fgets(line, 256, f))
+        sscanf(line, "cpu1 %u %u %u %u %u %u %u", &cpu1.user, &cpu1.nice,
+               &cpu1.system, &cpu1.idle, &cpu1.iowait, &cpu1.irq,
+               &cpu1.softirq);
       fclose(f);
     }
   }
@@ -1292,38 +1391,14 @@ static void sample_info(void) {
     }
     _swap_prev = _swap;
 
-
-    static unsigned int _pswpin_seen = 0;
-    static unsigned int _pswpin_prev;
-    unsigned int _pswpin = (unsigned int)pswpin;
-    if (!_pswpin_seen) {
-      _pswpin_seen = 1;
-      tditrace("PSWPIN~%u", _pswpin);
-    } else if (_pswpin_prev != _pswpin) {
-      tditrace("PSWPIN~%u", _pswpin);
-    }
-    _pswpin_prev = _pswpin;
-
-
-    static unsigned int _pswpout_seen = 0;
-    static unsigned int _pswpout_prev;
-    unsigned int _pswpout = (unsigned int)pswpout;
-    if (!_pswpout_seen) {
-      _pswpout_seen = 1;
-      tditrace("PSWPOUT~%u", _pswpout);
-    } else if (_pswpout_prev != _pswpout) {
-      tditrace("PSWPOUT~%u", _pswpout);
-    }
-    _pswpout_prev = _pswpout;
-
     static unsigned int _pgpgin_seen = 0;
     static unsigned int _pgpgin_prev;
     unsigned int _pgpgin = (unsigned int)pgpgin;
     if (!_pgpgin_seen) {
       _pgpgin_seen = 1;
-      tditrace("PGPGIN~%u", _pgpgin);
+      tditrace("PGPGIN#%u", _pgpgin);
     } else if (_pgpgin_prev != _pgpgin) {
-      tditrace("PGPGIN~%u", _pgpgin);
+      tditrace("PGPGIN#%u", _pgpgin);
     }
     _pgpgin_prev = _pgpgin;
 
@@ -1332,11 +1407,33 @@ static void sample_info(void) {
     unsigned int _pgpgout = (unsigned int)pgpgout;
     if (!_pgpgout_seen) {
       _pgpgout_seen = 1;
-      tditrace("PGPGOUT~%u", _pgpgout);
+      tditrace("PGPGOUT#%u", _pgpgout);
     } else if (_pgpgout_prev != _pgpgout) {
-      tditrace("PGPGOUT~%u", _pgpgout);
+      tditrace("PGPGOUT#%u", _pgpgout);
     }
     _pgpgout_prev = _pgpgout;
+
+    static unsigned int _pswpin_seen = 0;
+    static unsigned int _pswpin_prev;
+    unsigned int _pswpin = (unsigned int)pswpin;
+    if (!_pswpin_seen) {
+      _pswpin_seen = 1;
+      tditrace("PSWPIN#%u", _pswpin);
+    } else if (_pswpin_prev != _pswpin) {
+      tditrace("PSWPIN#%u", _pswpin);
+    }
+    _pswpin_prev = _pswpin;
+
+    static unsigned int _pswpout_seen = 0;
+    static unsigned int _pswpout_prev;
+    unsigned int _pswpout = (unsigned int)pswpout;
+    if (!_pswpout_seen) {
+      _pswpout_seen = 1;
+      tditrace("PSWPOUT#%u", _pswpout);
+    } else if (_pswpout_prev != _pswpout) {
+      tditrace("PSWPOUT#%u", _pswpout);
+    }
+    _pswpout_prev = _pswpout;
 
     // tditrace("PGFAULT~%u", (unsigned int)pgfault);
     // tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault);
@@ -1353,7 +1450,6 @@ static void sample_info(void) {
   }
 
   if (do_selfinfo) {
-
     static unsigned int _rss_seen = 0;
     static unsigned int _rss_prev;
     unsigned int _rss = (rss * 4);
@@ -1404,15 +1500,80 @@ static void sample_info(void) {
     // tditrace("MAJFLT~%u", (unsigned int)ru.ru_majflt);
     // tditrace("_BI~%u", ((unsigned int)ru.ru_inblock - ru_bi_base));
     // tditrace("_BO~%u", ((unsigned int)ru.ru_oublock - ru_bo_base));
+
+    static unsigned int _cpu0_user_seen = 0;
+    static unsigned int _cpu0_user_prev;
+    unsigned int _cpu0_user = cpu0.user + cpu0.nice;
+    if (!_cpu0_user_seen) {
+      _cpu0_user_seen = 1;
+      tditrace("0_usr^%u", _cpu0_user);
+    } else if (_cpu0_user_prev != _cpu0_user) {
+      tditrace("0_usr^%u", _cpu0_user);
+    }
+    _cpu0_user_prev = _cpu0_user;
+
+    static unsigned int _cpu0_system_seen = 0;
+    static unsigned int _cpu0_system_prev;
+    unsigned int _cpu0_system = cpu0.system;
+    if (!_cpu0_system_seen) {
+      _cpu0_system_seen = 1;
+      tditrace("0_sys^%u", _cpu0_system);
+    } else if (_cpu0_system_prev != _cpu0_system) {
+      tditrace("0_sys^%u", _cpu0_system);
+    }
+    _cpu0_system_prev = _cpu0_system;
+
+    static unsigned int _cpu0_io_seen = 0;
+    static unsigned int _cpu0_io_prev;
+    unsigned int _cpu0_io = cpu0.iowait;
+    if (!_cpu0_io_seen) {
+      _cpu0_io_seen = 1;
+      tditrace("0_io^%u", _cpu0_io);
+    } else if (_cpu0_io_prev != _cpu0_io) {
+      tditrace("0_io^%u", _cpu0_io);
+    }
+    _cpu0_io_prev = _cpu0_io;
+
+    static unsigned int _cpu1_user_seen = 0;
+    static unsigned int _cpu1_user_prev;
+    unsigned int _cpu1_user = cpu1.user + cpu1.nice;
+    if (!_cpu1_user_seen) {
+      _cpu1_user_seen = 1;
+      tditrace("1_usr^%u", _cpu1_user);
+    } else if (_cpu1_user_prev != _cpu1_user) {
+      tditrace("1_usr^%u", _cpu1_user);
+    }
+    _cpu1_user_prev = _cpu1_user;
+
+    static unsigned int _cpu1_system_seen = 0;
+    static unsigned int _cpu1_system_prev;
+    unsigned int _cpu1_system = cpu1.system;
+    if (!_cpu1_system_seen) {
+      _cpu1_system_seen = 1;
+      tditrace("1_sys^%u", _cpu1_system);
+    } else if (_cpu1_system_prev != _cpu1_system) {
+      tditrace("1_sys^%u", _cpu1_system);
+    }
+    _cpu1_system_prev = _cpu1_system;
+
+    static unsigned int _cpu1_io_seen = 0;
+    static unsigned int _cpu1_io_prev;
+    unsigned int _cpu1_io = cpu1.iowait;
+    if (!_cpu1_io_seen) {
+      _cpu1_io_seen = 1;
+      tditrace("1_io^%u", _cpu1_io);
+    } else if (_cpu1_io_prev != _cpu1_io) {
+      tditrace("1_io^%u", _cpu1_io);
+    }
+    _cpu1_io_prev = _cpu1_io;
   }
 }
 
 static void *monitor_thread(void *param) {
-  sample_info();
-
   stat(gtracebufferfilename, &gtrace_buffer_st);
 
   if (do_maps) {
+    sample_info();
     usleep(1 * 1000 * 1000);
     dump_proc_self_maps();
   }
@@ -1495,7 +1656,7 @@ static void *monitor_thread(void *param) {
       if (!offload_over50) {
         LOCK();
         int check =
-            ((trace_buffer_byte_ptr - gtrace_buffer) > (gtracebuffersize / 2));
+            (((unsigned int)trace_buffer_byte_ptr - (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
         UNLOCK();
 
         if (check) {
@@ -1562,7 +1723,7 @@ static void *monitor_thread(void *param) {
       } else {
         LOCK();
         int check =
-            ((trace_buffer_byte_ptr - gtrace_buffer) < (gtracebuffersize / 2));
+            (((unsigned int)trace_buffer_byte_ptr - (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
         UNLOCK();
 
         if (check) {
@@ -1651,7 +1812,7 @@ static int create_trace_buffer(void) {
 
   stat(gtracebufferfilename, &gtrace_buffer_st);
 
-  int i;
+  unsigned int i;
   for (i = 0; i < gtracebuffersize; i++) {
     gtrace_buffer[i] = 0;
   }
@@ -1825,7 +1986,7 @@ void start_monitor_thread(void) {
 }
 
 int tditrace_init(void) {
-  int i;
+  unsigned int i;
 
   if (tditrace_inited) {
     return 0;
@@ -1833,6 +1994,10 @@ int tditrace_init(void) {
 
   gpid = getpid();
   get_process_name_by_pid(gpid, gprocname);
+
+  if (strcmp(gprocname, "tdi") == 0) {
+    if (!getenv("NOSKIPINIT")) return -1;
+  }
 
   if (strcmp(gprocname, "mkdir") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"mkdir\" ; not tracing\n",
@@ -1886,16 +2051,16 @@ int tditrace_init(void) {
 
   char *env;
 
-  if (env = getenv("TRACEBUFFERSIZE")) {
+  if ((env = getenv("TRACEBUFFERSIZE"))) {
     gtracebuffersize = atoi(env) * 1024 * 1024;
   }
 
-  if (env = getenv(gprocname)) {
+  if ((env = getenv(gprocname))) {
     gtracebuffersize = atoi(env) * 1024 * 1024;
   }
 
   gmask = 0x0;
-  if (env = getenv("MASK")) {
+  if ((env = getenv("MASK"))) {
     for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
       if (strstr(env, instruments[i])) gmask |= (1 << i);
     }
@@ -1916,7 +2081,7 @@ int tditrace_init(void) {
   }
 
   gtouch = 0x0;
-  if (env = getenv("TOUCH")) {
+  if ((env = getenv("TOUCH"))) {
     for (i = 0; i < sizeof(touches) / sizeof(char *); i++) {
       if (strstr(env, touches[i])) gtouch |= (1 << i);
     }
@@ -1938,40 +2103,40 @@ int tditrace_init(void) {
   do_persecond = 1;
 
   do_sysinfo = 0;
-  if (env = getenv("SYSINFO")) {
+  if ((env = getenv("SYSINFO"))) {
     do_sysinfo = atoi(env);
     if (do_sysinfo > do_persecond) do_persecond = do_sysinfo;
   }
 
   do_selfinfo = 0;
-  if (env = getenv("SELFINFO")) {
+  if ((env = getenv("SELFINFO"))) {
     do_selfinfo = atoi(env);
     if (do_selfinfo > do_persecond) do_persecond = do_selfinfo;
   }
 
   do_offload = 0;
-  if (env = getenv("OFFLOAD")) {
+  if ((env = getenv("OFFLOAD"))) {
     do_offload = 1;
     strcpy(offload_location, env);
   }
 
   do_wrap = 0;
-  if (env = getenv("WRAP")) {
+  if ((env = getenv("WRAP"))) {
     do_wrap = (atoi(env) >= 1);
   }
 
   do_maps = 0;
-  if (env = getenv("MAPS")) {
+  if ((env = getenv("MAPS"))) {
     do_maps = (atoi(env) >= 1);
   }
 
   report_tid = 0;
-  if (env = getenv("TID")) {
+  if ((env = getenv("TID"))) {
     report_tid = (atoi(env) >= 1);
   }
 
   thedelay = 0;
-  if (env = getenv("DELAY")) {
+  if ((env = getenv("DELAY"))) {
     thedelay = atoi(env);
   }
 
@@ -1980,7 +2145,7 @@ int tditrace_init(void) {
    */
 
   int remove = 1;
-  if (env = getenv("REMOVE")) {
+  if ((env = getenv("REMOVE"))) {
     remove = (atoi(env) >= 1);
   }
 
@@ -1990,7 +2155,7 @@ int tditrace_init(void) {
 
     dp = opendir("/tmp/");
     if (dp != NULL) {
-      while (ep = readdir(dp)) {
+      while ((ep = readdir(dp))) {
         if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
           char procpid[128];
           sprintf(procpid, (char *)"/proc/%d",
@@ -2050,8 +2215,6 @@ static void tditrace_rewind() {
    */
   sprintf((char *)trace_buffer_dword_ptr, (char *)"TDITRACE");
   trace_buffer_dword_ptr += 2;
-
-  unsigned int *p = trace_buffer_dword_ptr;
 
   gettimeofday((struct timeval *)trace_buffer_dword_ptr, 0);
   trace_buffer_dword_ptr += 2;
@@ -2150,7 +2313,7 @@ void tditrace_exit(int argc, char *argv[]) {
 
     dp = opendir("/tmp/");
     if (dp != NULL) {
-      while (ep = readdir(dp)) {
+      while ((ep = readdir(dp))) {
         if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
           sprintf(tracebuffers[buffers].filename, "/tmp/%s", ep->d_name);
           check_trace_buffer(buffers);
@@ -2305,7 +2468,7 @@ void tditrace_internal(va_list args, const char *format) {
   unsigned int numbers[8];
   unsigned int nr_numbers = 0;
   unsigned short identifier = 0;
-  int i;
+  unsigned int i;
 
   /*
    * take and store timestamp
@@ -2321,7 +2484,7 @@ void tditrace_internal(va_list args, const char *format) {
   unsigned int *trace_text_dword_ptr = (unsigned int *)trace_text;
   char ch;
 
-  while (ch = *(format++)) {
+  while ((ch = *(format++))) {
     if (ch == '%') {
       switch (ch = (*format++)) {
         case 's': {
@@ -2461,13 +2624,13 @@ void tditrace_internal(va_list args, const char *format) {
    */
   *trace_buffer_dword_ptr = 0;
 
-  if (((char *)trace_buffer_dword_ptr - gtrace_buffer) >
+  if (((unsigned int)trace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
       (gtracebuffersize - 1024)) {
     if (do_offload || do_wrap) {
       // clear unused and rewind to rewind ptr
       fprintf(stderr, "tdi: rewind[%d,%s]\n", gpid, gprocname);
-      int i;
-      for (i = (char *)trace_buffer_dword_ptr - gtrace_buffer;
+      unsigned int i;
+      for (i = (unsigned int)trace_buffer_dword_ptr - (unsigned int)gtrace_buffer;
            i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
@@ -2480,4 +2643,19 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   UNLOCK();
+}
+
+}  // extern "C"
+
+static void __attribute__((constructor)) tditracer_constructor();
+static void __attribute__((destructor)) tditracer_destructor();
+
+static void tditracer_constructor() {
+  if (tditrace_init() == -1) {
+    return;
+  }
+}
+
+static void tditracer_destructor() {
+  fprintf(stderr, "tdi: exit[%d]\n", getpid());
 }
