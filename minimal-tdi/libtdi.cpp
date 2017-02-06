@@ -1072,6 +1072,19 @@ static void tmpfs_message(void) {
   fprintf(stderr, "\n");
 }
 
+#define OUT(name, trace, value)           \
+                                          \
+  static unsigned int _##name##_seen = 0; \
+  static unsigned int _##name##_prev;     \
+  unsigned int _##name = value;           \
+  if (!_##name##_seen) {                  \
+    _##name##_seen = 1;                   \
+    tditrace(trace, _##name);             \
+  } else if (_##name##_prev != _##name) { \
+    tditrace(trace, _##name);             \
+  }                                       \
+  _##name##_prev = _##name;
+
 static void sample_info(void) {
   char line[256];
   FILE *f = NULL;
@@ -1083,9 +1096,11 @@ static void sample_info(void) {
   int do_procmeminfo = do_sysinfo;
   int do_proctvbcmmeminfo = do_sysinfo;
   int do_procstat = do_sysinfo;
+  int do_procdiskstats = do_sysinfo;
+  int do_procnetdev = do_sysinfo;
 
   int do_procselfstatm = do_selfinfo;
-  int do_procselfstatus = do_selfinfo;
+  int do_procselfstatus = 0;  // do_selfinfo;
   int do_procselfsmaps = do_selfinfo;
 
   struct sysinfo si;
@@ -1182,7 +1197,7 @@ static void sample_info(void) {
         sscanf(line, "pgpgin %d", &pgpgin);
         sscanf(line, "pgpgout %d", &pgpgout);
         sscanf(line, "pgfault %d", &pgfault);
-        sscanf(line, "pgmajfault %d", &pgmajfault);
+        if (sscanf(line, "pgmajfault %d", &pgmajfault)) break;
       }
       if (pswpin_base == 0) pswpin_base = pswpin;
       if (pswpout_base == 0) pswpout_base = pswpout;
@@ -1206,7 +1221,7 @@ static void sample_info(void) {
   int inactive_anon = 0;
   int active_file = 0;
   int inactive_file = 0;
-  //int mapped = 0;
+  // int mapped = 0;
 
   if (do_procmeminfo) {
     f = fopen("/proc/meminfo", "r");
@@ -1337,7 +1352,6 @@ static void sample_info(void) {
             if (sscanf(line, "VmSwap: %d", &vmswap)) break;
             line = strtok_r(NULL, "\n", &saveptr);
           }
-
         } else
           break;
       }
@@ -1345,98 +1359,93 @@ static void sample_info(void) {
     close(fd);
   }
 
+  struct diskstat_t {
+    unsigned int reads;
+    unsigned int reads_merged;
+    unsigned int reads_sectors;
+    unsigned int reads_time;
+    unsigned int writes;
+    unsigned int writes_merged;
+    unsigned int writes_sectors;
+    unsigned int writes_time;
+  };
+
+  diskstat_t sda2, sdb1;
+
+  if (do_procdiskstats) {
+    if ((f = fopen("/proc/diskstats", "r"))) {
+      while (fgets(line, 256, f)) {
+        char *pos;
+        if ((pos = strstr(line, "sda2 "))) {
+          sscanf(pos, "sda2 %u %u %u %u %u %u %u %u", &sda2.reads,
+                 &sda2.reads_merged, &sda2.reads_sectors, &sda2.reads_time,
+                 &sda2.writes, &sda2.writes_merged, &sda2.writes_sectors,
+                 &sda2.writes_time);
+        } else if ((pos = strstr(line, "sdb1 "))) {
+          sscanf(pos, "sdb1 %u %u %u %u %u %u %u %u", &sdb1.reads,
+                 &sdb1.reads_merged, &sdb1.reads_sectors, &sdb1.reads_time,
+                 &sdb1.writes, &sdb1.writes_merged, &sdb1.writes_sectors,
+                 &sdb1.writes_time);
+        }
+      }
+      fclose(f);
+    }
+  }
+
+  struct netdev_t {
+    unsigned long r_bytes;
+    unsigned int r_packets;
+    unsigned int r_errs;
+    unsigned int r_drop;
+    unsigned int r_fifo;
+    unsigned int r_frame;
+    unsigned int r_compressed;
+    unsigned int r_multicast;
+    unsigned long t_bytes;
+    unsigned int t_packets;
+    unsigned int t_errs;
+    unsigned int t_drop;
+    unsigned int t_fifo;
+    unsigned int t_frame;
+    unsigned int t_compressed;
+    unsigned int t_multicast;
+  };
+
+  netdev_t net1;
+
+  if (do_procnetdev) {
+    if ((f = fopen("/proc/net/dev", "r"))) {
+      while (fgets(line, 256, f)) {
+        char *pos;
+        if ((pos = strstr(line, "enp0s3: "))) {
+          sscanf(pos,
+                 "enp0s3: %lu %u %u %u %u %u %u %u %lu %u %u %u %u %u %u %u",
+                 &net1.r_bytes, &net1.r_packets, &net1.r_errs, &net1.r_drop,
+                 &net1.r_fifo, &net1.r_frame, &net1.r_compressed,
+                 &net1.r_multicast, &net1.t_bytes, &net1.t_packets,
+                 &net1.t_errs, &net1.t_drop, &net1.t_fifo, &net1.t_frame,
+                 &net1.t_compressed, &net1.t_multicast);
+          break;
+        }
+      }
+    }
+    fclose(f);
+  }
+
   if (do_sysinfo) {
-    static unsigned int _free_seen = 0;
-    static unsigned int _free_prev;
-    unsigned int _free = (unsigned int)((si.freeram / 1024) * si.mem_unit);
-    if (!_free_seen) {
-      _free_seen = 1;
-      tditrace("FREE~%u", _free);
-    } else if (_free_prev != _free) {
-      tditrace("FREE~%u", _free);
-    }
-    _free_prev = _free;
+    OUT(free, "FREE~%u", (unsigned int)((si.freeram / 1024) * si.mem_unit))
+    OUT(buff, "BUFF~%u", (unsigned int)((si.bufferram / 1024) * si.mem_unit))
+    OUT(cach, "CACH~%u", (unsigned int)cached)
+    OUT(swap, "SWAP~%u",
+        (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit))
 
-    static unsigned int _buff_seen = 0;
-    static unsigned int _buff_prev;
-    unsigned int _buff = (unsigned int)((si.bufferram / 1024) * si.mem_unit);
-    if (!_buff_seen) {
-      _buff_seen = 1;
-      tditrace("BUFF~%u", _buff);
-    } else if (_buff_prev != _buff) {
-      tditrace("BUFF~%u", _buff);
-    }
-    _buff_prev = _buff;
+    OUT(pgpgin, "PGPGIN#%u", ((unsigned int)pgpgin))
+    OUT(pgpgout, "PGPGOUT#%u", ((unsigned int)pgpgout))
+    OUT(pswpin, "PSWPIN#%u", ((unsigned int)pswpin))
+    OUT(pswpout, "PSWPOUT#%u", ((unsigned int)pswpout))
 
-    static unsigned int _cach_seen = 0;
-    static unsigned int _cach_prev;
-    unsigned int _cach = (unsigned int)cached;
-    if (!_cach_seen) {
-      _cach_seen = 1;
-      tditrace("CACH~%u", _cach);
-    } else if (_cach_prev != _cach) {
-      tditrace("CACH~%u", _cach);
-    }
-    _cach_prev = _cach;
-
-    static unsigned int _swap_seen = 0;
-    static unsigned int _swap_prev;
-    unsigned int _swap =
-        (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit);
-    if (!_swap_seen) {
-      _swap_seen = 1;
-      tditrace("SWAP~%u", _swap);
-    } else if (_swap_prev != _swap) {
-      tditrace("SWAP~%u", _swap);
-    }
-    _swap_prev = _swap;
-
-    static unsigned int _pgpgin_seen = 0;
-    static unsigned int _pgpgin_prev;
-    unsigned int _pgpgin = (unsigned int)pgpgin;
-    if (!_pgpgin_seen) {
-      _pgpgin_seen = 1;
-      tditrace("PGPGIN#%u", _pgpgin);
-    } else if (_pgpgin_prev != _pgpgin) {
-      tditrace("PGPGIN#%u", _pgpgin);
-    }
-    _pgpgin_prev = _pgpgin;
-
-    static unsigned int _pgpgout_seen = 0;
-    static unsigned int _pgpgout_prev;
-    unsigned int _pgpgout = (unsigned int)pgpgout;
-    if (!_pgpgout_seen) {
-      _pgpgout_seen = 1;
-      tditrace("PGPGOUT#%u", _pgpgout);
-    } else if (_pgpgout_prev != _pgpgout) {
-      tditrace("PGPGOUT#%u", _pgpgout);
-    }
-    _pgpgout_prev = _pgpgout;
-
-    static unsigned int _pswpin_seen = 0;
-    static unsigned int _pswpin_prev;
-    unsigned int _pswpin = (unsigned int)pswpin;
-    if (!_pswpin_seen) {
-      _pswpin_seen = 1;
-      tditrace("PSWPIN#%u", _pswpin);
-    } else if (_pswpin_prev != _pswpin) {
-      tditrace("PSWPIN#%u", _pswpin);
-    }
-    _pswpin_prev = _pswpin;
-
-    static unsigned int _pswpout_seen = 0;
-    static unsigned int _pswpout_prev;
-    unsigned int _pswpout = (unsigned int)pswpout;
-    if (!_pswpout_seen) {
-      _pswpout_seen = 1;
-      tditrace("PSWPOUT#%u", _pswpout);
-    } else if (_pswpout_prev != _pswpout) {
-      tditrace("PSWPOUT#%u", _pswpout);
-    }
-    _pswpout_prev = _pswpout;
-
-    // tditrace("PGFAULT~%u", (unsigned int)pgfault);
-    // tditrace("PGMAJFAULT~%u", (unsigned int)pgmajfault);
+    OUT(pgfault, "PGFAULT#%u", (unsigned int)pgfault)
+    OUT(pgfaultmaj, "PGMAJFAULT#%u", (unsigned int)pgmajfault)
 
     // tditrace("A_ANON~%u", (unsigned int)active_anon);
     // tditrace("I_ANON~%u", (unsigned int)inactive_anon);
@@ -1447,52 +1456,31 @@ static void sample_info(void) {
 
     // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
     // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
+
+    OUT(cpu0_user, "0_usr^%u", (cpu0.user + cpu0.nice))
+    OUT(cpu0_system, "0_sys^%u", (cpu0.system))
+    OUT(cpu0_io, "0_io^%u", (cpu0.iowait))
+    OUT(cpu0_irq, "0_irq^%u", (cpu0.irq + cpu0.softirq))
+
+    OUT(cpu1_user, "1_usr^%u", (cpu1.user + cpu1.nice))
+    OUT(cpu1_system, "1_sys^%u", (cpu1.system))
+    OUT(cpu1_io, "1_io^%u", (cpu1.iowait))
+    OUT(cpu1_irq, "1_irq^%u", (cpu1.irq + cpu1.softirq))
+
+    OUT(sda2_reads, "sda2_r#%u", (sda2.reads))
+    OUT(sda2_writes, "sda2_w#%u", (sda2.writes))
+    OUT(sdb1_reads, "sdb1_r#%u", (sdb1.reads))
+    OUT(sdb1_writes, "sdb1_w#%u", (sdb1.writes))
+
+    OUT(net1_r_packets, "net_r#%u", (net1.r_packets))
+    OUT(net1_w_packets, "net_t#%u", (net1.t_packets))
   }
 
   if (do_selfinfo) {
-    static unsigned int _rss_seen = 0;
-    static unsigned int _rss_prev;
-    unsigned int _rss = (rss * 4);
-    if (!_rss_seen) {
-      _rss_seen = 1;
-      tditrace(":RSS~%u", _rss);
-    } else if (_rss_prev != _rss) {
-      tditrace(":RSS~%u", _rss);
-    }
-    _rss_prev = _rss;
-
-    static unsigned int _brk_seen = 0;
-    static unsigned int _brk_prev;
-    unsigned int _brk = (mi.arena / 1024);
-    if (!_brk_seen) {
-      _brk_seen = 1;
-      tditrace(":BRK~%u", _brk);
-    } else if (_brk_prev != _brk) {
-      tditrace(":BRK~%u", _brk);
-    }
-    _brk_prev = _brk;
-
-    static unsigned int _mmap_seen = 0;
-    static unsigned int _mmap_prev;
-    unsigned int _mmap = (mi.hblkhd / 1024);
-    if (!_mmap_seen) {
-      _mmap_seen = 1;
-      tditrace(":MMAP~%u", _mmap);
-    } else if (_mmap_prev != _mmap) {
-      tditrace(":MMAP~%u", _mmap);
-    }
-    _mmap_prev = _mmap;
-
-    static unsigned int _swap_seen = 0;
-    static unsigned int _swap_prev;
-    unsigned int _swap = smapsswap;
-    if (!_swap_seen) {
-      _swap_seen = 1;
-      tditrace(":SWAP~%u", _swap);
-    } else if (_swap_prev != _swap) {
-      tditrace(":SWAP~%u", _swap);
-    }
-    _swap_prev = _swap;
+    OUT(rss, ":RSS~%u", (rss * 4))
+    OUT(brk, ":BRK~%u", (mi.arena / 1024))
+    OUT(mmap, ":MMAP~%u", (mi.hblkhd / 1024))
+    OUT(swap, ":SWAP~%u", smapsswap)
 
     // tditrace("VM~%u", (unsigned int)(vmsize * 4));
     // tditrace("MAXRSS~%u", (unsigned int)(ru.ru_maxrss / 1024));
@@ -1500,72 +1488,6 @@ static void sample_info(void) {
     // tditrace("MAJFLT~%u", (unsigned int)ru.ru_majflt);
     // tditrace("_BI~%u", ((unsigned int)ru.ru_inblock - ru_bi_base));
     // tditrace("_BO~%u", ((unsigned int)ru.ru_oublock - ru_bo_base));
-
-    static unsigned int _cpu0_user_seen = 0;
-    static unsigned int _cpu0_user_prev;
-    unsigned int _cpu0_user = cpu0.user + cpu0.nice;
-    if (!_cpu0_user_seen) {
-      _cpu0_user_seen = 1;
-      tditrace("0_usr^%u", _cpu0_user);
-    } else if (_cpu0_user_prev != _cpu0_user) {
-      tditrace("0_usr^%u", _cpu0_user);
-    }
-    _cpu0_user_prev = _cpu0_user;
-
-    static unsigned int _cpu0_system_seen = 0;
-    static unsigned int _cpu0_system_prev;
-    unsigned int _cpu0_system = cpu0.system;
-    if (!_cpu0_system_seen) {
-      _cpu0_system_seen = 1;
-      tditrace("0_sys^%u", _cpu0_system);
-    } else if (_cpu0_system_prev != _cpu0_system) {
-      tditrace("0_sys^%u", _cpu0_system);
-    }
-    _cpu0_system_prev = _cpu0_system;
-
-    static unsigned int _cpu0_io_seen = 0;
-    static unsigned int _cpu0_io_prev;
-    unsigned int _cpu0_io = cpu0.iowait;
-    if (!_cpu0_io_seen) {
-      _cpu0_io_seen = 1;
-      tditrace("0_io^%u", _cpu0_io);
-    } else if (_cpu0_io_prev != _cpu0_io) {
-      tditrace("0_io^%u", _cpu0_io);
-    }
-    _cpu0_io_prev = _cpu0_io;
-
-    static unsigned int _cpu1_user_seen = 0;
-    static unsigned int _cpu1_user_prev;
-    unsigned int _cpu1_user = cpu1.user + cpu1.nice;
-    if (!_cpu1_user_seen) {
-      _cpu1_user_seen = 1;
-      tditrace("1_usr^%u", _cpu1_user);
-    } else if (_cpu1_user_prev != _cpu1_user) {
-      tditrace("1_usr^%u", _cpu1_user);
-    }
-    _cpu1_user_prev = _cpu1_user;
-
-    static unsigned int _cpu1_system_seen = 0;
-    static unsigned int _cpu1_system_prev;
-    unsigned int _cpu1_system = cpu1.system;
-    if (!_cpu1_system_seen) {
-      _cpu1_system_seen = 1;
-      tditrace("1_sys^%u", _cpu1_system);
-    } else if (_cpu1_system_prev != _cpu1_system) {
-      tditrace("1_sys^%u", _cpu1_system);
-    }
-    _cpu1_system_prev = _cpu1_system;
-
-    static unsigned int _cpu1_io_seen = 0;
-    static unsigned int _cpu1_io_prev;
-    unsigned int _cpu1_io = cpu1.iowait;
-    if (!_cpu1_io_seen) {
-      _cpu1_io_seen = 1;
-      tditrace("1_io^%u", _cpu1_io);
-    } else if (_cpu1_io_prev != _cpu1_io) {
-      tditrace("1_io^%u", _cpu1_io);
-    }
-    _cpu1_io_prev = _cpu1_io;
   }
 }
 
@@ -1655,8 +1577,8 @@ static void *monitor_thread(void *param) {
 
       if (!offload_over50) {
         LOCK();
-        int check =
-            (((unsigned int)trace_buffer_byte_ptr - (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
+        int check = (((unsigned int)trace_buffer_byte_ptr -
+                      (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
         UNLOCK();
 
         if (check) {
@@ -1722,8 +1644,8 @@ static void *monitor_thread(void *param) {
 
       } else {
         LOCK();
-        int check =
-            (((unsigned int)trace_buffer_byte_ptr - (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
+        int check = (((unsigned int)trace_buffer_byte_ptr -
+                      (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
         UNLOCK();
 
         if (check) {
@@ -2630,7 +2552,8 @@ void tditrace_internal(va_list args, const char *format) {
       // clear unused and rewind to rewind ptr
       fprintf(stderr, "tdi: rewind[%d,%s]\n", gpid, gprocname);
       unsigned int i;
-      for (i = (unsigned int)trace_buffer_dword_ptr - (unsigned int)gtrace_buffer;
+      for (i = (unsigned int)trace_buffer_dword_ptr -
+               (unsigned int)gtrace_buffer;
            i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
