@@ -15,11 +15,12 @@
 void usage(void) {
   printf("tdi v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
   printf("\nUsage: tdi -d [tracebuffer]\n");
-  printf("         tdidump : convert tditracebuffer(s) to tdi.\n");
+  printf("         tdidump : convert tditracebuffer(s) to tdi format.\n");
   printf("\nUsage: tdi -s [tracebuffer]\n");
-  printf("         tdistat : tditracebuffer(s) status.\n");
+  printf("         tdistat : report tditracebuffer(s) status.\n");
   printf("\nUsage: tdi -t\n");
-  printf("         tditest : create small set of tracepoints.\n");
+  printf(
+      "         tditest : create tracebuffer with small set of tracepoints.\n");
 }
 
 static int tdidump(int argc, char *argv[]);
@@ -148,6 +149,76 @@ static int tdistat(int argc, char *argv[]) {
   return 0;
 }
 
+/*
+ * send new value
+ */
+#define OUT(name, trace, value) \
+                                \
+  unsigned int _##name = value; \
+  tditrace(trace, _##name);
+
+/*
+ * send new value, unless new value == previous value
+ * i.e. do not send new value, if new value == prev value
+ */
+#define OUT1(name, trace, value)          \
+                                          \
+  static unsigned int _##name##_seen = 0; \
+  static unsigned int _##name##_prev;     \
+  unsigned int _##name = value;           \
+  if (_##name##_seen == 0) {              \
+    _##name##_seen = 1;                   \
+    tditrace(trace, _##name);             \
+  } else if (_##name##_prev != _##name) { \
+    tditrace(trace, _##name);             \
+  }                                       \
+  _##name##_prev = _##name;
+
+/*
+ * send new value, unless new value == prev value and new value == prev prev
+ * value
+ *  i.e. do not send new value, if new value == prev value == prev prev value
+ */
+#define OUT2(name, trace, value)                                               \
+                                                                               \
+  static unsigned int _##name##_seen = 0;                                      \
+  static unsigned int _##name##_prev;                                          \
+  static unsigned int _##name##_prevprev;                                      \
+  unsigned int _##name = value;                                                \
+  if (_##name##_seen == 0) {                                                   \
+    _##name##_seen = 1;                                                        \
+    tditrace(trace, _##name);                                                  \
+  } else if (_##name##_seen == 1) {                                            \
+    _##name##_seen = 2;                                                        \
+    tditrace(trace, _##name);                                                  \
+  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
+    tditrace(trace, _##name);                                                  \
+  }                                                                            \
+  _##name##_prevprev = _##name##_prev;                                         \
+  _##name##_prev = _##name;
+
+/*
+ * send previous value, unless new value == prev value and new value ==
+ * prev prev value
+ * i.e. do not send previous if new value == prev value == prev prev value
+ */
+#define OUT3(name, trace, value)                                               \
+                                                                               \
+  static unsigned int _##name##_seen = 0;                                      \
+  static unsigned int _##name##_prev;                                          \
+  static unsigned int _##name##_prevprev;                                      \
+  unsigned int _##name = value;                                                \
+  if (_##name##_seen == 0) {                                                   \
+    _##name##_seen = 1;                                                        \
+  } else if (_##name##_seen == 1) {                                            \
+    _##name##_seen = 2;                                                        \
+    tditrace(trace, _##name##_prev);                                           \
+  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
+    tditrace(trace, _##name##_prev);                                           \
+  }                                                                            \
+  _##name##_prevprev = _##name##_prev;                                         \
+  _##name##_prev = _##name;
+
 static int tditest(int argc, char *argv[]) {
   int i;
   void *handle;
@@ -163,37 +234,56 @@ static int tditest(int argc, char *argv[]) {
 
   dlerror(); /* Clear any existing error */
 
-  tditrace =
-      (void (*)(const char *format, ...))dlsym(handle, "tditrace");
+  tditrace = (void (*)(const char *format, ...))dlsym(handle, "tditrace");
 
+  int value = 0;
+  int values[] = {0,  0, 0, 0, 10, 0, 0,  0,  0,  0,  0, 0, 0,
+                  30, 0, 0, 0, 0,  0, 40, 0,  0,  0,  0, 0, 0,
+                  0,  0, 8, 0, 0,  0, 9,  10, 11, 12, 0, 0, 0};
+
+  for (i = 0; (unsigned int)i < (sizeof(values) / sizeof(int)); i++) {
+    value += values[i];
+
+    tditrace("OUT2 %u", (unsigned int)value);
+
+    OUT(value, "VALUE#%u", (unsigned int)value)
+    OUT1(value1, "VALUE1#%u", (unsigned int)value)
+    OUT2(value2, "VALUE2#%u", (unsigned int)value)
+    OUT3(value3, "VALUE3#%u", (unsigned int)value)
+
+    usleep(100 * 1000);
+  }
+
+#if 0
   for (i = 0; i < 10; i++) {
-
     tditrace("@T+task1 %d", i);
-    usleep(10 * 1024);
+    usleep(10 * 1000);
     tditrace("@T-task1");
 
     tditrace("@I+isr1 %x", i);
-    usleep(20 * 1024);
+    usleep(20 * 1000);
     tditrace("@I-isr1");
 
     tditrace("note %d");
-    usleep(1 * 1024);
+    usleep(1 * 1000);
 
     tditrace("@S+semaphore1 %d");
-    usleep(2 * 1024);
+    usleep(2 * 1000);
 
     tditrace("@E+event1 %d,%d", i, i);
-    usleep(3 * 1024);
+    usleep(3 * 1000);
 
     tditrace("queue1~%d", i);
 
     tditrace("@A+agent1 %s,%d", "number", i);
-    usleep(30 * 1024);
+    usleep(30 * 1000);
     tditrace("@A-agent1");
 
     tditrace("@A+agent2 %s,%d", "number", i);
-    usleep(30 * 1024);
+    usleep(30 * 1000);
     tditrace("@A-agent2");
   }
+#endif
+
   return 0;
 }
