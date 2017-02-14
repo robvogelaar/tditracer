@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,8 +10,10 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 
 void usage(void) {
   printf("tdi v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
@@ -21,11 +24,15 @@ void usage(void) {
   printf("\nUsage: tdi -t\n");
   printf(
       "         tditest : create tracebuffer with small set of tracepoints.\n");
+  printf("\nUsage: tdi -m <message>\n");
+  printf("         tdimessage: send a message to the tditracer(s)\n");
+  printf("         'rewind' = rewind the tditracebuffer(s)\n");
 }
 
 static int tdidump(int argc, char *argv[]);
 static int tdistat(int argc, char *argv[]);
 static int tditest(int argc, char *argv[]);
+static int tdimessage(int argc, char *argv[]);
 
 /******************************************************************************/
 int main(int argc, char *argv[]) {
@@ -41,6 +48,11 @@ int main(int argc, char *argv[]) {
 
   else if (argc > 1 && (strcmp(argv[1], "-t") == 0)) {
     tditest(argc - 1, &argv[1]);
+    return 0;
+  }
+
+  else if (argc > 1 && (strcmp(argv[1], "-m") == 0)) {
+    tdimessage(argc - 1, &argv[1]);
     return 0;
   }
 
@@ -149,6 +161,8 @@ static int tdistat(int argc, char *argv[]) {
   return 0;
 }
 
+void (*tditrace)(const char *format, ...);
+
 /*
  * send new value
  */
@@ -160,6 +174,7 @@ static int tdistat(int argc, char *argv[]) {
 /*
  * send new value, unless new value == previous value
  * i.e. do not send new value, if new value == prev value
+ * and do not send unless a non 0 value is seen
  */
 #define OUT1(name, trace, value)          \
                                           \
@@ -167,8 +182,10 @@ static int tdistat(int argc, char *argv[]) {
   static unsigned int _##name##_prev;     \
   unsigned int _##name = value;           \
   if (_##name##_seen == 0) {              \
-    _##name##_seen = 1;                   \
-    tditrace(trace, _##name);             \
+    if (_##name != 0) {                   \
+      _##name##_seen = 1;                 \
+      tditrace(trace, _##name);           \
+    }                                     \
   } else if (_##name##_prev != _##name) { \
     tditrace(trace, _##name);             \
   }                                       \
@@ -178,6 +195,7 @@ static int tdistat(int argc, char *argv[]) {
  * send new value, unless new value == prev value and new value == prev prev
  * value
  *  i.e. do not send new value, if new value == prev value == prev prev value
+ * and do not send unless a non 0 value is seen
  */
 #define OUT2(name, trace, value)                                               \
                                                                                \
@@ -186,8 +204,10 @@ static int tdistat(int argc, char *argv[]) {
   static unsigned int _##name##_prevprev;                                      \
   unsigned int _##name = value;                                                \
   if (_##name##_seen == 0) {                                                   \
-    _##name##_seen = 1;                                                        \
-    tditrace(trace, _##name);                                                  \
+    if (_##name != 0) {                                                        \
+      _##name##_seen = 1;                                                      \
+      tditrace(trace, _##name);                                                \
+    }                                                                          \
   } else if (_##name##_seen == 1) {                                            \
     _##name##_seen = 2;                                                        \
     tditrace(trace, _##name);                                                  \
@@ -201,6 +221,7 @@ static int tdistat(int argc, char *argv[]) {
  * send previous value, unless new value == prev value and new value ==
  * prev prev value
  * i.e. do not send previous if new value == prev value == prev prev value
+ * and do not send unless a non 0 value is seen
  */
 #define OUT3(name, trace, value)                                               \
                                                                                \
@@ -209,7 +230,9 @@ static int tdistat(int argc, char *argv[]) {
   static unsigned int _##name##_prevprev;                                      \
   unsigned int _##name = value;                                                \
   if (_##name##_seen == 0) {                                                   \
-    _##name##_seen = 1;                                                        \
+    if (_##name != 0) {                                                        \
+      _##name##_seen = 1;                                                      \
+    }                                                                          \
   } else if (_##name##_seen == 1) {                                            \
     _##name##_seen = 2;                                                        \
     tditrace(trace, _##name##_prev);                                           \
@@ -219,10 +242,39 @@ static int tdistat(int argc, char *argv[]) {
   _##name##_prevprev = _##name##_prev;                                         \
   _##name##_prev = _##name;
 
+//#pragma GCC push_options
+//#pragma GCC optimize("O0")
+
+static void *thread_task(void *param) {
+  time_t t;
+  int *p = (int *)param;
+  srand((unsigned)time(&t));
+
+  while (1) {
+    tditrace("%m%n", *p, 10000);
+
+    tditrace("@%d+task%d", *p&7, *p);
+
+    usleep((rand() % 100) * 1000);
+
+    #if 0
+    long long int j = (long long int)((rand() % 100) * 10000LL);
+    while (j) {
+      j--;
+    };
+    #endif
+
+    tditrace("@%d-task%d", *p&7, *p);
+
+    usleep((rand() % 100) * 1000);
+  }
+  return NULL;
+}
+//#pragma GCC pop_options
+
 static int tditest(int argc, char *argv[]) {
   int i;
   void *handle;
-  void (*tditrace)(const char *format, ...);
 
   setenv("NOSKIPINIT", "1", -1);
 
@@ -236,6 +288,7 @@ static int tditest(int argc, char *argv[]) {
 
   tditrace = (void (*)(const char *format, ...))dlsym(handle, "tditrace");
 
+#if 0
   int value = 0;
   int values[] = {0,  0, 0, 0, 10, 0, 0,  0,  0,  0,  0, 0, 0,
                   30, 0, 0, 0, 0,  0, 40, 0,  0,  0,  0, 0, 0,
@@ -253,7 +306,7 @@ static int tditest(int argc, char *argv[]) {
 
     usleep(100 * 1000);
   }
-
+#endif
 #if 0
   for (i = 0; i < 10; i++) {
     tditrace("@T+task1 %d", i);
@@ -285,5 +338,91 @@ static int tditest(int argc, char *argv[]) {
   }
 #endif
 
+#if 1
+#define NR_THREADS_TASK 10
+  static pthread_t thread_id_task[NR_THREADS_TASK];
+  static int param_task[NR_THREADS_TASK];
+
+  for (i = 0; i < NR_THREADS_TASK; i++) {
+    param_task[i] = i;
+    pthread_create(&thread_id_task[i], NULL, thread_task, &param_task[i]);
+  }
+
+  for (i = 0; i < NR_THREADS_TASK; i++) {
+    pthread_join(thread_id_task[i], NULL);
+  }
+
+#endif
+
+  return 0;
+}
+
+int send(const char *msg) {
+  DIR *dp;
+  struct dirent *ep;
+  char socket_path[128];
+
+  dp = opendir("/tmp/");
+  if (dp != NULL) {
+    while ((ep = readdir(dp))) {
+      if (strncmp(ep->d_name, "tditracesocket@", 15) == 0) {
+        fprintf(stdout, "\"%s\"\n", ep->d_name);
+
+        sprintf(socket_path, "/tmp/%s", ep->d_name);
+
+        struct sockaddr_un addr;
+        int fd;
+
+        if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+          fprintf(stderr, "socket error\n");
+          continue;
+        }
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+
+        if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+          fprintf(stderr, "connect error\n");
+          continue;
+        }
+
+        int rc = strlen(msg);
+        if (write(fd, msg, rc) != rc) {
+          if (rc > 0)
+            fprintf(stderr, "partial write");
+          else {
+            perror("write error");
+          }
+        }
+
+        char buf[100];
+        rc = read(fd, buf, sizeof(buf));
+        if (rc == -1) {
+          fprintf(stdout, "[%d]\n", rc);
+          perror("read");
+        } else if (rc == 0) {
+          fprintf(stdout, "[%d]\n", rc);
+        } else {
+          buf[rc] = 0;
+          fprintf(stdout, "received:\"%s\"\n", buf);
+        }
+
+        close(fd);
+      }
+    }
+    closedir(dp);
+  }
+
+  return 0;
+}
+
+static int tdimessage(int argc, char *argv[]) {
+  if (argc > 1) {
+    fprintf(stdout, "sending:\"%s\"\n", argv[1]);
+    send(argv[1]);
+  } else {
+    fprintf(stderr, "no message provided\n");
+  }
   return 0;
 }

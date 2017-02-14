@@ -13,6 +13,10 @@
 
 extern void tditrace(const char* format, ...) __attribute__((weak));
 
+static char uninitialized1[8*4096];
+
+static char initialized2[8*4096] = {0,1};
+
 int main(int argc, char* argv[]) {
   void* allocations_mmap1[1024];
   void* allocations_malloc1[1024];
@@ -49,7 +53,7 @@ int main(int argc, char* argv[]) {
   memset(allocations_malloc1, 0, sizeof allocations_malloc1);
   memset(allocations_malloc2, 0, sizeof allocations_malloc2);
 
-  size_t i = 0;
+  int i = 0;
 
   while (loops--) {
     fprintf(stdout, "%d:", loops);
