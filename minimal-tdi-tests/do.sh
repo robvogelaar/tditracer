@@ -1,5 +1,5 @@
-g++ -m32 -shared -pthread -Os -Wall -Wno-unused-result libtdi.cpp -ldl -o libtdi.so && cp -v libtdi.so /home/rev/nfs
-g++ -m32 -pthread -O2 -Wall tdi.cpp -ldl -o tdi && cp -v tdi /home/rev/nfs
+g++ -m32 -shared -pthread -O3 -Wall -Wno-unused-result libtdi.cpp -ldl -o libtdi.so && cp -v libtdi.so /home/rev/nfs
+g++ -m32 -pthread -O3 -Wall tdi.cpp -ldl -o tdi && cp -v tdi /home/rev/nfs
 
 g++ -m32 sleeper.cpp -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs
 g++ -m32 simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver && cp -v simserver /home/rev/nfs

@@ -100,10 +100,15 @@ void execute(const char* msg) {
 
   fprintf(stdout, "%-5d \"%s\"\n", getpid(), msg);
 
-  static unsigned int mmap1_bytes;
-  static char* mmap1;
-  static unsigned int malloc1_bytes;
-  static char* malloc1;
+  static unsigned int mmaps_bytes[8];
+  static char* mmaps[8];
+  static unsigned int mallocs_bytes[8];
+  static char* mallocs[8];
+
+  static int mmap_counter = 0;
+  static int malloc_counter = 0;
+
+  int mmap_id;
 
   /*
    * marker
@@ -127,56 +132,76 @@ void execute(const char* msg) {
    * mmap
    */
   if ((n = sscanf(msg, "mmap %s", s)) >= 1) {
-    mmap1_bytes =
+    mmaps_bytes[mmap_counter] =
         atoi(s) * (strchr(s, 'M') ? 1024 * 1024 : strchr(s, 'K') ? 1024 : 1);
-
 #if 0
     fprintf(stdout, "mmap %d bytes\n", mmap1_bytes);
 #endif
-
     TDITRACE("@T+action mmap %s", s);
-    mmap1 = (char*)mmap(NULL, mmap1_bytes, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS
-                        /* | MAP_POPULATE */
-                        ,
-                        -1, 0);
+    mmaps[mmap_counter] =
+        (char*)mmap(NULL, mmaps_bytes[mmap_counter], PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS
+                    /* | MAP_POPULATE */
+                    ,
+                    -1, 0);
     TDITRACE("@T-action");
 
-    if ((int)mmap1 != -1) {
+    if ((int)mmaps[mmap_counter] != -1) {
       TDITRACE("@T+action memset %s", s);
-      memset(mmap1, 0, mmap1_bytes);
+      memset(mmaps[mmap_counter], 0, mmaps_bytes[mmap_counter]);
       TDITRACE("@T-action");
     }
+
+    mmap_counter++;
+  }
+
+  /*
+   * memset
+   */
+  if ((n = sscanf(msg, "memset %u", &mmap_id)) >= 1) {
+#if 0
+    fprintf(stdout, "memset %u\n", mmap_id);
+#endif
+    TDITRACE("@T+action memset %s", s);
+    memset(mmaps[mmap_id], 0, mmaps_bytes[mmap_id]);
+    TDITRACE("@T-action");
   }
 
   /*
    * munmap
    */
-  if ((strcmp(msg, "munmap")) == 0) {
-    #if 0
-    fprintf(stdout, "munmap %d bytes\n", mmap1_bytes);
-    #endif
-    TDITRACE("@T+action munmap %s", s);
-    munmap(mmap1, mmap1_bytes);
+  if ((n = sscanf(msg, "munmap %u", &mmap_id)) >= 1) {
+#if 0
+    fprintf(stdout, "munmap %u\n", mmap_id);
+#endif
+    TDITRACE("@T+action munmap %u", mmap_id);
+    munmap(mmaps[mmap_id], mmaps_bytes[mmap_id]);
     TDITRACE("@T-action");
   }
 
+  /*
+   * malloc
+   */
   if ((n = sscanf(msg, "malloc %s", s)) >= 1) {
-    malloc1_bytes =
+    mallocs_bytes[malloc_counter] =
         atoi(s) * (strchr(s, 'M') ? 1024 * 1024 : strchr(s, 'K') ? 1024 : 1);
 
-    #if 0
+#if 0
     fprintf(stdout, "malloc %d bytes\n", malloc1_bytes);
-    #endif
-    malloc1 = (char*)malloc(malloc1_bytes);
-    memset(malloc1, 0, malloc1_bytes);
+#endif
+    mallocs[malloc_counter] = (char*)malloc(mallocs_bytes[malloc_counter]);
+    memset(mallocs[malloc_counter], 0, mallocs_bytes[malloc_counter]);
   }
 
-  if ((strcmp(msg, "free")) == 0) {
-    #if 0
-    fprintf(stdout, "free %d bytes\n", malloc1_bytes);
-    #endif
-    free(malloc1);
+  /*
+   * free
+   */
+  int malloc_id;
+  if ((n = sscanf(msg, "free %u", &malloc_id)) >= 1) {
+#if 0
+    fprintf(stdout, "free %u\n", malloc_id);
+#endif
+    free(mallocs[malloc_id]);
   }
 
   /*
@@ -195,7 +220,9 @@ void execute(const char* msg) {
       if (i == num) primes++;
       num++;
     }
+#if 0
     printf("%d prime numbers under %d\n", primes, primesunder);
+#endif
   }
 
   /*
