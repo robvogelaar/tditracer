@@ -29,6 +29,7 @@ extern "C" {
 #include <syscall.h>
 #include <unistd.h>
 
+#include "tdi.h"
 extern void tditrace(const char *format, ...);
 extern void tditrace_ex(int mask, const char *format, ...);
 
@@ -1115,19 +1116,21 @@ static void tmpfs_message(void) {
  * send new value, unless new value == previous value
  * i.e. do not send new value, if new value == prev value
  * and do not send unless a non 0 value is seen
+
  */
-#define OUT1(name, trace, value)          \
+
+#define OUT1(name, trace, tname, tvalue)  \
                                           \
   static unsigned int _##name##_seen = 0; \
   static unsigned int _##name##_prev;     \
-  unsigned int _##name = value;           \
+  unsigned int _##name = tvalue;          \
   if (_##name##_seen == 0) {              \
     if (_##name != 0) {                   \
       _##name##_seen = 1;                 \
-      tditrace(trace, _##name);           \
+      tditrace(trace, tname, _##name);    \
     }                                     \
   } else if (_##name##_prev != _##name) { \
-    tditrace(trace, _##name);             \
+    tditrace(trace, tname, _##name);      \
   }                                       \
   _##name##_prev = _##name;
 
@@ -1137,22 +1140,22 @@ static void tmpfs_message(void) {
  *  i.e. do not send new value, if new value == prev value == prev prev value
  * and do not send unless a non 0 value is seen
  */
-#define OUT2(name, trace, value)                                               \
+#define OUT2(name, trace, tname, tvalue)                                       \
                                                                                \
   static unsigned int _##name##_seen = 0;                                      \
   static unsigned int _##name##_prev;                                          \
   static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = value;                                                \
+  unsigned int _##name = tvalue;                                               \
   if (_##name##_seen == 0) {                                                   \
     if (_##name != 0) {                                                        \
       _##name##_seen = 1;                                                      \
-      tditrace(trace, _##name);                                                \
+      tditrace(trace, tname, _##name);                                         \
     }                                                                          \
   } else if (_##name##_seen == 1) {                                            \
     _##name##_seen = 2;                                                        \
-    tditrace(trace, _##name);                                                  \
+    tditrace(trace, tname, _##name);                                           \
   } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, _##name);                                                  \
+    tditrace(trace, tname, _##name);                                           \
   }                                                                            \
   _##name##_prevprev = _##name##_prev;                                         \
   _##name##_prev = _##name;
@@ -1163,29 +1166,374 @@ static void tmpfs_message(void) {
  * i.e. do not send previous if new value == prev value == prev prev value
  * and do not send unless a non 0 value is seen
  */
-#define OUT3(name, trace, value)                                               \
+#define OUT3(name, trace, tname, tvalue)                                       \
                                                                                \
   static unsigned int _##name##_seen = 0;                                      \
   static unsigned int _##name##_prev;                                          \
   static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = value;                                                \
+  unsigned int _##name = tvalue;                                               \
   if (_##name##_seen == 0) {                                                   \
     if (_##name != 0) {                                                        \
       _##name##_seen = 1;                                                      \
     }                                                                          \
   } else if (_##name##_seen == 1) {                                            \
     _##name##_seen = 2;                                                        \
-    tditrace(trace, _##name##_prev);                                           \
+    tditrace(trace, tname, _##name##_prev);                                    \
   } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, _##name##_prev);                                           \
+    tditrace(trace, tname, _##name##_prev);                                    \
   }                                                                            \
   _##name##_prevprev = _##name##_prev;                                         \
   _##name##_prev = _##name;
 
-static void sample_info(void) {
+/*
+ * tdiprocvmstat
+ */
+int tdiprocvmstat(struct tdistructprocvmstat *s) {
   char line[1024];
   FILE *f = NULL;
 
+  // tditrace("@A+do_procvmstat");
+  f = fopen("/proc/vmstat", "r");
+  if (f) {
+    while (fgets(line, 256, f)) {
+      if (sscanf(line, "pswpin %d", &s->pswpin)) continue;
+      if (sscanf(line, "pswpout %d", &s->pswpout)) continue;
+      if (sscanf(line, "pgpgin %d", &s->pgpgin)) continue;
+      if (sscanf(line, "pgpgout %d", &s->pgpgout)) continue;
+      if (sscanf(line, "pgfault %d", &s->pgfault)) continue;
+      if (sscanf(line, "pgmajfault %d", &s->pgmajfault)) break;
+    }
+
+    fclose(f);
+  }
+
+  // tditrace("@A-do_procvmstat");
+  return 0;
+}
+
+/*
+ * tdiprocmeminfo
+ */
+int tdiprocmeminfo(struct tdistructprocmeminfo *s) {
+  char line[1024];
+  FILE *f = NULL;
+
+  // tditrace("@A+tdiprocmeminfo");
+  f = fopen("/proc/meminfo", "r");
+  if (f) {
+    while (fgets(line, 256, f)) {
+      if (sscanf(line, "Cached: %d", &s->cached)) continue;
+      if (sscanf(line, "Active(anon): %d", &s->active_anon)) continue;
+      if (sscanf(line, "Inactive(anon): %d", &s->inactive_anon)) continue;
+      if (sscanf(line, "Active(file): %d", &s->active_file)) continue;
+      if (sscanf(line, "Inactive(file): %d", &s->inactive_file)) break;
+      // sscanf(line, "Mapped: %d", &mapped);
+    }
+    fclose(f);
+  }
+  // tditrace("@A-tdiprocmeminfo");
+
+  return 0;
+}
+
+int tdiproctvbcmmeminfo(struct tdistructproctvbcmmeminfo *s) {
+  char line[1024];
+  FILE *f = NULL;
+
+  // tditrace("@A+do_proctvbcmmeminfo");
+  s->heap0free = 0;
+  s->heap1free = 0;
+  f = fopen("/proc/tvbcm/meminfo", "r");
+  if (f) {
+    while (fgets(line, 256, f)) {
+      if (&s->heap0free == 0)
+        sscanf(line, "free %d", &s->heap0free);
+      else if (&s->heap1free == 0)
+        sscanf(line, "free %d", &s->heap1free);
+    }
+    fclose(f);
+  }
+  // tditrace("@A-do_proctvbcmmeminfo");
+
+  return 0;
+}
+
+int tdiprocstat(struct tdistructprocstat *s) {
+  char line[1024];
+  FILE *f = NULL;
+
+  // tditrace("@A+do_procstat");
+  f = fopen("/proc/stat", "r");
+  if (f) {
+    if (fgets(line, 256, f))
+      sscanf(line, "cpu %u %u %u %u %u %u %u", &s->cpu_user, &s->cpu_nice,
+             &s->cpu_system, &s->cpu_idle, &s->cpu_iowait, &s->cpu_irq,
+             &s->cpu_softirq);
+    if (fgets(line, 256, f))
+      sscanf(line, "cpu0 %u %u %u %u %u %u %u", &s->cpu0_user, &s->cpu0_nice,
+             &s->cpu0_system, &s->cpu0_idle, &s->cpu0_iowait, &s->cpu0_irq,
+             &s->cpu0_softirq);
+    if (fgets(line, 256, f))
+      sscanf(line, "cpu1 %u %u %u %u %u %u %u", &s->cpu1_user, &s->cpu1_nice,
+             &s->cpu1_system, &s->cpu1_idle, &s->cpu1_iowait, &s->cpu1_irq,
+             &s->cpu1_softirq);
+    fclose(f);
+  }
+  // tditrace("@A-do_procstat");
+
+  return 0;
+}
+
+int tdiprocselfstatm(struct tdistructprocselfstatm *s) {
+  // tditrace("@A+do_procselfstatm");
+
+  int fd = 0;
+  char buffer[65];
+  int gotten;
+  fd = open("/proc/self/statm", O_RDONLY);
+  if (fd >= 0) {
+    gotten = read(fd, buffer, 64);
+    buffer[gotten] = '\0';
+    sscanf(buffer, "%lu %lu", &s->vmsize, &s->rss);
+  }
+  close(fd);
+
+  // tditrace("@A-do_procselfstatm");
+  return 0;
+}
+
+int tdiprocselfstatus(struct tdistructprocselfstatus *s) {
+  int fd;
+  int bytes;
+  static char proc_self_status[16 * 1024 + 1];
+
+  // tditrace("@A+do_procselfstatus");
+
+  fd = open("/proc/self/status", O_RDONLY);
+  if (fd >= 0) {
+    while (1) {
+      bytes = read(fd, proc_self_status, sizeof(proc_self_status) - 1);
+      if ((bytes == -1) && (errno == EINTR))
+        /* keep trying */;
+      else if (bytes > 0) {
+        proc_self_status[bytes] = '\0';
+        char *saveptr;
+        char *line = strtok_r(proc_self_status, "\n", &saveptr);
+        while (line) {
+          if (sscanf(line, "VmSwap: %d", &s->vmswap)) break;
+          line = strtok_r(NULL, "\n", &saveptr);
+        }
+      } else
+        break;
+    }
+    close(fd);
+  }
+
+  // tditrace("@A+do_procselfstatus");
+  return 0;
+}
+
+int tdiprocselfsmaps(tdistructprocselfsmaps *s) {
+  static int do_fullsmaps = 0;
+  static char proc_self_smaps[16 * 1024 + 1];
+  int fd;
+  int bytes;
+
+  // tditrace("@A+do_procselfmaps");
+
+  fd = open("/proc/self/smaps", O_RDONLY);
+  if (fd >= 0) {
+    s->swap = 0;
+    while (1) {
+      bytes = read(fd, proc_self_smaps, sizeof(proc_self_smaps) - 1);
+      if ((bytes == -1) && (errno == EINTR))
+        /* keep trying */;
+      else if (bytes > 0) {
+        proc_self_smaps[bytes] = '\0';
+
+        char *saveptr;
+        char *line = strtok_r(proc_self_smaps, "\n", &saveptr);
+
+        while (line) {
+          if (1) {
+            int swap;
+            if (sscanf(line, "Swap: %d", &swap)) {
+              s->swap += swap;
+            }
+          }
+
+          if (do_fullsmaps) {
+            unsigned long start, end;
+            char flag_r, flag_w, flag_x, flag_s;
+            unsigned long long pgoff;
+            unsigned int maj, min;
+            unsigned long ino, dum;
+            char name[1024];
+            int n;
+            if (sscanf(line, "%08lx-%08lx", &dum, &dum) == 2) {
+              strcpy(name, "ANONYMOUS");
+              if ((n = sscanf(line,
+                              "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu %s",
+                              &start, &end, &flag_r, &flag_w, &flag_x, &flag_s,
+                              &pgoff, &maj, &min, &ino, name)) >= 10) {
+              }
+            }
+            int rss, pss, sc, sd, pc, pd, ref, anon, swap;
+            sscanf(line, "Rss:%d", &rss);
+            sscanf(line, "Pss:%d", &pss);
+            sscanf(line, "Shared_Clean:%d", &sc);
+            sscanf(line, "Shared_Dirty:%d", &sd);
+            sscanf(line, "Private_Clean:%d", &pc);
+            sscanf(line, "Private_Dirty:%d", &pd);
+            sscanf(line, "Referenced:%d", &ref);
+            sscanf(line, "Anonymous:%d", &anon);
+            sscanf(line, "Swap:%d", &swap);
+            if (strstr(line, "Swap")) {
+              if (swap) {
+                char *nm = strrchr(name, '/');
+
+#if 0
+                  char out[256];
+                  sprintf(
+                      out,
+                      "%40s %08lx-%08lx %6ld %c%c%c%c %5d %5d %5d %5d %5d %5d "
+                      "%5d %5d %5d",
+                      nm ? nm + 1 : name, start, end, (end - start) / 1024,
+                      flag_r, flag_w, flag_x, flag_s, rss, pss, sc, sd, pc, pd,
+                      ref, anon, swap);
+                  tditrace(out);
+#endif
+                tditrace("_swap_ %s %d", nm ? nm + 1 : name, swap);
+              }
+            }
+          }
+
+          line = strtok_r(NULL, "\n", &saveptr);
+        }
+
+      } else
+        break;
+    }
+    close(fd);
+  }
+
+  // tditrace("@A-do_procselfmaps");
+
+  static unsigned int seen_smapsswap = 0;
+  static unsigned int prev_smapsswap = 0;
+  if (seen_smapsswap == 0) {
+    seen_smapsswap = 1;
+  } else {
+    do_fullsmaps = (s->swap != prev_smapsswap);
+  }
+  prev_smapsswap = s->swap;
+
+  return 0;
+}
+
+int tdiprocdiskstats(struct tdistructprocdiskstats s[], const char *disks,
+                     int *nrdisks) {
+  char dsks[256];
+
+  *nrdisks = 0;
+  // tditrace("@A+do_procdiskstats");
+
+  if (!disks) {
+    return 0;
+  }
+
+  char *pt;
+  char *saveptr;
+  strcpy(dsks, disks);
+
+  pt = strtok_r(dsks, ",", &saveptr);
+
+  while (pt != NULL) {
+    strcpy(s[*nrdisks].name, pt);
+    sprintf(s[*nrdisks].match, "%s %%u %%u %%u %%u %%u %%u %%u %%u", pt);
+    pt = strtok_r(NULL, ",", &saveptr);
+    (*nrdisks)++;
+  }
+
+  if (*nrdisks) {
+    char line[1024];
+    FILE *f = NULL;
+    int d;
+    if ((f = fopen("/proc/diskstats", "r"))) {
+      while (fgets(line, 256, f)) {
+        for (d = 0; d < *nrdisks; d++) {
+          char *pos;
+          struct tdistructprocdiskstats *ps = &s[d];
+          if ((pos = strstr(line, ps->name))) {
+            sscanf(pos, ps->match, &ps->reads, &ps->reads_merged,
+                   &ps->reads_sectors, &ps->reads_time, &ps->writes,
+                   &ps->writes_merged, &ps->writes_sectors, &ps->writes_time);
+            break;
+          }
+        }
+      }
+      fclose(f);
+    }
+  }
+
+  // tditrace("@A-do_procdiskstats");
+  return 0;
+}
+
+int tdiprocnetdev(struct tdistructprocnetdev s[], const char *nets,
+                  int *nrnets) {
+  char nts[256];
+
+  // tditrace("@A+do_procnetdev");
+  *nrnets = 0;
+
+  if (!nets) {
+    return 0;
+  }
+
+  char *pt;
+  char *saveptr;
+
+  strcpy(nts, nets);
+  pt = strtok_r(nts, ",", &saveptr);
+  while (pt != NULL) {
+    strcpy(s[*nrnets].name, pt);
+    sprintf(s[*nrnets].match,
+            "%s: %%lu %%u %%u %%u %%u %%u %%u %%u %%lu %%u %%u %%u %%u %%u %%u "
+            "%%u",
+            pt);
+    pt = strtok_r(NULL, ",", &saveptr);
+    (*nrnets)++;
+  }
+
+  if (*nrnets) {
+    char line[1024];
+    FILE *f = NULL;
+    int n;
+    if ((f = fopen("/proc/net/dev", "r"))) {
+      while (fgets(line, 256, f)) {
+        for (n = 0; n < *nrnets; n++) {
+          char *pos;
+          struct tdistructprocnetdev *pn = &s[n];
+          if ((pos = strstr(line, pn->name))) {
+            sscanf(pos, pn->match, &pn->r_bytes, &pn->r_packets, &pn->r_errs,
+                   &pn->r_drop, &pn->r_fifo, &pn->r_frame, &pn->r_compressed,
+                   &pn->r_multicast, &pn->t_bytes, &pn->t_packets, &pn->t_errs,
+                   &pn->t_drop, &pn->t_fifo, &pn->t_frame, &pn->t_compressed,
+                   &pn->t_multicast);
+            break;
+          }
+        }
+      }
+      fclose(f);
+    }
+  }
+
+  // tditrace("@A-do_procnetdev");
+  return 0;
+}
+
+static void sample_info(void) {
   int do_structsysinfo = do_sysinfo;
   int do_structmallinfo = do_selfinfo;
   int do_structgetrusage = 1;  // do_selfinfo;
@@ -1282,398 +1630,97 @@ static void sample_info(void) {
   /*
    * procvmstat
    */
-  int pswpin = 0;
-  int pswpout = 0;
-  int pgpgin = 0;
-  int pgpgout = 0;
-  int pgfault = 0;
-  int pgmajfault = 0;
-
+  struct tdistructprocvmstat vmstat;
   if (do_procvmstat) {
     // tditrace("@A+do_procvmstat");
-
-    f = fopen("/proc/vmstat", "r");
-    if (f) {
-      while (fgets(line, 256, f)) {
-        if (sscanf(line, "pswpin %d", &pswpin)) continue;
-        if (sscanf(line, "pswpout %d", &pswpout)) continue;
-        if (sscanf(line, "pgpgin %d", &pgpgin)) continue;
-        if (sscanf(line, "pgpgout %d", &pgpgout)) continue;
-        if (sscanf(line, "pgfault %d", &pgfault)) continue;
-        if (sscanf(line, "pgmajfault %d", &pgmajfault)) break;
-      }
-
-      fclose(f);
-    }
-
+    tdiprocvmstat(&vmstat);
     // tditrace("@A-do_procvmstat");
   }
-
-  int cached = 0;
-  int active_anon = 0;
-  int inactive_anon = 0;
-  int active_file = 0;
-  int inactive_file = 0;
-  // int mapped = 0;
 
   /*
    * procmeminfo
    */
+  struct tdistructprocmeminfo meminfo;
   if (do_procmeminfo) {
-    // tditrace("@A+do_procmeminfo");
-
-    f = fopen("/proc/meminfo", "r");
-    if (f) {
-      while (fgets(line, 256, f)) {
-        if (sscanf(line, "Cached: %d", &cached)) continue;
-        if (sscanf(line, "Active(anon): %d", &active_anon)) continue;
-        if (sscanf(line, "Inactive(anon): %d", &inactive_anon)) continue;
-        if (sscanf(line, "Active(file): %d", &active_file)) continue;
-        if (sscanf(line, "Inactive(file): %d", &inactive_file)) break;
-        // sscanf(line, "Mapped: %d", &mapped);
-      }
-      fclose(f);
-    }
-
-    // tditrace("@A-do_procmeminfo");
+    tdiprocmeminfo(&meminfo);
   }
-
-  int heap0free = 0;
-  int heap1free = 0;
 
   /*
    * proctvbcmmeminfo
    */
+  struct tdistructproctvbcmmeminfo tvbcmmeminfo;
   if (do_proctvbcmmeminfo) {
-    // tditrace("@A+do_proctvbcmmeminfo");
-
-    f = fopen("/proc/tvbcm/meminfo", "r");
-    if (f) {
-      while (fgets(line, 256, f)) {
-        if (heap0free == 0)
-          sscanf(line, "free %d", &heap0free);
-        else if (heap1free == 0)
-          sscanf(line, "free %d", &heap1free);
-      }
-      fclose(f);
-    }
-
-    // tditrace("@A-do_proctvbcmmeminfo");
+    tdiproctvbcmmeminfo(&tvbcmmeminfo);
   }
 
-  struct cpu_t {
-    int user;
-    int nice;
-    int system;
-    int idle;
-    int iowait;
-    int irq;
-    int softirq;
-  };
-  cpu_t cpu, cpu0, cpu1;
-
+  /*
+   * procstat
+   */
+  struct tdistructprocstat stat;
   if (do_procstat) {
-    // tditrace("@A+do_procstat");
-
-    f = fopen("/proc/stat", "r");
-    if (f) {
-      if (fgets(line, 256, f))
-        sscanf(line, "cpu %u %u %u %u %u %u %u", &cpu.user, &cpu.nice,
-               &cpu.system, &cpu.idle, &cpu.iowait, &cpu.irq, &cpu.softirq);
-      if (fgets(line, 256, f))
-        sscanf(line, "cpu0 %u %u %u %u %u %u %u", &cpu0.user, &cpu0.nice,
-               &cpu0.system, &cpu0.idle, &cpu0.iowait, &cpu0.irq,
-               &cpu0.softirq);
-      if (fgets(line, 256, f))
-        sscanf(line, "cpu1 %u %u %u %u %u %u %u", &cpu1.user, &cpu1.nice,
-               &cpu1.system, &cpu1.idle, &cpu1.iowait, &cpu1.irq,
-               &cpu1.softirq);
-      fclose(f);
-    }
-
-    // tditrace("@A-do_procstat");
+    tdiprocstat(&stat);
   }
 
   /*
    * procselfstatm
    */
-  unsigned long vmsize = 0;
-  unsigned long rss = 0;
+  struct tdistructprocselfstatm selfstatm;
   if (do_procselfstatm) {
-    // tditrace("@A+do_procselfstatm");
-
-    int fh = 0;
-    char buffer[65];
-    int gotten;
-    fh = open("/proc/self/statm", O_RDONLY);
-    gotten = read(fh, buffer, 64);
-    buffer[gotten] = '\0';
-    sscanf(buffer, "%lu %lu", &vmsize, &rss);
-    close(fh);
-
-    // tditrace("@A-do_procselfstatm");
+    tdiprocselfstatm(&selfstatm);
   }
 
   /*
    * procselfsmaps
    */
-  int smapsswap = 0;
-
+  struct tdistructprocselfsmaps selfsmaps;
   if (do_procselfsmaps) {
-    static int do_fullsmaps = 0;
-    static char proc_self_smaps[16 * 1024 + 1];
-    int fd;
-    int bytes;
-
-    // tditrace("@A+do_procselfmaps");
-
-    fd = open("/proc/self/smaps", O_RDONLY);
-    if (fd >= 0) {
-      while (1) {
-        bytes = read(fd, proc_self_smaps, sizeof(proc_self_smaps) - 1);
-        if ((bytes == -1) && (errno == EINTR))
-          /* keep trying */;
-        else if (bytes > 0) {
-          proc_self_smaps[bytes] = '\0';
-
-          char *saveptr;
-          char *line = strtok_r(proc_self_smaps, "\n", &saveptr);
-
-          while (line) {
-            if (1) {
-              int swap;
-              if (sscanf(line, "Swap: %d", &swap)) {
-                smapsswap += swap;
-              }
-            }
-
-            if (do_fullsmaps) {
-              unsigned long start, end;
-              char flag_r, flag_w, flag_x, flag_s;
-              unsigned long long pgoff;
-              unsigned int maj, min;
-              unsigned long ino, dum;
-              char name[1024];
-              int n;
-              if (sscanf(line, "%08lx-%08lx", &dum, &dum) == 2) {
-                strcpy(name, "ANONYMOUS");
-                if ((n = sscanf(
-                         line, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu %s",
-                         &start, &end, &flag_r, &flag_w, &flag_x, &flag_s,
-                         &pgoff, &maj, &min, &ino, name)) >= 10) {
-                }
-              }
-              int rss, pss, sc, sd, pc, pd, ref, anon, swap;
-              sscanf(line, "Rss:%d", &rss);
-              sscanf(line, "Pss:%d", &pss);
-              sscanf(line, "Shared_Clean:%d", &sc);
-              sscanf(line, "Shared_Dirty:%d", &sd);
-              sscanf(line, "Private_Clean:%d", &pc);
-              sscanf(line, "Private_Dirty:%d", &pd);
-              sscanf(line, "Referenced:%d", &ref);
-              sscanf(line, "Anonymous:%d", &anon);
-              sscanf(line, "Swap:%d", &swap);
-              if (strstr(line, "Swap")) {
-                if (swap) {
-                  char *nm = strrchr(name, '/');
-
-#if 0
-                  char out[256];
-                  sprintf(
-                      out,
-                      "%40s %08lx-%08lx %6ld %c%c%c%c %5d %5d %5d %5d %5d %5d "
-                      "%5d %5d %5d",
-                      nm ? nm + 1 : name, start, end, (end - start) / 1024,
-                      flag_r, flag_w, flag_x, flag_s, rss, pss, sc, sd, pc, pd,
-                      ref, anon, swap);
-                  tditrace(out);
-#endif
-                  tditrace("_swap_ %s %d", nm ? nm + 1 : name, swap);
-                }
-              }
-            }
-
-            line = strtok_r(NULL, "\n", &saveptr);
-          }
-
-        } else
-          break;
-      }
-      close(fd);
-    }
-
-    // tditrace("@A-do_procselfmaps");
-
-    static int seen_smapsswap = 0;
-    static int prev_smapsswap = 0;
-    if (seen_smapsswap == 0) {
-      seen_smapsswap = 1;
-    } else {
-      do_fullsmaps = (smapsswap != prev_smapsswap);
-    }
-    prev_smapsswap = smapsswap;
+    tdiprocselfsmaps(&selfsmaps);
   }
 
   /*
    * procselfstatus
    */
-  int vmswap = 0;
+  struct tdistructprocselfstatus selfstatus;
   if (do_procselfstatus) {
-    int fd;
-    int bytes;
-    static char proc_self_status[16 * 1024 + 1];
-
-    // tditrace("@A+do_procselfstatus");
-
-    fd = open("/proc/self/status", O_RDONLY);
-    if (fd >= 0) {
-      while (1) {
-        bytes = read(fd, proc_self_status, sizeof(proc_self_status) - 1);
-        if ((bytes == -1) && (errno == EINTR))
-          /* keep trying */;
-        else if (bytes > 0) {
-          proc_self_status[bytes] = '\0';
-          char *saveptr;
-          char *line = strtok_r(proc_self_status, "\n", &saveptr);
-          while (line) {
-            if (sscanf(line, "VmSwap: %d", &vmswap)) break;
-            line = strtok_r(NULL, "\n", &saveptr);
-          }
-        } else
-          break;
-      }
-      close(fd);
-    }
-
-    // tditrace("@A+do_procselfstatus");
+    tdiprocselfstatus(&selfstatus);
   }
 
   /*
    * procdiskstats
    */
-  struct diskstat_t {
-    char name[16];
-    char match[64];
-    unsigned int reads;
-    unsigned int reads_merged;
-    unsigned int reads_sectors;
-    unsigned int reads_time;
-    unsigned int writes;
-    unsigned int writes_merged;
-    unsigned int writes_sectors;
-    unsigned int writes_time;
-  };
-
-  static int nr_disks = -1;
-  static diskstat_t ds[10];
-
+  struct tdistructprocdiskstats diskstats[8];
+  int nrdisks;
   if (do_procdiskstats) {
-    // tditrace("@A+do_procdiskstats");
-
-    if (nr_disks == -1) {
-      char *pt;
-      nr_disks = 0;
-      pt = strtok(getenv("DISKS"), ",");
-      while (pt != NULL) {
-        strcpy(ds[nr_disks].name, pt);
-        sprintf(ds[nr_disks].match, "%s %%u %%u %%u %%u %%u %%u %%u %%u", pt);
-        pt = strtok(NULL, ",");
-        nr_disks++;
-      }
-    }
-
-    if (nr_disks) {
-      int d;
-      if ((f = fopen("/proc/diskstats", "r"))) {
-        while (fgets(line, 256, f)) {
-          for (d = 0; d < nr_disks; d++) {
-            char *pos;
-            diskstat_t *pds = &ds[d];
-            if ((pos = strstr(line, pds->name))) {
-              sscanf(pos, pds->match, &pds->reads, &pds->reads_merged,
-                     &pds->reads_sectors, &pds->reads_time, &pds->writes,
-                     &pds->writes_merged, &pds->writes_sectors,
-                     &pds->writes_time);
-              break;
-            }
-          }
-        }
-        fclose(f);
-      }
-    }
-
-    // tditrace("@A-do_procdiskstats");
+    tdiprocdiskstats(diskstats, getenv("DISKS"), &nrdisks);
   }
 
   /*
    * procnetdev
    */
-  struct netdev_t {
-    unsigned long r_bytes;
-    unsigned int r_packets;
-    unsigned int r_errs;
-    unsigned int r_drop;
-    unsigned int r_fifo;
-    unsigned int r_frame;
-    unsigned int r_compressed;
-    unsigned int r_multicast;
-    unsigned long t_bytes;
-    unsigned int t_packets;
-    unsigned int t_errs;
-    unsigned int t_drop;
-    unsigned int t_fifo;
-    unsigned int t_frame;
-    unsigned int t_compressed;
-    unsigned int t_multicast;
-  };
-
-  netdev_t n2;
-
+  struct tdistructprocnetdev netdev[4];
+  int nrnets;
   if (do_procnetdev) {
-    // tditrace("@A+do_procnetdev");
-
-    if ((f = fopen("/proc/net/dev", "r"))) {
-      while (fgets(line, 256, f)) {
-        char *pos;
-        if ((pos = strstr(line, "bcm0:"))) {
-          sscanf(pos, "bcm0:%lu %u %u %u %u %u %u %u %lu %u %u %u %u %u %u %u",
-                 &n2.r_bytes, &n2.r_packets, &n2.r_errs, &n2.r_drop, &n2.r_fifo,
-                 &n2.r_frame, &n2.r_compressed, &n2.r_multicast, &n2.t_bytes,
-                 &n2.t_packets, &n2.t_errs, &n2.t_drop, &n2.t_fifo, &n2.t_frame,
-                 &n2.t_compressed, &n2.t_multicast);
-          break;
-        }
-#if 0
-        else if ((pos = strstr(line, "eth0: "))) {
-          sscanf(pos, "eth0: %lu %u %u %u %u %u %u %u %lu %u %u %u %u %u %u %u",
-                 &n1.r_bytes, &n1.r_packets, &n1.r_errs, &n1.r_drop, &n1.r_fifo,
-                 &n1.r_frame, &n1.r_compressed, &n1.r_multicast, &n1.t_bytes,
-                 &n1.t_packets, &n1.t_errs, &n1.t_drop, &n1.t_fifo, &n1.t_frame,
-                 &n1.t_compressed, &n1.t_multicast);
-        }
-#endif
-      }
-      fclose(f);
-    }
-
-    // tditrace("@A-do_procnetdev");
+    tdiprocnetdev(netdev, getenv("NETS"), &nrnets);
   }
 
   if (do_sysinfo) {
-    OUT1(free, "FREE~%u", (unsigned int)((si.freeram / 1024) * si.mem_unit))
-    OUT1(buff, "BUFF~%u", (unsigned int)((si.bufferram / 1024) * si.mem_unit))
-    OUT1(cach, "CACH~%u", (unsigned int)cached)
-    OUT1(swap, "SWAP~%u",
+    OUT1(free, "%s~%u", "FREE",
+         (unsigned int)((si.freeram / 1024) * si.mem_unit))
+
+    OUT1(buff, "%s~%u", "BUFF",
+         (unsigned int)((si.bufferram / 1024) * si.mem_unit))
+    OUT1(cach, "%s~%u", "CACH", (unsigned int)meminfo.cached)
+    OUT1(swap, "%s~%u", "SWAP",
          (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit))
 
-    OUT3(pgpgin, "PGPGIN#%u", ((unsigned int)pgpgin))
-    OUT3(pgpgout, "PGPGOUT#%u", ((unsigned int)pgpgout))
+    OUT3(pgpgin, "%s#%u", "PGIN", ((unsigned int)vmstat.pgpgin))
+    OUT3(pgpgout, "%s#%u", "PGOUT", ((unsigned int)vmstat.pgpgout))
 
-    OUT3(pgfault, "MINFLT#%u", (unsigned int)pgfault)
-    OUT3(pgmajfault, "MAJFLT#%u", (unsigned int)pgmajfault)
+    OUT3(pgfault, "%s#%u", "MINFLT", (unsigned int)vmstat.pgfault)
+    OUT3(pgmajfault, "%s#%u", "MAJFLT", (unsigned int)vmstat.pgmajfault)
 
-    OUT3(pswpin, "PSWPIN#%u", ((unsigned int)pswpin))
-    OUT3(pswpout, "PSWPOUT#%u", ((unsigned int)pswpout))
+    OUT3(pswpin, "%s#%u", "SWIN", ((unsigned int)vmstat.pswpin))
+    OUT3(pswpout, "%s#%u", "SWOUT", ((unsigned int)vmstat.pswpout))
 
     // tditrace("A_ANON~%u", (unsigned int)active_anon);
     // tditrace("I_ANON~%u", (unsigned int)inactive_anon);
@@ -1685,55 +1732,51 @@ static void sample_info(void) {
     // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
     // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
 
-    OUT1(cpu0_user, "0_usr^%u", (cpu0.user + cpu0.nice))
-    OUT1(cpu0_system, "0_sys^%u", (cpu0.system))
-    OUT1(cpu0_io, "0_io^%u", (cpu0.iowait))
-    OUT1(cpu0_irq, "0_irq^%u", (cpu0.irq + cpu0.softirq))
+    OUT1(cpu0_user, "%s^%u", "0_usr", (stat.cpu0_user + stat.cpu0_nice))
+    OUT1(cpu0_system, "%s^%u", "0_sys", (stat.cpu0_system))
+    OUT1(cpu0_io, "%s^%u", "0_io", (stat.cpu0_iowait))
+    OUT1(cpu0_irq, "%s^%u", "0_irq", (stat.cpu0_irq + stat.cpu0_softirq))
 
-    OUT1(cpu1_user, "1_usr^%u", (cpu1.user + cpu1.nice))
-    OUT1(cpu1_system, "1_sys^%u", (cpu1.system))
-    OUT1(cpu1_io, "1_io^%u", (cpu1.iowait))
-    OUT1(cpu1_irq, "1_irq^%u", (cpu1.irq + cpu1.softirq))
+    OUT1(cpu1_user, "%s^%u", "1_usr", (stat.cpu1_user + stat.cpu1_nice))
+    OUT1(cpu1_system, "%s^%u", "1_sys", (stat.cpu1_system))
+    OUT1(cpu1_io, "%s^%u", "1_io", (stat.cpu1_iowait))
+    OUT1(cpu1_irq, "%s^%u", "1_irq", (stat.cpu1_irq + stat.cpu1_softirq))
 
-    int d;
-    for (d = 0; d < nr_disks; d++) {
-      if (strcmp(ds[d].name, "sda4") == 0) {
-        OUT3(sda4_reads, "sda4_r#%u", (ds[d].reads_sectors));
-        OUT3(sda4_writes, "sda4_w#%u", (ds[d].writes_sectors));
-      } else if (strcmp(ds[d].name, "sda8") == 0) {
-        OUT3(sda8_reads, "sda8_r#%u", (ds[d].reads_sectors));
-        OUT3(sda8_writes, "sda8_w#%u", (ds[d].writes_sectors));
-      } else if (strcmp(ds[d].name, "sda11") == 0) {
-        OUT3(sda11_reads, "sda11_r#%u", (ds[d].reads_sectors));
-        OUT3(sda11_writes, "sda11_w#%u", (ds[d].writes_sectors));
-      } else if (strcmp(ds[d].name, "sda13") == 0) {
-        OUT3(sda13_reads, "sda13_r#%u", (ds[d].reads_sectors));
-        OUT3(sda13_writes, "sda13_w#%u", (ds[d].writes_sectors));
-      } else if (strcmp(ds[d].name, "sdb1") == 0) {
-        OUT3(sdb1_reads, "sdb1_r#%u", (ds[d].reads_sectors));
-        OUT3(sdb1_writes, "sdb1_w#%u", (ds[d].writes_sectors));
-      }
+    if (nrdisks--) {
+      OUT3(sd0_reads, "%s_r#%u", diskstats[0].name, diskstats[0].reads_sectors);
+      OUT3(sd0_writes, "%s_w#%u", diskstats[0].name,
+           diskstats[0].writes_sectors);
     }
 
-    // OUT3(eth0_r_packets, "eth0_r#%u", (n1.r_packets))
-    // OUT3(eth0_w_packets, "eth0_t#%u", (n1.t_packets))
+    if (nrdisks--) {
+      OUT3(sd1_reads, "%s_r#%u", diskstats[1].name, diskstats[1].reads_sectors);
+      OUT3(sd1_writes, "%s_w#%u", diskstats[1].name,
+           diskstats[1].writes_sectors);
+    }
 
-    // OUT3(bcm0_r_packets, "bcm0_r#%u", (n2.r_packets))
-    // OUT3(bcm0_w_packets, "bcm0_t#%u", (n2.t_packets))
+    if (nrnets--) {
+      OUT3(nt0_reads, "%s_r#%u", netdev[0].name, netdev[0].r_packets);
+      OUT3(nt0_writes, "%s_t#%u", netdev[0].name, netdev[0].t_packets);
+    }
+
+    if (nrdisks--) {
+      OUT3(nt1_reads, "%s_r#%u", netdev[1].name, netdev[1].r_packets);
+      OUT3(nt1_writes, "%s_w#%u", netdev[1].name, netdev[1].t_packets);
+    }
   }
 
   if (do_selfinfo) {
-    OUT1(rss, ":RSS~%u", (rss * 4))
-    // OUT1(brk, ":BRK~%u", (mi.arena / 1024))
-    // OUT1(mmap, ":MMAP~%u", (mi.hblkhd / 1024))
-    OUT1(swap, ":SWAP~%u", smapsswap)
+    OUT1(rss, "%s~%u", ":RSS", (selfstatm.rss * 4))
+    // OUT1(brk, "%s~%u", ":BRK", (mi.arena / 1024))
+    // OUT1(mmap, "%s~%u", ":MMAP", (mi.hblkhd / 1024))
+    OUT1(swap, "%s~%u", ":SWAP", selfsmaps.swap)
 
-    // tditrace("VM~%u", (unsigned int)(vmsize * 4));
-    // tditrace("MAXRSS~%u", (unsigned int)(ru.ru_maxrss / 1024));
-    OUT3(ru_minflt, ":MINFLT#%u", (unsigned int)ru.ru_minflt);
-    OUT3(ru_majflt, ":MAJFLT#%u", (unsigned int)ru.ru_majflt);
-    // tditrace("_BI~%u", ((unsigned int)ru.ru_inblock));
-    // tditrace("_BO~%u", ((unsigned int)ru.ru_oublock));
+    // tditrace("%s~%u", "VM", (unsigned int)(vmsize * 4));
+    // tditrace("%s~%u", "MAXRSS", (unsigned int)(ru.ru_maxrss / 1024));
+    OUT3(ru_minflt, "%s#%u", ":MINFLT", (unsigned int)ru.ru_minflt);
+    OUT3(ru_majflt, "%s#%u", ":MAJFLT", (unsigned int)ru.ru_majflt);
+    // tditrace("%s~%u", ":BI", ((unsigned int)ru.ru_inblock));
+    // tditrace("%s~%u", ":BO", ((unsigned int)ru.ru_oublock));
   }
 }
 
@@ -2886,3 +2929,100 @@ static void tditracer_destructor() {
 #endif
 }
 
+/*
+ ******************************************************************************************
+ */
+
+#if 0
+extern "C" int extra(int in, int *out) {
+
+    static int (*__extra)(int, int *) = NULL;
+
+    if (NULL == __extra) {
+        __extra = (int (*)(int, int *))dlsym(RTLD_NEXT, __func__);
+        if (NULL == __extra) {
+            fprintf(stderr, "Error in `dlsym`: %s %s\n", __func__, dlerror());
+        }
+    }
+
+    tditrace("@T+extra()");
+    int ret = __extra(in, out);
+    tditrace("@T-extra()");
+
+    return ret;
+}
+#endif
+
+#if 0
+#if 1
+extern "C" void *mmap(void *__addr, size_t __len, int __prot, int __flags,
+                      int __fd, __off_t __offset) {
+  static void *(*__mmap)(void *, size_t, int, int, int, __off_t) = NULL;
+  if (__mmap == NULL) {
+    __mmap = (void *(*)(void *, size_t, int, int, int, __off_t))dlsym(RTLD_NEXT,
+                                                                      "mmap");
+    if (__mmap == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  tditrace("@T+mmap%n", (int)__len);
+  void *ret = __mmap(__addr, __len, __prot, __flags, __fd, __offset);
+  tditrace("@T-mmap%n", (int)ret);
+
+  return ret;
+}
+#endif
+
+#if 1
+extern "C" int munmap(void *__addr, size_t __len) {
+  static int (*__munmap)(void *, size_t) = NULL;
+  if (__munmap == NULL) {
+    __munmap = (int (*)(void *, size_t))dlsym(RTLD_NEXT, "munmap");
+    if (__munmap == NULL) {
+      fprintf(stderr, "Error in dlsym: %s\n", dlerror());
+    }
+  }
+
+  tditrace("@T+munmap%n%n", __addr, __len);
+  int ret = __munmap(__addr, __len);
+  tditrace("@T-munmap");
+
+  return ret;
+}
+#endif
+
+extern "C" void syslog(int pri, const char *fmt, ...) {
+  if (pri == 187) {
+    va_list args;
+    va_start(args, fmt);
+    int a1 = va_arg(args, int);
+    tditrace("syslog() \"%s\"", a1);
+  }
+}
+
+#if 1
+extern "C" void *memset(void *dest, int c, size_t n) {
+  static void *(*__memset)(void *, int, size_t) = NULL;
+
+  if (__memset == NULL) {
+    __memset = (void *(*)(void *, int, size_t))dlsym(RTLD_NEXT, "memset");
+    if (NULL == __memset) {
+      fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
+    }
+  }
+
+  tditrace("@I+memset%n%n%n", dest, c, n);
+  void *ret = __memset(dest, c, n);
+  tditrace("@I-memset");
+
+  return ret;
+}
+#endif
+#endif
+
+/*
+ ******************************************************************************************
+ ******************************************************************************************
+ ******************************************************************************************
+ */

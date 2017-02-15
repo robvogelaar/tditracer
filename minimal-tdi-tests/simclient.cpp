@@ -1,12 +1,12 @@
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
-#include <netinet/tcp.h>
 #include <sys/un.h>
 #include <unistd.h>
 
 // char *socket_path = "./socket";
-char *socket_path = (char*)"\0hidden";
+char *socket_path = (char *)"\0hidden";
 
 int main(int argc, char *argv[]) {
   struct sockaddr_un addr;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
   }
 
   while ((rc = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-    if (write(fd, buf, (rc-1)) != (rc-1)) {
+    if (write(fd, buf, (rc - 1)) != (rc - 1)) {
       if (rc > 0)
         fprintf(stderr, "partial write");
       else {
@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
       fprintf(stdout, "simclient:%d\n", rc);
     } else {
       buf[rc] = 0;
-      #if 1
+#if 0
       fprintf(stdout, "simclient:\"%s\"\n", buf);
-      #endif
+#endif
     }
   }
 

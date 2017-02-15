@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+#include "tdi.h"
+
 void usage(void) {
   printf("tdi v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
   printf("\nUsage: tdi -d [tracebuffer]\n");
@@ -27,12 +29,15 @@ void usage(void) {
   printf("\nUsage: tdi -m <message>\n");
   printf("         tdimessage: send a message to the tditracer(s)\n");
   printf("         'rewind' = rewind the tditracebuffer(s)\n");
+  printf("\nUsage: tdi -p\n");
+  printf("         tdiproc : report procfs data.\n");
 }
 
 static int tdidump(int argc, char *argv[]);
 static int tdistat(int argc, char *argv[]);
 static int tditest(int argc, char *argv[]);
 static int tdimessage(int argc, char *argv[]);
+static int tdiproc(int argc, char *argv[]);
 
 /******************************************************************************/
 int main(int argc, char *argv[]) {
@@ -53,6 +58,11 @@ int main(int argc, char *argv[]) {
 
   else if (argc > 1 && (strcmp(argv[1], "-m") == 0)) {
     tdimessage(argc - 1, &argv[1]);
+    return 0;
+  }
+
+  else if (argc > 1 && (strcmp(argv[1], "-p") == 0)) {
+    tdiproc(argc - 1, &argv[1]);
     return 0;
   }
 
@@ -253,18 +263,18 @@ static void *thread_task(void *param) {
   while (1) {
     tditrace("%m%n", *p, 10000);
 
-    tditrace("@%d+task%d", *p&7, *p);
+    tditrace("@%d+task%d", *p & 7, *p);
 
     usleep((rand() % 100) * 1000);
 
-    #if 0
+#if 0
     long long int j = (long long int)((rand() % 100) * 10000LL);
     while (j) {
       j--;
     };
-    #endif
+#endif
 
-    tditrace("@%d-task%d", *p&7, *p);
+    tditrace("@%d-task%d", *p & 7, *p);
 
     usleep((rand() % 100) * 1000);
   }
@@ -424,5 +434,150 @@ static int tdimessage(int argc, char *argv[]) {
   } else {
     fprintf(stderr, "no message provided\n");
   }
+  return 0;
+}
+
+static int tdiproc(int argc, char *argv[]) {
+  void *handle;
+
+  handle = dlopen("libtdi.so", RTLD_LAZY);
+  if (!handle) {
+    fprintf(stderr, "%s\n", dlerror());
+    exit(EXIT_FAILURE);
+  }
+
+  dlerror(); /* Clear any existing error */
+
+  pfntdiprocvmstat tdiprocvmstat =
+      (pfntdiprocvmstat)dlsym(handle, "tdiprocvmstat");
+  struct tdistructprocvmstat vmstat;
+  if (tdiprocvmstat) {
+    tdiprocvmstat(&vmstat);
+    fprintf(stdout,
+            "vmstat= pswpin:%d, pswpout:%d, pgpgin:%d, pgpgout:%d, pgfault:%d, "
+            "pgmajfault:%d\n",
+            vmstat.pswpin, vmstat.pswpout, vmstat.pgpgin, vmstat.pgpgout,
+            vmstat.pgfault, vmstat.pgmajfault);
+  }
+
+  pfntdiprocmeminfo tdiprocmeminfo =
+      (pfntdiprocmeminfo)dlsym(handle, "tdiprocmeminfo");
+
+  struct tdistructprocmeminfo meminfo;
+  if (tdiprocmeminfo) {
+    tdiprocmeminfo(&meminfo);
+    fprintf(
+        stdout,
+        "meminfo= cached:%d, active_anon:%d, inactive_anon:%d, active_file:%d, "
+        "inactive_file:%d\n",
+        meminfo.cached, meminfo.active_anon, meminfo.inactive_anon,
+        meminfo.active_file, meminfo.inactive_file);
+  }
+
+  pfntdiproctvbcmmeminfo tdiproctvbcmmeminfo =
+      (pfntdiproctvbcmmeminfo)dlsym(handle, "tdiproctvbcmmeminfo");
+
+  struct tdistructproctvbcmmeminfo tvbcmmeminfo;
+  if (tdiproctvbcmmeminfo) {
+    tdiproctvbcmmeminfo(&tvbcmmeminfo);
+    fprintf(stdout, "tvbcmmeminfo= heap0free:%d, heap1free:%d\n",
+            tvbcmmeminfo.heap0free / 1024, tvbcmmeminfo.heap1free / 1024);
+  }
+
+  pfntdiprocstat tdiprocstat = (pfntdiprocstat)dlsym(handle, "tdiprocstat");
+
+  struct tdistructprocstat stat;
+  if (tdiprocstat) {
+    tdiprocstat(&stat);
+    fprintf(stdout,
+            "stat= cpu_user:%u, cpu_nice:%u, cpu_sys:%u, cpu_idle:%u, "
+            "cpu_iowait:%u, cpu_irq:%u, cpu_softirq:%u\n",
+            stat.cpu_user, stat.cpu_nice, stat.cpu_system, stat.cpu_idle,
+            stat.cpu_iowait, stat.cpu_irq, stat.cpu_softirq);
+    fprintf(stdout,
+            "stat= cpu0_user:%u, cpu0_nice:%u, cpu0_sys:%u, cpu0_idle:%u, "
+            "cpu0_iowait:%u, cpu0_irq:%u, cpu0_softirq:%u\n",
+            stat.cpu0_user, stat.cpu0_nice, stat.cpu0_system, stat.cpu0_idle,
+            stat.cpu0_iowait, stat.cpu0_irq, stat.cpu0_softirq);
+    fprintf(stdout,
+            "stat= cpu1_user:%u, cpu1_nice:%u, cpu1_sys:%u, cpu1_idle:%u, "
+            "cpu1_iowait:%u, cpu1_irq:%u, cpu1_softirq:%u\n",
+            stat.cpu1_user, stat.cpu1_nice, stat.cpu1_system, stat.cpu1_idle,
+            stat.cpu1_iowait, stat.cpu1_irq, stat.cpu1_softirq);
+  }
+
+  pfntdiprocselfstatm tdiprocselfstatm =
+      (pfntdiprocselfstatm)dlsym(handle, "tdiprocselfstatm");
+
+  struct tdistructprocselfstatm selfstatm;
+  if (tdiprocselfstatm) {
+    tdiprocselfstatm(&selfstatm);
+    fprintf(stdout, "selfstatm= vmsize:%lu, rss:%lu\n", selfstatm.vmsize,
+            selfstatm.rss);
+  }
+
+  pfntdiprocselfstatus tdiprocselfstatus =
+      (pfntdiprocselfstatus)dlsym(handle, "tdiprocselfstatus");
+
+  struct tdistructprocselfstatus selfstatus;
+  if (tdiprocselfstatus) {
+    tdiprocselfstatus(&selfstatus);
+    fprintf(stdout, "selfstatus= vmswap:%d\n", selfstatus.vmswap);
+  }
+
+  pfntdiprocselfsmaps tdiprocselfsmaps =
+      (pfntdiprocselfsmaps)dlsym(handle, "tdiprocselfsmaps");
+
+  struct tdistructprocselfsmaps selfsmaps;
+  if (tdiprocselfsmaps) {
+    tdiprocselfsmaps(&selfsmaps);
+    fprintf(stdout, "selfsmaps= swap:%d\n", selfsmaps.swap);
+  }
+
+  pfntdiprocdiskstats tdiprocdiskstats =
+      (pfntdiprocdiskstats)dlsym(handle, "tdiprocdiskstats");
+
+  static struct tdistructprocdiskstats diskstats[10];
+  if (tdiprocdiskstats) {
+    int m, n;
+    tdiprocdiskstats(diskstats, getenv("DISKS"), &n);
+
+    for (m = 0; m < n; m++) {
+      fprintf(
+          stdout,
+          "diskstats= name:%s, reads:%u, reads_merged:%u, reads_sectors:%u, "
+          "reads_time:%u, writes:%u, writes_merged:%u, writes_sectors:%u, "
+          "writes_time:%u,\n",
+          diskstats[m].name, diskstats[m].reads, diskstats[m].reads_merged,
+          diskstats[m].reads_sectors, diskstats[m].reads_time,
+          diskstats[m].writes, diskstats[m].writes_merged,
+          diskstats[m].writes_sectors, diskstats[m].writes_time);
+    }
+  }
+
+  pfntdiprocnetdev tdiprocnetdev =
+      (pfntdiprocnetdev)dlsym(handle, "tdiprocnetdev");
+
+  static struct tdistructprocnetdev netdev[10];
+  if (tdiprocnetdev) {
+    int m, n;
+    tdiprocnetdev(netdev, getenv("NETS"), &n);
+
+    for (m = 0; m < n; m++) {
+      fprintf(stdout,
+              "netdev= name:%s, r_bytes: %lu, r_packets: %u, r_errs: %u, "
+              "r_drop: %u, r_fifo: %u, r_frame: %u, r_compressed: %u, "
+              "r_multicast: %u, t_bytes: %lu, t_packets: %u, "
+              "t_errs: %u, t_drop: %u, t_fifo: %u, t_frame: %u, "
+              "t_compressed: %u, t_multicast:%u\n",
+              netdev[m].name, netdev[m].r_bytes, netdev[m].r_packets,
+              netdev[m].r_errs, netdev[m].r_drop, netdev[m].r_fifo,
+              netdev[m].r_frame, netdev[m].r_compressed, netdev[m].r_multicast,
+              netdev[m].t_bytes, netdev[m].t_packets, netdev[m].t_errs,
+              netdev[m].t_drop, netdev[m].t_fifo, netdev[m].t_frame,
+              netdev[m].t_compressed, netdev[m].t_multicast);
+    }
+  }
+
   return 0;
 }

@@ -13,6 +13,8 @@
 void (*tditrace)(const char* format,
                  ...) = (void (*)(const char* format, ...))dlsym(RTLD_DEFAULT,
                                                                  "tditrace");
+#define TDITRACE(format, ...) \
+  if (NULL != tditrace) tditrace(format, ##__VA_ARGS__)
 
 // char *socket_path = "./socket";
 char* socket_path = (char*)"\0hidden";
@@ -24,8 +26,8 @@ int main(int argc, char* argv[]) {
   char buf[100];
   int fd, cl, rc;
 
-  tditrace("@T+action %s", argv[0]);
-  tditrace("@T-action");
+  TDITRACE("@T+action %s", argv[0]);
+  TDITRACE("@T-action");
 
   if (argc > 1) socket_path = argv[1];
 
@@ -62,15 +64,16 @@ int main(int argc, char* argv[]) {
 
     while ((rc = read(cl, buf, sizeof(buf))) > 0) {
       buf[rc] = 0;
-#if 1
+#if 0
       printf("simserver:\"%s\"\n", buf);
 #endif
 
       if (strcmp(buf, "exit") == 0) {
-        tditrace("@T+action exit");
-        tditrace("@T-action exit");
+        TDITRACE("@T+action exit");
+        TDITRACE("@T-action exit");
         write(cl, "done", 4);
         close(cl);
+        fprintf(stdout, "+%-5d \"exit\"\n", getpid());
         exit(0);
       } else {
         execute(buf);
@@ -95,7 +98,7 @@ void execute(const char* msg) {
   unsigned int n, i;
   char s[16];
 
-  fprintf(stdout, "+execute[%s]\n", msg);
+  fprintf(stdout, "%-5d \"%s\"\n", getpid(), msg);
 
   static unsigned int mmap1_bytes;
   static char* mmap1;
@@ -111,12 +114,12 @@ void execute(const char* msg) {
 
     if (!mark_seen) {
       mark_seen = 1;
-      tditrace("@%d+mark", mark_color);
+      TDITRACE("@%d+mark", mark_color);
     } else {
-      tditrace("@%d-mark", mark_color);
+      TDITRACE("@%d-mark", mark_color);
       mark_color++;
       mark_color &= 7;
-      tditrace("@%d+mark", mark_color);
+      TDITRACE("@%d+mark", mark_color);
     }
   }
 
@@ -127,20 +130,22 @@ void execute(const char* msg) {
     mmap1_bytes =
         atoi(s) * (strchr(s, 'M') ? 1024 * 1024 : strchr(s, 'K') ? 1024 : 1);
 
+#if 0
     fprintf(stdout, "mmap %d bytes\n", mmap1_bytes);
+#endif
 
-    tditrace("@T+action mmap %s", s);
+    TDITRACE("@T+action mmap %s", s);
     mmap1 = (char*)mmap(NULL, mmap1_bytes, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS
                         /* | MAP_POPULATE */
                         ,
                         -1, 0);
-    tditrace("@T-action");
+    TDITRACE("@T-action");
 
     if ((int)mmap1 != -1) {
-      tditrace("@T+action memset %s", s);
+      TDITRACE("@T+action memset %s", s);
       memset(mmap1, 0, mmap1_bytes);
-      tditrace("@T-action");
+      TDITRACE("@T-action");
     }
   }
 
@@ -148,23 +153,29 @@ void execute(const char* msg) {
    * munmap
    */
   if ((strcmp(msg, "munmap")) == 0) {
+    #if 0
     fprintf(stdout, "munmap %d bytes\n", mmap1_bytes);
-    tditrace("@T+action munmap %s", s);
+    #endif
+    TDITRACE("@T+action munmap %s", s);
     munmap(mmap1, mmap1_bytes);
-    tditrace("@T-action");
+    TDITRACE("@T-action");
   }
 
   if ((n = sscanf(msg, "malloc %s", s)) >= 1) {
     malloc1_bytes =
         atoi(s) * (strchr(s, 'M') ? 1024 * 1024 : strchr(s, 'K') ? 1024 : 1);
 
+    #if 0
     fprintf(stdout, "malloc %d bytes\n", malloc1_bytes);
+    #endif
     malloc1 = (char*)malloc(malloc1_bytes);
     memset(malloc1, 0, malloc1_bytes);
   }
 
   if ((strcmp(msg, "free")) == 0) {
+    #if 0
     fprintf(stdout, "free %d bytes\n", malloc1_bytes);
+    #endif
     free(malloc1);
   }
 
@@ -199,9 +210,9 @@ void execute(const char* msg) {
     void* handle;
     void (*f)(int, int) = NULL;
 
-    tditrace("@T+action dlopen(%s)", lname);
+    TDITRACE("@T+action dlopen(%s)", lname);
     handle = dlopen(lname, RTLD_LAZY);
-    tditrace("@T-action");
+    TDITRACE("@T-action");
 
     if (!handle) {
       fprintf(stderr, "%s\n", dlerror());
@@ -210,11 +221,15 @@ void execute(const char* msg) {
     f = (void (*)(int, int))dlsym(handle, fname);
 
     if (f) {
+#if 0
       fprintf(stdout, "%s %s %d %d\n", lname, fname, fparam1, fparam2);
-      tditrace("@T+action %s %d %d", fname, fparam1, fparam2);
+#endif
+      TDITRACE("@T+action %s %d %d", fname, fparam1, fparam2);
       f(fparam1, fparam2);
-      tditrace("@T-action");
+      TDITRACE("@T-action");
     }
   }
+#if 0
   fprintf(stdout, "-execute[%s]\n", msg);
+#endif
 }
