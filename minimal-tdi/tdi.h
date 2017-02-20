@@ -3,6 +3,107 @@ extern void tditrace(const char *format, ...);
 extern void tditrace_ex(int mask, const char *format, ...);
 #endif
 
+
+/*
+ * send new value
+ */
+#define OUT(name, trace, value) \
+                                \
+  unsigned int _##name = value; \
+  tditrace(trace, _##name);
+
+/*
+ * send new value, unless new value == previous value
+ * i.e. do not send new value, if new value == prev value
+ * and do not send unless a non 0 value is seen
+ */
+
+#define OUT1(name, trace, tname, tvalue)  \
+                                          \
+  static unsigned int _##name##_seen = 0; \
+  static unsigned int _##name##_prev;     \
+  unsigned int _##name = tvalue;          \
+  if (_##name##_seen == 0) {              \
+    if (_##name != 0) {                   \
+      _##name##_seen = 1;                 \
+      tditrace(trace, tname, _##name);    \
+    }                                     \
+  } else if (_##name##_prev != _##name) { \
+    tditrace(trace, tname, _##name);      \
+  }                                       \
+  _##name##_prev = _##name;
+
+#define OUT1base(name, trace, tname, tvalue)            \
+                                                        \
+  static unsigned int _##name##_seen = 0;               \
+  static unsigned int _##name##_prev;                   \
+  static unsigned int _##name##_base;                   \
+  unsigned int _##name = tvalue;                        \
+  if (_##name##_seen == 0) {                            \
+    if (_##name != 0) {                                 \
+      _##name##_seen = 1;                               \
+      _##name##_base = _##name;                         \
+      tditrace(trace, tname, _##name - _##name##_base); \
+    }                                                   \
+  } else if (_##name##_prev != _##name) {               \
+    tditrace(trace, tname, _##name - _##name##_base);   \
+  }                                                     \
+  _##name##_prev = _##name;
+
+/*
+ * send new value, unless new value == prev value and new value == prev prev
+ * value
+ *  i.e. do not send new value, if new value == prev value == prev prev value
+ * and do not send unless a non 0 value is seen
+ */
+#define OUT2(name, trace, tname, tvalue)                                       \
+                                                                               \
+  static unsigned int _##name##_seen = 0;                                      \
+  static unsigned int _##name##_prev;                                          \
+  static unsigned int _##name##_prevprev;                                      \
+  unsigned int _##name = tvalue;                                               \
+  if (_##name##_seen == 0) {                                                   \
+    if (_##name != 0) {                                                        \
+      _##name##_seen = 1;                                                      \
+      tditrace(trace, tname, _##name);                                         \
+    }                                                                          \
+  } else if (_##name##_seen == 1) {                                            \
+    _##name##_seen = 2;                                                        \
+    tditrace(trace, tname, _##name);                                           \
+  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
+    tditrace(trace, tname, _##name);                                           \
+  }                                                                            \
+  _##name##_prevprev = _##name##_prev;                                         \
+  _##name##_prev = _##name;
+
+/*
+ * send previous value, unless new value == prev value and new value ==
+ * prev prev value
+ * i.e. do not send previous if new value == prev value == prev prev value
+ * and do not send unless a non 0 value is seen
+ */
+#define OUT3(name, trace, tname, tvalue)                                       \
+                                                                               \
+  static unsigned int _##name##_seen = 0;                                      \
+  static unsigned int _##name##_prev;                                          \
+  static unsigned int _##name##_prevprev;                                      \
+  unsigned int _##name = tvalue;                                               \
+  if (_##name##_seen == 0) {                                                   \
+    if (_##name != 0) {                                                        \
+      _##name##_seen = 1;                                                      \
+    }                                                                          \
+  } else if (_##name##_seen == 1) {                                            \
+    if (_##name##_prev != _##name) {                                           \
+      _##name##_seen = 2;                                                      \
+      tditrace(trace, tname, _##name##_prev);                                  \
+    }                                                                          \
+  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
+    tditrace(trace, tname, _##name##_prev);                                    \
+  }                                                                            \
+  _##name##_prevprev = _##name##_prev;                                         \
+  _##name##_prev = _##name;
+
+
 struct tdistructprocvmstat {
   int pswpin;
   int pswpout;
@@ -65,7 +166,13 @@ struct tdistructprocselfstatus {
 typedef int (*pfntdiprocselfstatus)(struct tdistructprocselfstatus *s);
 
 struct tdistructprocselfsmaps {
-  unsigned int swap;
+  unsigned int code_rss;
+  unsigned int code_pss;
+  unsigned int code_ref;
+  unsigned int data_rss;
+  unsigned int data_pss;
+  unsigned int data_ref;
+  unsigned int data_swap;
 };
 typedef int (*pfntdiprocselfsmaps)(struct tdistructprocselfsmaps *s);
 
@@ -106,3 +213,23 @@ struct tdistructprocnetdev {
 };
 typedef int (*pfntdiprocnetdev)(struct tdistructprocnetdev s[],
                                 const char *nets, int *nrnets);
+
+
+#define CPUINFO           128
+#define MEMINFO           129
+#define DSKINFO           130
+#define NETINFO           131
+
+#define SLFINFO           132
+
+#define PIDINFO           133
+
+#define MARKER            134
+
+
+#define CPUINFO_MAXNUMBER   7   // 0..7
+#define MEMINFO_MAXNUMBER   9
+#define DSKINFO_MAXNUMBER   7
+#define NETINFO_MAXNUMBER   3
+
+#define SLFINFO_MAXNUMBER  10

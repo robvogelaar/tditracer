@@ -5,15 +5,11 @@
 extern "C" {
 
 #include <ctype.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <stdarg.h>
-#if 0
-#include <linux/futex.h>
-#endif
-#include <dirent.h>
 #include <malloc.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -38,63 +34,9 @@ extern void tditrace_ex(int mask, const char *format, ...);
 static pid_t gpid;
 static char gprocname[128];
 
-#if 0
-
-struct simplefu_semaphore {
-  int avail;
-  int waiters;
-};
-
-typedef struct simplefu_semaphore *simplefu;
-
-struct simplefu_mutex {
-  struct simplefu_semaphore sema;
-};
-
-typedef struct simplefu_mutex *simplemu;
-
-struct simplefu_mutex myMutex;
-
-static void simplefu_down(simplefu who) {
-  int val;
-  do {
-    val = who->avail;
-    if (val > 0 && __sync_bool_compare_and_swap(&who->avail, val, val - 1))
-      return;
-    __sync_fetch_and_add(&who->waiters, 1);
-    syscall(__NR_futex, &who->avail, FUTEX_WAIT, val, NULL, 0, 0);
-    __sync_fetch_and_sub(&who->waiters, 1);
-  } while (1);
-}
-
-static void simplefu_up(simplefu who) {
-  int nval = __sync_add_and_fetch(&who->avail, 1);
-  if (who->waiters > 0) {
-    syscall(__NR_futex, &who->avail, FUTEX_WAKE, nval, NULL, 0, 0);
-  }
-}
-
-static void simplefu_mutex_init(simplemu mx) {
-  mx->sema.avail = 1;
-  mx->sema.waiters = 0;
-}
-
-static void simplefu_mutex_lock(simplemu mx) { simplefu_down(&mx->sema); }
-static void simplefu_mutex_unlock(simplemu mx) { simplefu_up(&mx->sema); }
-
-static void LOCK_init(void) {
-  simplefu_mutex_init(&myMutex);
-} 
-
-static void LOCK(void) {
-  simplefu_mutex_lock(&myMutex);
-} 
-
-static void UNLOCK(void) {
-  simplefu_mutex_unlock(&myMutex);
-}
-
-#else
+static char pid_procname_table_procname[128][16];
+static unsigned int pid_procname_table_pid[16];
+static int pid_procname_table_nr = 0;
 
 static pthread_mutex_t lock;
 
@@ -106,8 +48,6 @@ static void LOCK_init(void) {
 
 static void LOCK(void) { pthread_mutex_lock(&lock); }
 static void UNLOCK(void) { pthread_mutex_unlock(&lock); }
-
-#endif
 
 #define TASKS 0
 #define ISRS 1
@@ -171,11 +111,258 @@ static int nr_events = 0;
 static char notes_array[1024][128];
 static int nr_notes = 0;
 
-// 128 notes of 1000 agents each
+// 128 agents of 1000 chars each
 static char agents_array[1024][128];
 static int nr_agents = 0;
 
 static void tditrace_rewind();
+
+#define docycle(number, id, pidid)      \
+  static unsigned int _##id##_seen[10]; \
+                                        \
+  if (_##id##_seen[pidid] == 0) {       \
+    _##id##_seen[pidid] = 1;            \
+  }                                     \
+  fprintf(stdout, "VAL 6 %d %lld\n", id + pidid * 10, number * 10000000LL);
+
+#define doqueue(number, id, pidid, tstamp)                             \
+  static unsigned int _##id##_seen[10];                                \
+  static unsigned int _##id##_prev[10];                                \
+                                                                       \
+  if (_##id##_seen[pidid] == 0) {                                      \
+    if (number != 0) {                                                 \
+      _##id##_seen[pidid] = 1;                                         \
+      if (number >= _##id##_prev[pidid])                               \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                number - _##id##_prev[pidid]);                         \
+      else                                                             \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                _##id##_prev[pidid] - number);                         \
+    }                                                                  \
+  } else {                                                             \
+    if (number != _##id##_prev[pidid]) {                               \
+      if (number >= _##id##_prev[pidid])                               \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                number - _##id##_prev[pidid]);                         \
+      else                                                             \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                _##id##_prev[pidid] - number);                         \
+    }                                                                  \
+  }                                                                    \
+  _##id##_prev[pidid] = number;
+
+#define doqueue_base(number, id, pidid, tstamp)                        \
+  static unsigned int _##id##_seen[10];                                \
+  static unsigned int _##id##_prev[10];                                \
+  static unsigned int _##id##_base[10];                                \
+                                                                       \
+  if (_##id##_seen[pidid] == 0) {                                      \
+    if (number != 0) {                                                 \
+      _##id##_seen[pidid] = 1;                                         \
+      _##id##_base[pidid] = number;                                    \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])       \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]); \
+      else                                                             \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid])); \
+    }                                                                  \
+  } else {                                                             \
+    if ((number - _##id##_base[pidid]) != _##id##_prev[pidid]) {       \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])       \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]); \
+      else                                                             \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid])); \
+    }                                                                  \
+  }                                                                    \
+  _##id##_prev[pidid] = (number - _##id##_base[pidid]);
+
+#define dovalue(number, id, pidid)                                            \
+                                                                              \
+  static unsigned int _##id##_seen[10];                                       \
+  static unsigned int _##id##_prev[10];                                       \
+  static unsigned int _##id##_prevprev[10];                                   \
+  if (_##id##_seen[pidid] == 0) {                                             \
+    if (number != 0) {                                                        \
+      _##id##_seen[pidid] = 1;                                                \
+    }                                                                         \
+  } else if (_##id##_seen[pidid] == 1) {                                      \
+    if (_##id##_prev[pidid] != number) {                                      \
+      _##id##_seen[pidid] = 2;                                                \
+      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * 10, _##id##_prev[pidid]); \
+    }                                                                         \
+  } else if ((_##id##_prev[pidid] != number) ||                               \
+             (_##id##_prevprev[pidid] != number)) {                           \
+    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * 10, _##id##_prev[pidid]);   \
+  }                                                                           \
+  _##id##_prevprev[pidid] = _##id##_prev[pidid];                              \
+  _##id##_prev[pidid] = number;
+
+static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
+  static int entries_added = 0;
+
+  if (!entries_added) {
+    fprintf(stdout, "NAM 6 6500 CPU0_USER\n");
+    fprintf(stdout, "NAM 6 6501 CPU0_SYSTEM\n");
+    fprintf(stdout, "NAM 6 6502 CPU0_IO\n");
+    fprintf(stdout, "NAM 6 6503 CPU0_IRQ\n");
+    fprintf(stdout, "NAM 6 6504 CPU1_USER\n");
+    fprintf(stdout, "NAM 6 6505 CPU1_SYSTEM\n");
+    fprintf(stdout, "NAM 6 6506 CPU1_IO\n");
+    fprintf(stdout, "NAM 6 6507 CPU1_IRQ\n");
+    entries_added = 1;
+  }
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  docycle(numbers[0], 6500, 0);
+  docycle(numbers[1], 6501, 0);
+  docycle(numbers[2], 6502, 0);
+  docycle(numbers[3], 6503, 0);
+  docycle(numbers[4], 6504, 0);
+  docycle(numbers[5], 6505, 0);
+  docycle(numbers[6], 6506, 0);
+  docycle(numbers[7], 6507, 0);
+}
+
+static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
+  static int entries_added = 0;
+
+  if (!entries_added) {
+    fprintf(stdout, "NAM 3 3500 FREE\n");
+    fprintf(stdout, "NAM 3 3501 BUFFERS\n");
+    fprintf(stdout, "NAM 3 3502 CACHED\n");
+    fprintf(stdout, "NAM 3 3503 SWAP\n");
+    fprintf(stdout, "NAM 3 3504 SWOUT\n");
+    fprintf(stdout, "NAM 3 3505 SWIN\n");
+
+    fprintf(stdout, "NAM 5 5500 PGIN\n");
+    fprintf(stdout, "NAM 5 5501 PGOUT\n");
+    fprintf(stdout, "NAM 5 5502 MINFLT\n");
+    fprintf(stdout, "NAM 5 5503 MAJFLT\n");
+    fprintf(stdout, "NAM 5 5504 SWOUT\n");
+    fprintf(stdout, "NAM 5 5505 SWIN\n");
+    entries_added = 1;
+  }
+
+  doqueue(numbers[0], 3500, 0, timestamp);
+  doqueue(numbers[1], 3501, 0, timestamp);
+  doqueue(numbers[2], 3502, 0, timestamp);
+  doqueue(numbers[3], 3503, 0, timestamp);
+  doqueue_base(numbers[4], 3504, 0, timestamp);
+  doqueue_base(numbers[5], 3505, 0, timestamp);
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  dovalue(numbers[6], 5500, 0);
+  dovalue(numbers[7], 5501, 0);
+  dovalue(numbers[8], 5502, 0);
+  dovalue(numbers[9], 5503, 0);
+  dovalue(numbers[4], 5504, 0);
+  dovalue(numbers[5], 5505, 0);
+}
+
+static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
+  //    OUT1(rss, "%s~%u", "rss", (selfstatm.rss * 4));
+  //    OUT1(code_rss, "%s~%u", "code_rss", (selfsmaps.code_rss));
+  //    OUT1(code_ref, "%s~%u", "code_ref", (selfsmaps.code_ref));
+  //    OUT1(data_rss, "%s~%u", "data", (selfsmaps.data_rss));
+  //    OUT1(data_ref, "%s~%u", "data_ref", (selfsmaps.data_ref));
+  //    OUT1(data_swap, "%s~%u", "data_swap", selfsmaps.data_swap);
+  //    OUT1(brk, "%s~%u", "brk", (mi.arena / 1024));
+  //    OUT1(mmap, "%s~%u", "mmap", (mi.hblkhd / 1024));
+  //    OUT3(ru_minflt, "%s#%u", "minflt", (unsigned int)ru.ru_minflt);
+  //    OUT3(ru_majflt, "%s#%u", "majflt", (unsigned int)ru.ru_majflt);
+
+  static unsigned int pidlist[16];
+  static int nrpids_seen = 0;
+
+  unsigned int pid = numbers[0];
+  char procname[128] = "?";
+  int i;
+  for (i = 0; i < pid_procname_table_nr; i++) {
+    if (pid == pid_procname_table_pid[i])
+      strcpy(procname, pid_procname_table_procname[i]);
+  }
+
+  for (i = 0; i < nrpids_seen; i++) {
+    if (pid == pidlist[i]) break;
+  }
+  if (pid != pidlist[i]) {
+    pidlist[i] = pid;
+    nrpids_seen++;
+
+    fprintf(stdout, "NAM 3 %d [%d:%s]rss\n", 3600 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]code:rss\n", 3601 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]code:ref\n", 3602 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]data\n", 3603 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]data:ref\n", 3604 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]data:swap\n", 3605 + i * 10, pid,
+            procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]malloc:sbrk\n", 3606 + i * 10, pid,
+            procname);
+    fprintf(stdout, "NAM 3 %d [%d:%s]malloc:mmap\n", 3607 + i * 10, pid,
+            procname);
+
+    fprintf(stdout, "NAM 5 %d [%d:%s]minflt\n", 5600 + i * 10, pid, procname);
+    fprintf(stdout, "NAM 5 %d [%d:%s]majflt\n", 5601 + i * 10, pid, procname);
+  }
+
+  doqueue(numbers[1], 3600, i, timestamp);
+  doqueue(numbers[2], 3601, i, timestamp);
+  doqueue(numbers[3], 3602, i, timestamp);
+  doqueue(numbers[4], 3603, i, timestamp);
+  doqueue(numbers[5], 3604, i, timestamp);
+  doqueue(numbers[6], 3605, i, timestamp);
+  doqueue(numbers[7], 3606, i, timestamp);
+  doqueue(numbers[8], 3607, i, timestamp);
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  dovalue(numbers[9], 5600, i);
+  dovalue(numbers[10], 5601, i);
+}
+
+static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
+  static int entries_added = 0;
+  if (!entries_added) {
+    fprintf(stdout, "NAM 3 5700 FREE\n");
+    fprintf(stdout, "NAM 3 5701 BUFFERS\n");
+  }
+}
+
+static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
+  static int entries_added = 0;
+  if (!entries_added) {
+    fprintf(stdout, "NAM 3 5800 FREE\n");
+    fprintf(stdout, "NAM 3 5801 BUFFERS\n");
+  }
+}
+
+static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
+  static char markers[128][16];
+  static char marker_color[16];
+  static int markers_nr;
+  int i;
+
+  for (i = 0; i < markers_nr; i++) {
+    if (strncmp(text, markers[i], text_len) == 0) break;
+  }
+
+  if (strncmp(text, markers[i], text_len) != 0) {
+    strncpy(markers[i], text, text_len);
+    markers[i][text_len] = 0;
+    markers_nr++;
+    fprintf(stdout, "NAM %d %d %s\n", AGENTS, 8900 + i, markers[i]);
+    fprintf(stdout, "STA %d %d %lld\n", AGENTS, 8900 + i, timestamp);
+    fprintf(stdout, "DSC 3 0 %d\n", marker_color[i]);
+  } else {
+    fprintf(stdout, "STO %d %d %lld\n", AGENTS, 8900 + i, timestamp);
+    fprintf(stdout, "STA %d %d %lld\n", AGENTS, 8900 + i, timestamp);
+    marker_color[i] += 1;
+    marker_color[i] &= 7;
+    fprintf(stdout, "DSC 3 0 %d\n", marker_color[i]);
+  }
+}
 
 static void addentry(FILE *stdout, const char *text_in, int text_len,
                      _u64 timestamp, const char *procname, int pid, int tid,
@@ -203,7 +390,43 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   char text_in1[1024];
   char *text = text_in1;
 
+  if (identifier == CPUINFO) {
+    addentry_cpuinfo(numbers, timestamp);
+    return;
+  } else if (identifier == MEMINFO) {
+    addentry_meminfo(numbers, timestamp);
+    return;
+  } else if (identifier == SLFINFO) {
+    addentry_slfinfo(numbers, timestamp);
+    return;
+  } else if (identifier == DSKINFO) {
+    addentry_dskinfo(numbers, timestamp);
+    return;
+  } else if (identifier == NETINFO) {
+    addentry_netinfo(numbers, timestamp);
+    return;
+  } else if (identifier == PIDINFO) {
+    int i;
+    unsigned int pid = numbers[0];
+    for (i = 0; i < pid_procname_table_nr; i++) {
+      if (pid == pid_procname_table_pid[i]) break;
+    }
+    if (pid != pid_procname_table_pid[i]) {
+      pid_procname_table_pid[i] = pid;
+      strncpy(pid_procname_table_procname[i], text_in, text_len);
+      pid_procname_table_procname[i][text_len] = 0;
+      pid_procname_table_nr++;
+    }
+    return;
+  } else if (identifier == MARKER) {
+    addentry_marker(text_in, text_len, timestamp);
+    return;
+  }
+
+#if 0
   sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
+#endif
+  sprintf(text_in1, "[%d:%s]", pid, procname);
   int procpidtidlen = strlen(text_in1);
 
   isampersand =
@@ -223,20 +446,32 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   if (isampersand) {
     strncpy(text_in1, text_in, 3);
 
+#if 0
     snprintf(&text_in1[3], procpidtidlen + text_len + 1 - 3, "[%s][%d][%d]%s",
              procname, pid, tid, &text_in[3]);
+#endif
+    snprintf(&text_in1[3], procpidtidlen + text_len + 1 - 3, "[%d:%s]%s", pid,
+             procname, &text_in[3]);
 
   } else {
     if (text_len)
+
+#if 0
       snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s",
                procname, pid, tid, text_in);
+#endif
+      snprintf(text_in1, procpidtidlen + text_len + 1, "[%d:%s]%s", pid,
+               procname, text_in);
     else
+#if 0
       snprintf(text_in1, procpidtidlen + 2 + 1, "[%s][%d][%d]%02X", procname,
                pid, tid, identifier);
+#endif
+      snprintf(text_in1, procpidtidlen + 2 + 1, "[%d:%s]%02X", pid, procname,
+               identifier);
   }
 
   // fprintf(stderr, "text=\"%s\"\n", text);
-
   // for (i=0;i<30;i++)
   //   fprintf(stderr, "%02x ", text[i]);
   // fprintf(stderr,"\n");
@@ -306,15 +541,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        sprintf(fullentry, "NAM %d %d %s\n", TASKS, TASKS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", TASKS, TASKS * 1000 + entry,
                 tasks_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // Add the STA or STO entry
-      sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
-              TASKS, TASKS * 1000 + entry, timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", TASKS,
+              TASKS * 1000 + entry, timestamp);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -376,15 +609,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        sprintf(fullentry, "NAM %d %d %s\n", SEMAS, SEMAS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", SEMAS, SEMAS * 1000 + entry,
                 semas_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // Add the OCC entry
-      sprintf(fullentry, "OCC %d %d %lld\n", SEMAS, SEMAS * 1000 + entry,
+      fprintf(stdout, "OCC %d %d %lld\n", SEMAS, SEMAS * 1000 + entry,
               timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -447,15 +678,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        sprintf(fullentry, "NAM %d %d %s\n", ISRS, ISRS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", ISRS, ISRS * 1000 + entry,
                 isrs_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // Add the STA or STO entry
-      sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
-              ISRS, ISRS * 1000 + entry, timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", ISRS,
+              ISRS * 1000 + entry, timestamp);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -516,15 +745,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        sprintf(fullentry, "NAM %d %d %s\n", EVENTS, EVENTS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", EVENTS, EVENTS * 1000 + entry,
                 events_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // Add the OCC entry
-      sprintf(fullentry, "OCC %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
+      fprintf(stdout, "OCC %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
               timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -596,15 +823,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        sprintf(fullentry, "NAM %d %d %s\n", AGENTS, AGENTS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", AGENTS, AGENTS * 1000 + entry,
                 agents_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // Add the STA or STO entry
-      sprintf(fullentry, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO",
-              AGENTS, AGENTS * 1000 + entry, timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", AGENTS,
+              AGENTS * 1000 + entry, timestamp);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -615,13 +840,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
       // Add a DSC color entry
       if (enter_not_exit && ((agentchar >= '0') && (agentchar <= '7'))) {
-        sprintf(fullentry, "DSC 3 0 %d\n", agentchar - '0');
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
+        fprintf(stdout, "DSC 3 0 %d\n", agentchar - '0');
       }
 
       return;
     }
   }
+
   /*
    * QUEUES entry
    *
@@ -629,7 +854,6 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
    * a queue entry for it.
    * check whether '~' exists and pull out the name and value
    */
-
   name[0] = 0;
   char *q;
   q = strchr(text, '~');
@@ -643,8 +867,6 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         name[i] = 0;
         value = atoi(text + i + 1);
         text[i] = 32;  // create split marker
-
-        // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
       }
     }
 
@@ -667,9 +889,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_queues++;
 
         // Since we added a new entry we need to create a NAM
-        sprintf(fullentry, "NAM %d %d %s\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", QUEUES, QUEUES * 1000 + entry,
                 queues_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
 
         // reset the prev_value;
         prev_queues[entry] = 0;
@@ -679,12 +900,11 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // add a STA (with the delta) or a STO (with the delta) depending on
       // whether the value went up or went down
       if (value >= prev_queues[entry])
-        sprintf(fullentry, "STA %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "STA %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
                 timestamp, value - prev_queues[entry]);
       else
-        sprintf(fullentry, "STO %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "STO %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
                 timestamp, prev_queues[entry] - value);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
       prev_queues[entry] = value;
 
       return;
@@ -694,8 +914,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   /*
      * VALUES entry
      *
-     * if text is of the form name#value then interpret this as a value and add
-     * a value entry for it.
+     * if text is of the form name#value then interpret this as a value and
+     * add a value entry for it.
      * check whether '#' exists and pull out the name and value
      */
 
@@ -706,14 +926,10 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     for (i = 0; i < (int)strlen(text); i++) {
       if (text[i] == 32) break;
       if (text[i] == 35) {
-        // fprintf(stderr, "text1=\"%s\"\n", text);
-
         strncpy(name, text, i);
         name[i] = 0;
         value = atoi(text + i + 1);
         text[i] = 32;  // create split marker
-
-        // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
       }
     }
 
@@ -736,18 +952,14 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_values++;
 
         // Since we added a new entry we need to create a NAM
-        sprintf(fullentry, "NAM %d %d %s\n", VALUES, VALUES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", VALUES, VALUES * 1000 + entry,
                 values_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // fill in the value
       // add a TIM and a VAL
-      sprintf(fullentry, "TIM %lld\n", timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
-      sprintf(fullentry, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry,
-              value);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
+      fprintf(stdout, "TIM %lld\n", timestamp);
+      fprintf(stdout, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry, value);
 
       return;
     }
@@ -756,8 +968,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   /*
      * CYCLES entry
      *
-     * if text is of the form name^cycle then interpret this as a cycle and add
-     * a cycle entry for it.
+     * if text is of the form name^cycle then interpret this as a cycle and
+     * add a cycle entry for it.
      * check whether '^' exists and pull out the name and cycle
      */
 
@@ -768,14 +980,10 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     for (i = 0; i < (int)strlen(text); i++) {
       if (text[i] == 32) break;
       if (text[i] == 94) {
-        // fprintf(stderr, "text1=\"%s\"\n", text);
-
         strncpy(name, text, i);
         name[i] = 0;
         value = atoi(text + i + 1);
         text[i] = 32;  // create split marker
-
-        // fprintf(stderr, "name=\"%s\", text=\"%s\"\n", name, text);
       }
     }
 
@@ -798,18 +1006,15 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_cycles++;
 
         // Since we added a new entry we need to create a NAM
-        sprintf(fullentry, "NAM %d %d %s\n", CYCLES, CYCLES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", CYCLES, CYCLES * 1000 + entry,
                 cycles_array[entry]);
-        fwrite(fullentry, strlen(fullentry), 1, stdout);
       }
 
       // fill in the value
       // add a TIM and a CYCLE
-      sprintf(fullentry, "TIM %lld\n", timestamp);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
-      sprintf(fullentry, "VAL %d %d %lld\n", CYCLES, CYCLES * 1000 + entry,
+      fprintf(stdout, "TIM %lld\n", timestamp);
+      fprintf(stdout, "VAL %d %d %lld\n", CYCLES, CYCLES * 1000 + entry,
               value * 10000000LL);
-      fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       return;
     }
@@ -863,15 +1068,12 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
     // Since we added a new entry we need to create a NAM, with only the
     // first part of the text
-    sprintf(fullentry, "NAM %d %d %s\n", NOTES, NOTES * 1000 + entry,
+    fprintf(stdout, "NAM %d %d %s\n", NOTES, NOTES * 1000 + entry,
             notes_array[entry]);
-    fwrite(fullentry, strlen(fullentry), 1, stdout);
   }
 
   // Add the OCC entry
-  sprintf(fullentry, "OCC %d %d %lld\n", NOTES, NOTES * 1000 + entry,
-          timestamp);
-  fwrite(fullentry, strlen(fullentry), 1, stdout);
+  fprintf(stdout, "OCC %d %d %lld\n", NOTES, NOTES * 1000 + entry, timestamp);
 
   // Add the DSC entry, replace any spaces with commas
   sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -1014,11 +1216,10 @@ static void get_process_name_by_pid(const int pid, char *name) {
   }
 }
 
-static char proc_self_maps[16 * 1024 + 1];
-
 static void dump_proc_self_maps(void) {
   int fd;
   int bytes;
+  char proc_self_maps[16 * 1024 + 1];
 
   fprintf(stderr, "tdi: maps...[%s][%d]\n", gprocname, gpid);
 
@@ -1106,105 +1307,29 @@ static void tmpfs_message(void) {
   fprintf(stderr, "\n");
 }
 
-/*
- * send new value
- */
-#define OUT(name, trace, value) \
-                                \
-  unsigned int _##name = value; \
-  tditrace(trace, _##name);
-
-/*
- * send new value, unless new value == previous value
- * i.e. do not send new value, if new value == prev value
- * and do not send unless a non 0 value is seen
-
- */
-
-#define OUT1(name, trace, tname, tvalue)  \
-                                          \
-  static unsigned int _##name##_seen = 0; \
-  static unsigned int _##name##_prev;     \
-  unsigned int _##name = tvalue;          \
-  if (_##name##_seen == 0) {              \
-    if (_##name != 0) {                   \
-      _##name##_seen = 1;                 \
-      tditrace(trace, tname, _##name);    \
-    }                                     \
-  } else if (_##name##_prev != _##name) { \
-    tditrace(trace, tname, _##name);      \
-  }                                       \
-  _##name##_prev = _##name;
-
-/*
- * send new value, unless new value == prev value and new value == prev prev
- * value
- *  i.e. do not send new value, if new value == prev value == prev prev value
- * and do not send unless a non 0 value is seen
- */
-#define OUT2(name, trace, tname, tvalue)                                       \
-                                                                               \
-  static unsigned int _##name##_seen = 0;                                      \
-  static unsigned int _##name##_prev;                                          \
-  static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = tvalue;                                               \
-  if (_##name##_seen == 0) {                                                   \
-    if (_##name != 0) {                                                        \
-      _##name##_seen = 1;                                                      \
-      tditrace(trace, tname, _##name);                                         \
-    }                                                                          \
-  } else if (_##name##_seen == 1) {                                            \
-    _##name##_seen = 2;                                                        \
-    tditrace(trace, tname, _##name);                                           \
-  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, tname, _##name);                                           \
-  }                                                                            \
-  _##name##_prevprev = _##name##_prev;                                         \
-  _##name##_prev = _##name;
-
-/*
- * send previous value, unless new value == prev value and new value ==
- * prev prev value
- * i.e. do not send previous if new value == prev value == prev prev value
- * and do not send unless a non 0 value is seen
- */
-#define OUT3(name, trace, tname, tvalue)                                       \
-                                                                               \
-  static unsigned int _##name##_seen = 0;                                      \
-  static unsigned int _##name##_prev;                                          \
-  static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = tvalue;                                               \
-  if (_##name##_seen == 0) {                                                   \
-    if (_##name != 0) {                                                        \
-      _##name##_seen = 1;                                                      \
-    }                                                                          \
-  } else if (_##name##_seen == 1) {                                            \
-    if (_##name##_prev != _##name) {                                           \
-      _##name##_seen = 2;                                                      \
-      tditrace(trace, tname, _##name##_prev);                                  \
-    }                                                                          \
-  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, tname, _##name##_prev);                                    \
-  }                                                                            \
-  _##name##_prevprev = _##name##_prev;                                         \
-  _##name##_prev = _##name;
+static char procbuf[256 * 1024];
 
 static char *readprocbuf(const char *path) {
-  static char procbuf[256 * 1024];
   char *p = procbuf;
-  int fd, r = 0;
+  int fd, bytes = 0;
 
 #define BLOCKSIZE 4096
 
 #ifdef DEBUG
   tditrace("@A+readprocbuf");
 #endif
+
   if ((fd = open(path, O_RDONLY))) {
-    do {
-      r = read(fd, p, BLOCKSIZE);
-      if (r > 0) p += r;
-    } while (r == BLOCKSIZE);
-    p[r] = 0;
+    while (1) {
+      bytes = read(fd, p, BLOCKSIZE);
+      if ((bytes == -1) && (errno == EINTR))
+        /* keep trying */;
+      else if (bytes > 0) {
+        p[bytes] = '\0';
+        p += bytes;
+      } else
+        break;
+    }
     close(fd);
 #ifdef DEBUG
     tditrace("@A-readprocbuf");
@@ -1406,99 +1531,76 @@ int tdiprocselfstatus(struct tdistructprocselfstatus *s) {
 }
 
 int tdiprocselfsmaps(tdistructprocselfsmaps *s) {
-  static int do_fullsmaps = 0;
-  static char proc_self_smaps[16 * 1024 + 1];
-  int fd;
-  int bytes;
+// static int do_fullsmaps = 0;
+// static char proc_self_smaps[16 * 1024 + 1];
+// int fd;
+// int bytes;
 
 #ifdef DEBUG
   tditrace("@A+tdiprocselfmaps");
 #endif
 
-  fd = open("/proc/self/smaps", O_RDONLY);
-  if (fd >= 0) {
-    s->swap = 0;
-    while (1) {
-      bytes = read(fd, proc_self_smaps, sizeof(proc_self_smaps) - 1);
-      if ((bytes == -1) && (errno == EINTR))
-        /* keep trying */;
-      else if (bytes > 0) {
-        proc_self_smaps[bytes] = '\0';
+  char *buf;
 
-        char *saveptr;
-        char *line = strtok_r(proc_self_smaps, "\n", &saveptr);
+  if ((buf = readprocbuf("/proc/self/smaps"))) {
+    char *saveptr;
+    char *line = strtok_r(buf, "\n", &saveptr);
 
-        while (line) {
-          if (1) {
-            int swap;
-            if (sscanf(line, "Swap: %d", &swap)) {
-              s->swap += swap;
-            }
+    s->code_rss = 0;
+    s->code_pss = 0;
+    s->code_ref = 0;
+    s->data_rss = 0;
+    s->data_pss = 0;
+    s->data_ref = 0;
+    s->data_swap = 0;
+
+    while (line) {
+      if (1) {
+        unsigned long start, end;
+        char flags[5];
+        unsigned long long pgoff;
+        unsigned int maj, min;
+        unsigned long ino, dum;
+        char name[256];
+        int n;
+
+        if (sscanf(line, "%08lx-%08lx", &dum, &dum) == 2) {
+          strcpy(name, "ANONYMOUS");
+          if ((n = sscanf(line, "%08lx-%08lx %s %08llx %02x:%02x %lu %s",
+                          &start, &end, flags, &pgoff, &maj, &min, &ino,
+                          name)) >= 7) {
           }
-
-          if (do_fullsmaps) {
-            unsigned long start, end;
-            char flag_r, flag_w, flag_x, flag_s;
-            unsigned long long pgoff;
-            unsigned int maj, min;
-            unsigned long ino, dum;
-            char name[1024];
-            int n;
-            if (sscanf(line, "%08lx-%08lx", &dum, &dum) == 2) {
-              strcpy(name, "ANONYMOUS");
-              if ((n = sscanf(line,
-                              "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu %s",
-                              &start, &end, &flag_r, &flag_w, &flag_x, &flag_s,
-                              &pgoff, &maj, &min, &ino, name)) >= 10) {
-              }
-            }
-            int rss, pss, sc, sd, pc, pd, ref, anon, swap;
-            sscanf(line, "Rss:%d", &rss);
-            sscanf(line, "Pss:%d", &pss);
-            sscanf(line, "Shared_Clean:%d", &sc);
-            sscanf(line, "Shared_Dirty:%d", &sd);
-            sscanf(line, "Private_Clean:%d", &pc);
-            sscanf(line, "Private_Dirty:%d", &pd);
-            sscanf(line, "Referenced:%d", &ref);
-            sscanf(line, "Anonymous:%d", &anon);
-            sscanf(line, "Swap:%d", &swap);
-            if (strstr(line, "Swap")) {
-              if (swap) {
-                char *nm = strrchr(name, '/');
-
-#if 0
-                  char out[256];
-                  sprintf(
-                      out,
-                      "%40s %08lx-%08lx %6ld %c%c%c%c %5d %5d %5d %5d %5d %5d "
-                      "%5d %5d %5d",
-                      nm ? nm + 1 : name, start, end, (end - start) / 1024,
-                      flag_r, flag_w, flag_x, flag_s, rss, pss, sc, sd, pc, pd,
-                      ref, anon, swap);
-                  tditrace(out);
-#endif
-                tditrace("_swap_ %s %d", nm ? nm + 1 : name, swap);
-              }
-            }
-          }
-
-          line = strtok_r(NULL, "\n", &saveptr);
         }
+        int rss, pss, sc, sd, pc, pd, ref, anon, swap;
+        sscanf(line, "Rss:%d", &rss);
+        sscanf(line, "Pss:%d", &pss);
+        sscanf(line, "Shared_Clean:%d", &sc);
+        sscanf(line, "Shared_Dirty:%d", &sd);
+        sscanf(line, "Private_Clean:%d", &pc);
+        sscanf(line, "Private_Dirty:%d", &pd);
+        sscanf(line, "Referenced:%d", &ref);
+        sscanf(line, "Anonymous:%d", &anon);
+        sscanf(line, "Swap:%d", &swap);
+        if (strstr(line, "Swap")) {
+          if (strcmp(flags, "r-xp") == 0) {
+            s->code_rss += rss;
+            s->code_pss += pss;
+            s->code_ref += ref;
+          } else if ((strcmp(flags, "r--p") == 0) ||
+                     (strcmp(flags, "rw-p") == 0) ||
+                     (strcmp(flags, "rwxp") == 0)) {
+            s->data_rss += rss;
+            s->data_pss += pss;
+            s->data_ref += ref;
+            s->data_swap += swap;
+          }
+        }
+      }
 
-      } else
-        break;
+      line = strtok_r(NULL, "\n", &saveptr);
     }
-    close(fd);
-  }
-
-  static unsigned int seen_smapsswap = 0;
-  static unsigned int prev_smapsswap = 0;
-  if (seen_smapsswap == 0) {
-    seen_smapsswap = 1;
   } else {
-    do_fullsmaps = (s->swap != prev_smapsswap);
   }
-  prev_smapsswap = s->swap;
 
 #ifdef DEBUG
   tditrace("@A-tdiprocselfmaps");
@@ -1534,11 +1636,12 @@ int tdiprocdiskstats(struct tdistructprocdiskstats s[], const char *disks,
   }
 
   if (*nrdisks) {
-    char line[1024];
-    FILE *f = NULL;
     int d;
-    if ((f = fopen("/proc/diskstats", "r"))) {
-      while (fgets(line, 256, f)) {
+    char *buf;
+    if ((buf = readprocbuf("/proc/diskstats"))) {
+      char *saveptr;
+      char *line = strtok_r(buf, "\n", &saveptr);
+      while (line) {
         for (d = 0; d < *nrdisks; d++) {
           char *pos;
           struct tdistructprocdiskstats *ps = &s[d];
@@ -1549,11 +1652,11 @@ int tdiprocdiskstats(struct tdistructprocdiskstats s[], const char *disks,
             break;
           }
         }
+
+        line = strtok_r(NULL, "\n", &saveptr);
       }
-      fclose(f);
     }
   }
-
 #ifdef DEBUG
   tditrace("@A-tdiprocdiskstats");
 #endif
@@ -1662,6 +1765,7 @@ void tdiproctest1(void) {
       line = strtok_r(NULL, "\n", &saveptr);
     }
   }
+
 #ifdef DEBUG
   tditrace("@A-tdiproctest1");
 #endif
@@ -1803,6 +1907,29 @@ static void sample_info(void) {
   struct tdistructprocstat stat;
   if (do_procstat) {
     tdiprocstat(&stat);
+
+#if 0
+    OUT1(cpu0_user, "%s^%u", "0_usr", (stat.cpu0_user + stat.cpu0_nice));
+    OUT1(cpu0_system, "%s^%u", "0_sys", (stat.cpu0_system));
+    OUT1(cpu0_io, "%s^%u", "0_io", (stat.cpu0_iowait));
+    OUT1(cpu0_irq, "%s^%u", "0_irq", (stat.cpu0_irq + stat.cpu0_softirq));
+
+    OUT1(cpu1_user, "%s^%u", "1_usr", (stat.cpu1_user + stat.cpu1_nice));
+    OUT1(cpu1_system, "%s^%u", "1_sys", (stat.cpu1_system));
+    OUT1(cpu1_io, "%s^%u", "1_io", (stat.cpu1_iowait));
+    OUT1(cpu1_irq, "%s^%u", "1_irq", (stat.cpu1_irq + stat.cpu1_softirq));
+#else
+    int c_numbers[8];
+    c_numbers[0] = stat.cpu0_user + stat.cpu0_nice;
+    c_numbers[1] = stat.cpu0_system;
+    c_numbers[2] = stat.cpu0_iowait;
+    c_numbers[3] = stat.cpu0_irq + stat.cpu0_softirq;
+    c_numbers[4] = stat.cpu1_user + stat.cpu1_nice;
+    c_numbers[5] = stat.cpu1_system;
+    c_numbers[6] = stat.cpu1_iowait;
+    c_numbers[7] = stat.cpu1_irq + stat.cpu1_softirq;
+    tditrace("%C", c_numbers);
+#endif
   }
 
   /*
@@ -1832,7 +1959,7 @@ static void sample_info(void) {
   /*
    * procdiskstats
    */
-  struct tdistructprocdiskstats diskstats[4];
+  struct tdistructprocdiskstats diskstats[6];
   int nrdisks;
   if (do_procdiskstats) {
     tdiprocdiskstats(diskstats, getenv("DISKS"), &nrdisks);
@@ -1847,35 +1974,47 @@ static void sample_info(void) {
     tdiprocnetdev(netdev, getenv("NETS"), &nrnets);
   }
 
-#ifdef DEBUG
+#if 0
   tdiproctest1();
 #endif
 
   if (do_sysinfo) {
+#if 0
     OUT1(free, "%s~%u", "FREE",
-         (unsigned int)((si.freeram / 1024) * si.mem_unit))
+         (unsigned int)((si.freeram / 1024) * si.mem_unit));
 
     OUT1(buff, "%s~%u", "BUFF",
-         (unsigned int)((si.bufferram / 1024) * si.mem_unit))
-    OUT1(cach, "%s~%u", "CACH", (unsigned int)meminfo.cached)
+         (unsigned int)((si.bufferram / 1024) * si.mem_unit));
+    OUT1(cach, "%s~%u", "CACH", (unsigned int)meminfo.cached);
     OUT1(swap, "%s~%u", "SWAP",
-         (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit))
+         (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit));
 
-    OUT3(pgpgin, "%s#%u", "PGIN", ((unsigned int)vmstat.pgpgin))
-    OUT3(pgpgout, "%s#%u", "PGOUT", ((unsigned int)vmstat.pgpgout))
+    OUT1base(pswpout2, "%s~%u", "SWOUT", ((unsigned int)(vmstat.pswpout * 4)));
+    OUT1base(pswpin2, "%s~%u", "SWIN", ((unsigned int)(vmstat.pswpin * 4)));
 
-    OUT3(pgfault, "%s#%u", "MINFLT", (unsigned int)vmstat.pgfault)
-    OUT3(pgmajfault, "%s#%u", "MAJFLT", (unsigned int)vmstat.pgmajfault)
+    OUT3(pgpgin, "%s#%u", "PGIN", ((unsigned int)vmstat.pgpgin));
+    OUT3(pgpgout, "%s#%u", "PGOUT", ((unsigned int)vmstat.pgpgout));
 
-    OUT3(pswpin, "%s#%u", "SWIN", ((unsigned int)vmstat.pswpin))
-    OUT3(pswpout, "%s#%u", "SWOUT", ((unsigned int)vmstat.pswpout))
+    OUT3(pgfault, "%s#%u", "MINFLT", (unsigned int)vmstat.pgfault);
+    OUT3(pgmajfault, "%s#%u", "MAJFLT", (unsigned int)vmstat.pgmajfault);
 
-    // tditrace("A_ANON~%u", (unsigned int)active_anon);
-    // tditrace("I_ANON~%u", (unsigned int)inactive_anon);
-    // tditrace("A_FILE~%u", (unsigned int)active_file);
-    // tditrace("I_FILE~%u", (unsigned int)inactive_file);
-
-    // tditrace("MAPPED~%d", (unsigned int)mapped);
+    OUT3(pswpout, "%s#%u", "SWOUT", ((unsigned int)vmstat.pswpout));
+    OUT3(pswpin, "%s#%u", "SWIN", ((unsigned int)vmstat.pswpin));
+#else
+    int m_numbers[10];
+    m_numbers[0] = (unsigned int)((si.freeram / 1024) * si.mem_unit);
+    m_numbers[1] = (unsigned int)((si.bufferram / 1024) * si.mem_unit);
+    m_numbers[2] = (unsigned int)meminfo.cached;
+    m_numbers[3] =
+        (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit);
+    m_numbers[4] = (unsigned int)vmstat.pswpout * 4;
+    m_numbers[5] = (unsigned int)vmstat.pswpin * 4;
+    m_numbers[6] = (unsigned int)vmstat.pgpgin;
+    m_numbers[7] = (unsigned int)vmstat.pgpgout;
+    m_numbers[8] = (unsigned int)vmstat.pgfault;
+    m_numbers[9] = (unsigned int)vmstat.pgmajfault;
+    tditrace("%M", m_numbers);
+#endif
 
     // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
     // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
@@ -1904,6 +2043,18 @@ static void sample_info(void) {
            diskstats[3].writes_sectors);
     }
 
+    if (nrdisks >= 5) {
+      OUT3(sd4_reads, "%s_r#%u", diskstats[4].name, diskstats[4].reads_sectors);
+      OUT3(sd4_writes, "%s_w#%u", diskstats[4].name,
+           diskstats[4].writes_sectors);
+    }
+
+    if (nrdisks >= 6) {
+      OUT3(sd3_reads, "%s_r#%u", diskstats[5].name, diskstats[5].reads_sectors);
+      OUT3(sd3_writes, "%s_w#%u", diskstats[5].name,
+           diskstats[5].writes_sectors);
+    }
+
     if (nrnets >= 1) {
       OUT3(nt0_reads, "%s_r#%u", netdev[0].name, netdev[0].r_packets);
       OUT3(nt0_writes, "%s_t#%u", netdev[0].name, netdev[0].t_packets);
@@ -1913,30 +2064,36 @@ static void sample_info(void) {
       OUT3(nt1_reads, "%s_r#%u", netdev[1].name, netdev[1].r_packets);
       OUT3(nt1_writes, "%s_w#%u", netdev[1].name, netdev[1].t_packets);
     }
-
-    OUT1(cpu0_user, "%s^%u", "0_usr", (stat.cpu0_user + stat.cpu0_nice))
-    OUT1(cpu0_system, "%s^%u", "0_sys", (stat.cpu0_system))
-    OUT1(cpu0_io, "%s^%u", "0_io", (stat.cpu0_iowait))
-    OUT1(cpu0_irq, "%s^%u", "0_irq", (stat.cpu0_irq + stat.cpu0_softirq))
-
-    OUT1(cpu1_user, "%s^%u", "1_usr", (stat.cpu1_user + stat.cpu1_nice))
-    OUT1(cpu1_system, "%s^%u", "1_sys", (stat.cpu1_system))
-    OUT1(cpu1_io, "%s^%u", "1_io", (stat.cpu1_iowait))
-    OUT1(cpu1_irq, "%s^%u", "1_irq", (stat.cpu1_irq + stat.cpu1_softirq))
   }
 
   if (do_selfinfo) {
-    OUT1(rss, "%s~%u", ":RSS", (selfstatm.rss * 4))
-    // OUT1(brk, "%s~%u", ":BRK", (mi.arena / 1024))
-    // OUT1(mmap, "%s~%u", ":MMAP", (mi.hblkhd / 1024))
-    OUT1(swap, "%s~%u", ":SWAP", selfsmaps.swap)
+#if 0
+    OUT1(rss, "%s~%u", "rss", (selfstatm.rss * 4));
+    OUT1(code_rss, "%s~%u", "code_rss", (selfsmaps.code_rss));
+    OUT1(code_ref, "%s~%u", "code_ref", (selfsmaps.code_ref));
+    OUT1(data_rss, "%s~%u", "data", (selfsmaps.data_rss));
+    OUT1(data_ref, "%s~%u", "data_ref", (selfsmaps.data_ref));
+    OUT1(data_swap, "%s~%u", "data_swap", selfsmaps.data_swap);
+    OUT1(brk, "%s~%u", "brk", (mi.arena / 1024));
+    OUT1(mmap, "%s~%u", "mmap", (mi.hblkhd / 1024));
+    OUT3(ru_minflt, "%s#%u", "minflt", (unsigned int)ru.ru_minflt);
+    OUT3(ru_majflt, "%s#%u", "majflt", (unsigned int)ru.ru_majflt);
+#else
+    unsigned int s_numbers[11];
+    s_numbers[0] = gpid;
+    s_numbers[1] = selfstatm.rss * 4;
+    s_numbers[2] = selfsmaps.code_rss;
+    s_numbers[3] = selfsmaps.code_ref;
+    s_numbers[4] = selfsmaps.data_rss;
+    s_numbers[5] = selfsmaps.data_ref;
+    s_numbers[6] = selfsmaps.data_swap;
+    s_numbers[7] = mi.arena / 1024;
+    s_numbers[8] = mi.hblkhd / 1024;
+    s_numbers[9] = (unsigned int)ru.ru_minflt;
+    s_numbers[10] = (unsigned int)ru.ru_majflt;
 
-    // tditrace("%s~%u", "VM", (unsigned int)(vmsize * 4));
-    // tditrace("%s~%u", "MAXRSS", (unsigned int)(ru.ru_maxrss / 1024));
-    OUT3(ru_minflt, "%s#%u", ":MINFLT", (unsigned int)ru.ru_minflt);
-    OUT3(ru_majflt, "%s#%u", ":MAJFLT", (unsigned int)ru.ru_majflt);
-    // tditrace("%s~%u", ":BI", ((unsigned int)ru.ru_inblock));
-    // tditrace("%s~%u", ":BO", ((unsigned int)ru.ru_oublock));
+    tditrace("%S", s_numbers);
+#endif
   }
 }
 
@@ -2274,6 +2431,8 @@ static int create_trace_buffer(void) {
   tditrace_inited = 1;
   UNLOCK();
 
+  tditrace("%P", gpid, gprocname);
+
   return 0;
 }
 
@@ -2421,7 +2580,11 @@ int tditrace_init(void) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"sh*\" ; not tracing\n",
             gprocname, gpid);
     return -1;
-  } else if (strncmp(gprocname, "bahsh", 2) == 0) {
+  } else if (strncmp(gprocname, "tivosh", 2) == 0) {
+    fprintf(stderr, "tdi: init[%s][%d], procname is \"tivosh\" ; not tracing\n",
+            gprocname, gpid);
+    return -1;
+  } else if (strncmp(gprocname, "bash", 2) == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"bash\" ; not tracing\n",
             gprocname, gpid);
     return -1;
@@ -2891,9 +3054,10 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   unsigned int trace_text[1024 / 4];
-  unsigned int numbers[8];
-  unsigned int nr_numbers = 0;
-  unsigned short identifier = 0;
+  unsigned int numbers[16];
+  unsigned int *pnumbers = numbers;
+  unsigned char nr_numbers = 0;
+  unsigned char identifier = 0;
   unsigned int i;
 
   /*
@@ -2993,13 +3157,108 @@ void tditrace_internal(va_list args, const char *format) {
         }
 
         case 'n': {
-          numbers[nr_numbers] = va_arg(args, int);
+          pnumbers[nr_numbers] = va_arg(args, int);
           nr_numbers++;
           break;
         }
 
         case 'm': {
           identifier = va_arg(args, int) & 0xff;
+          break;
+        }
+
+        case 'C': {
+          identifier = CPUINFO;
+          nr_numbers = CPUINFO_MAXNUMBER + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
+          break;
+        }
+
+        case 'M': {
+          identifier = MEMINFO;
+          nr_numbers = MEMINFO_MAXNUMBER + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
+          break;
+        }
+
+        case 'S': {
+          identifier = SLFINFO;
+          nr_numbers = SLFINFO_MAXNUMBER + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
+          break;
+        }
+
+        case 'D': {
+          identifier = DSKINFO;
+          nr_numbers = DSKINFO_MAXNUMBER + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
+          break;
+        }
+
+        case 'N': {
+          identifier = NETINFO;
+          nr_numbers = NETINFO_MAXNUMBER + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
+          break;
+        }
+
+        case 'P': {
+          identifier = PIDINFO;
+          nr_numbers = 1;
+          numbers[0] = va_arg(args, int);
+
+          char *s;
+          s = va_arg(args, char *);
+          if (s) {
+            int i = 0;
+            while (*s) {
+              *trace_text_ptr++ = *s++;
+              i++;
+              if (i > 256) break;
+            }
+          } else {
+            *trace_text_ptr++ = 'n';
+            *trace_text_ptr++ = 'i';
+            *trace_text_ptr++ = 'l';
+            *trace_text_ptr++ = 'l';
+          }
+          break;
+        }
+
+        case 'K': {
+          identifier = MARKER;
+
+          char *s;
+          s = va_arg(args, char *);
+          if (s) {
+            int i = 0;
+            while (*s) {
+              *trace_text_ptr++ = *s++;
+              i++;
+              if (i > 256) break;
+            }
+          } else {
+            *trace_text_ptr++ = 'n';
+            *trace_text_ptr++ = 'i';
+            *trace_text_ptr++ = 'l';
+            *trace_text_ptr++ = 'l';
+          }
+          break;
+        }
+
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9': {
+          identifier = 100 + ch - '0';
+          nr_numbers = ch - '0' + 1;
+          pnumbers = (unsigned int *)va_arg(args, int);
           break;
         }
 
@@ -3037,7 +3296,7 @@ void tditrace_internal(va_list args, const char *format) {
 
   i = 0;
   while (i != nr_numbers) {
-    *trace_buffer_dword_ptr++ = numbers[i];
+    *trace_buffer_dword_ptr++ = pnumbers[i];
     i++;
   }
 
@@ -3045,6 +3304,7 @@ void tditrace_internal(va_list args, const char *format) {
   while (i--) {
     *trace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
   }
+
   /*
    * mark the next marker as invalid
    */

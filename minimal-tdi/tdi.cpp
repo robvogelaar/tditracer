@@ -93,6 +93,8 @@ static int tdidump(int argc, char *argv[]) {
 
   tditrace_exit(argc, argv);
 
+  dlclose(handle);
+
   return 0;
 }
 
@@ -112,7 +114,7 @@ static int tdistat(int argc, char *argv[]) {
         sprintf(filename, "/tmp/%s", ep->d_name);
 
         if ((file = fopen(filename, "r")) != NULL) {
-          /* /tmp/.tditracebuffer-xxx-xxx */
+          // /tmp/tditracebuffer@proc@pid
 
           struct stat st;
           stat(filename, &st);
@@ -123,7 +125,7 @@ static int tdistat(int argc, char *argv[]) {
           bufmmapped = (char *)mmap(0, st.st_size, PROT_READ, MAP_PRIVATE,
                                     fileno(file), 0);
 
-          // token should hold "TDITRACEBUFFER"
+          // token should hold "TDITRACE"
           if (strncmp("TDITRACE", bufmmapped, 8) != 0) {
             fprintf(stderr,
                     "invalid "
@@ -173,85 +175,6 @@ static int tdistat(int argc, char *argv[]) {
 
 void (*tditrace)(const char *format, ...);
 
-/*
- * send new value
- */
-#define OUT(name, trace, value) \
-                                \
-  unsigned int _##name = value; \
-  tditrace(trace, _##name);
-
-/*
- * send new value, unless new value == previous value
- * i.e. do not send new value, if new value == prev value
- * and do not send unless a non 0 value is seen
- */
-#define OUT1(name, trace, value)          \
-                                          \
-  static unsigned int _##name##_seen = 0; \
-  static unsigned int _##name##_prev;     \
-  unsigned int _##name = value;           \
-  if (_##name##_seen == 0) {              \
-    if (_##name != 0) {                   \
-      _##name##_seen = 1;                 \
-      tditrace(trace, _##name);           \
-    }                                     \
-  } else if (_##name##_prev != _##name) { \
-    tditrace(trace, _##name);             \
-  }                                       \
-  _##name##_prev = _##name;
-
-/*
- * send new value, unless new value == prev value and new value == prev prev
- * value
- *  i.e. do not send new value, if new value == prev value == prev prev value
- * and do not send unless a non 0 value is seen
- */
-#define OUT2(name, trace, value)                                               \
-                                                                               \
-  static unsigned int _##name##_seen = 0;                                      \
-  static unsigned int _##name##_prev;                                          \
-  static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = value;                                                \
-  if (_##name##_seen == 0) {                                                   \
-    if (_##name != 0) {                                                        \
-      _##name##_seen = 1;                                                      \
-      tditrace(trace, _##name);                                                \
-    }                                                                          \
-  } else if (_##name##_seen == 1) {                                            \
-    _##name##_seen = 2;                                                        \
-    tditrace(trace, _##name);                                                  \
-  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, _##name);                                                  \
-  }                                                                            \
-  _##name##_prevprev = _##name##_prev;                                         \
-  _##name##_prev = _##name;
-
-/*
- * send previous value, unless new value == prev value and new value ==
- * prev prev value
- * i.e. do not send previous if new value == prev value == prev prev value
- * and do not send unless a non 0 value is seen
- */
-#define OUT3(name, trace, value)                                               \
-                                                                               \
-  static unsigned int _##name##_seen = 0;                                      \
-  static unsigned int _##name##_prev;                                          \
-  static unsigned int _##name##_prevprev;                                      \
-  unsigned int _##name = value;                                                \
-  if (_##name##_seen == 0) {                                                   \
-    if (_##name != 0) {                                                        \
-      _##name##_seen = 1;                                                      \
-    }                                                                          \
-  } else if (_##name##_seen == 1) {                                            \
-    _##name##_seen = 2;                                                        \
-    tditrace(trace, _##name##_prev);                                           \
-  } else if ((_##name##_prev != _##name) || (_##name##_prevprev != _##name)) { \
-    tditrace(trace, _##name##_prev);                                           \
-  }                                                                            \
-  _##name##_prevprev = _##name##_prev;                                         \
-  _##name##_prev = _##name;
-
 //#pragma GCC push_options
 //#pragma GCC optimize("O0")
 
@@ -298,6 +221,63 @@ static int tditest(int argc, char *argv[]) {
 
   tditrace = (void (*)(const char *format, ...))dlsym(handle, "tditrace");
 
+
+#if 1
+  for (i = 0; (unsigned int)i < 10; i++) {
+    tditrace("%K", "general");
+    tditrace("%K", "general2");
+    tditrace("%K", "general20");
+    tditrace("%K", "general200");
+    tditrace("%K", "general2000");
+    tditrace("%K", "general20000");
+
+    usleep(50 * 1000);
+
+  }
+#endif
+
+#if 0
+  for (i = 0; (unsigned int)i < 10; i++) {
+    tditrace("%P", 1039+i, "pid1039");
+
+    usleep(100 * 1000);
+  }
+#endif
+
+#if 0
+  for (i = 0; (unsigned int)i < 10; i++) {
+
+    tditrace("%m%n%n", i,i,10+i);
+
+    usleep(100 * 1000);
+  }
+#endif
+
+#if 0
+  for (i = 0; i < 10; i++) {
+
+    unsigned int ints[] = {1,2,3,4,5,6,7,8,9,10};
+
+    tditrace("%9", ints);
+    usleep(10 * 1000);
+
+  }
+#endif
+
+#if 0
+  for (i = 0; i < 10; i++) {
+
+    unsigned int ints[] = {1,2,3,4,5,6,7,8,9,10};
+
+    tditrace("%C", ints);
+    tditrace("%M", ints);
+    //tditrace("%D", ints);
+    //tditrace("%N", ints);
+    usleep(10 * 1000);
+
+  }
+#endif
+
 #if 0
   int value = 0;
   int values[] = {0,  0, 0, 0, 10, 0, 0,  0,  0,  0,  0, 0, 0,
@@ -307,12 +287,10 @@ static int tditest(int argc, char *argv[]) {
   for (i = 0; (unsigned int)i < (sizeof(values) / sizeof(int)); i++) {
     value += values[i];
 
-    tditrace("OUT2 %u", (unsigned int)value);
-
     OUT(value, "VALUE#%u", (unsigned int)value)
-    OUT1(value1, "VALUE1#%u", (unsigned int)value)
-    OUT2(value2, "VALUE2#%u", (unsigned int)value)
-    OUT3(value3, "VALUE3#%u", (unsigned int)value)
+    OUT1(value1, "%s#%u", "VALUE1", (unsigned int)value)
+    OUT2(value2, "%s#%u", "VALUE2", (unsigned int)value)
+    OUT3(value3, "%s#%u", "VALUE3", (unsigned int)value)
 
     usleep(100 * 1000);
   }
@@ -348,7 +326,7 @@ static int tditest(int argc, char *argv[]) {
   }
 #endif
 
-#if 1
+#if 0
 #define NR_THREADS_TASK 10
   static pthread_t thread_id_task[NR_THREADS_TASK];
   static int param_task[NR_THREADS_TASK];
@@ -364,6 +342,7 @@ static int tditest(int argc, char *argv[]) {
 
 #endif
 
+  dlclose(handle);
   return 0;
 }
 
@@ -439,6 +418,8 @@ static int tdimessage(int argc, char *argv[]) {
 
 static int tdiproc(int argc, char *argv[]) {
   void *handle;
+
+  // setenv("NOSKIPINIT", "1", -1);
 
   handle = dlopen("libtdi.so", RTLD_LAZY);
   if (!handle) {
@@ -528,11 +509,15 @@ static int tdiproc(int argc, char *argv[]) {
   pfntdiprocselfsmaps tdiprocselfsmaps =
       (pfntdiprocselfsmaps)dlsym(handle, "tdiprocselfsmaps");
 
+  fprintf(stdout, "+tdiprocselfsmaps\n");
+
   struct tdistructprocselfsmaps selfsmaps;
   if (tdiprocselfsmaps) {
     tdiprocselfsmaps(&selfsmaps);
-    fprintf(stdout, "selfsmaps= swap:%d\n", selfsmaps.swap);
+    fprintf(stdout, "selfsmaps= swap:%d\n", selfsmaps.data_swap);
   }
+
+  fprintf(stdout, "-tdiprocselfsmaps\n");
 
   pfntdiprocdiskstats tdiprocdiskstats =
       (pfntdiprocdiskstats)dlsym(handle, "tdiprocdiskstats");
@@ -579,5 +564,6 @@ static int tdiproc(int argc, char *argv[]) {
     }
   }
 
+  dlclose(handle);
   return 0;
 }

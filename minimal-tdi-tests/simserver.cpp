@@ -10,9 +10,8 @@
 
 // extern "C" void tditrace(const char* format, ...)  __attribute__((weak));
 
-void (*tditrace)(const char* format,
-                 ...) = (void (*)(const char* format, ...))dlsym(RTLD_DEFAULT,
-                                                                 "tditrace");
+static void (*tditrace)(const char* format, ...) = NULL;
+
 #define TDITRACE(format, ...) \
   if (NULL != tditrace) tditrace(format, ##__VA_ARGS__)
 
@@ -25,6 +24,8 @@ int main(int argc, char* argv[]) {
   struct sockaddr_un addr;
   char buf[100];
   int fd, cl, rc;
+
+  tditrace = (void (*)(const char* format, ...))dlsym(RTLD_DEFAULT, "tditrace");
 
   TDITRACE("@T+action %s", argv[0]);
   TDITRACE("@T-action");
@@ -114,18 +115,7 @@ void execute(const char* msg) {
    * marker
    */
   if (strcmp(msg, "mark") == 0) {
-    static int mark_seen = 0;
-    static int mark_color = 0;
-
-    if (!mark_seen) {
-      mark_seen = 1;
-      TDITRACE("@%d+mark", mark_color);
-    } else {
-      TDITRACE("@%d-mark", mark_color);
-      mark_color++;
-      mark_color &= 7;
-      TDITRACE("@%d+mark", mark_color);
-    }
+    TDITRACE("%K", "mark");
   }
 
   /*
