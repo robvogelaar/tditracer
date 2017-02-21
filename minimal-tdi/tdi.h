@@ -219,17 +219,18 @@ typedef int (*pfntdiprocnetdev)(struct tdistructprocnetdev s[],
 #define MEMINFO           129
 #define DSKINFO           130
 #define NETINFO           131
-
 #define SLFINFO           132
 
 #define PIDINFO           133
-
 #define MARKER            134
+#define ENVINFO           135
+#define DISKSLIST         136
+#define NETSLIST          137
 
 
 #define CPUINFO_MAXNUMBER   7   // 0..7
-#define MEMINFO_MAXNUMBER   9
-#define DSKINFO_MAXNUMBER   7
-#define NETINFO_MAXNUMBER   3
+#define MEMINFO_MAXNUMBER   9   // 0..9
+#define DSKINFO_MAXNUMBER   7   // 0..7
+#define NETINFO_MAXNUMBER   3   // 0..3
 
-#define SLFINFO_MAXNUMBER  10
+#define SLFINFO_MAXNUMBER  10   // 0..10

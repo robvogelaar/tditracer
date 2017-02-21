@@ -38,6 +38,12 @@ static char pid_procname_table_procname[128][16];
 static unsigned int pid_procname_table_pid[16];
 static int pid_procname_table_nr = 0;
 
+static char envs[128][16];
+static int envs_nr;
+
+static char diskslist[128];
+static char netslist[128];
+
 static pthread_mutex_t lock;
 
 static void LOCK_init(void) {
@@ -117,73 +123,73 @@ static int nr_agents = 0;
 
 static void tditrace_rewind();
 
-#define docycle(number, id, pidid)      \
-  static unsigned int _##id##_seen[10]; \
-                                        \
-  if (_##id##_seen[pidid] == 0) {       \
-    _##id##_seen[pidid] = 1;            \
-  }                                     \
-  fprintf(stdout, "VAL 6 %d %lld\n", id + pidid * 10, number * 10000000LL);
+#define docycle(number, id, pidid, span)  \
+  static unsigned int _##id##_seen[span]; \
+                                          \
+  if (_##id##_seen[pidid] == 0) {         \
+    _##id##_seen[pidid] = 1;              \
+  }                                       \
+  fprintf(stdout, "VAL 6 %d %lld\n", id + pidid * span, number * 10000000LL);
 
-#define doqueue(number, id, pidid, tstamp)                             \
-  static unsigned int _##id##_seen[10];                                \
-  static unsigned int _##id##_prev[10];                                \
-                                                                       \
-  if (_##id##_seen[pidid] == 0) {                                      \
-    if (number != 0) {                                                 \
-      _##id##_seen[pidid] = 1;                                         \
-      if (number >= _##id##_prev[pidid])                               \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                number - _##id##_prev[pidid]);                         \
-      else                                                             \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                _##id##_prev[pidid] - number);                         \
-    }                                                                  \
-  } else {                                                             \
-    if (number != _##id##_prev[pidid]) {                               \
-      if (number >= _##id##_prev[pidid])                               \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                number - _##id##_prev[pidid]);                         \
-      else                                                             \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                _##id##_prev[pidid] - number);                         \
-    }                                                                  \
-  }                                                                    \
+#define doqueue(number, id, pidid, span, tstamp)                         \
+  static unsigned int _##id##_seen[span];                                \
+  static unsigned int _##id##_prev[span];                                \
+                                                                         \
+  if (_##id##_seen[pidid] == 0) {                                        \
+    if (number != 0) {                                                   \
+      _##id##_seen[pidid] = 1;                                           \
+      if (number >= _##id##_prev[pidid])                                 \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                number - _##id##_prev[pidid]);                           \
+      else                                                               \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                _##id##_prev[pidid] - number);                           \
+    }                                                                    \
+  } else {                                                               \
+    if (number != _##id##_prev[pidid]) {                                 \
+      if (number >= _##id##_prev[pidid])                                 \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                number - _##id##_prev[pidid]);                           \
+      else                                                               \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                _##id##_prev[pidid] - number);                           \
+    }                                                                    \
+  }                                                                      \
   _##id##_prev[pidid] = number;
 
-#define doqueue_base(number, id, pidid, tstamp)                        \
-  static unsigned int _##id##_seen[10];                                \
-  static unsigned int _##id##_prev[10];                                \
-  static unsigned int _##id##_base[10];                                \
-                                                                       \
-  if (_##id##_seen[pidid] == 0) {                                      \
-    if (number != 0) {                                                 \
-      _##id##_seen[pidid] = 1;                                         \
-      _##id##_base[pidid] = number;                                    \
-      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])       \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                (number - _##id##_base[pidid]) - _##id##_prev[pidid]); \
-      else                                                             \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                _##id##_prev[pidid] - (number - _##id##_base[pidid])); \
-    }                                                                  \
-  } else {                                                             \
-    if ((number - _##id##_base[pidid]) != _##id##_prev[pidid]) {       \
-      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])       \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                (number - _##id##_base[pidid]) - _##id##_prev[pidid]); \
-      else                                                             \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * 10, tstamp, \
-                _##id##_prev[pidid] - (number - _##id##_base[pidid])); \
-    }                                                                  \
-  }                                                                    \
+#define doqueue_base(number, id, pidid, span, tstamp)                    \
+  static unsigned int _##id##_seen[span];                                \
+  static unsigned int _##id##_prev[span];                                \
+  static unsigned int _##id##_base[span];                                \
+                                                                         \
+  if (_##id##_seen[pidid] == 0) {                                        \
+    if (number != 0) {                                                   \
+      _##id##_seen[pidid] = 1;                                           \
+      _##id##_base[pidid] = number;                                      \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])         \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);   \
+      else                                                               \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid]));   \
+    }                                                                    \
+  } else {                                                               \
+    if ((number - _##id##_base[pidid]) != _##id##_prev[pidid]) {         \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])         \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);   \
+      else                                                               \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid]));   \
+    }                                                                    \
+  }                                                                      \
   _##id##_prev[pidid] = (number - _##id##_base[pidid]);
 
-#define dovalue(number, id, pidid)                                            \
+#define dovalue(number, id, pidid, span)                                      \
                                                                               \
-  static unsigned int _##id##_seen[10];                                       \
-  static unsigned int _##id##_prev[10];                                       \
-  static unsigned int _##id##_prevprev[10];                                   \
+  static unsigned int _##id##_seen[span];                                     \
+  static unsigned int _##id##_prev[span];                                     \
+  static unsigned int _##id##_prevprev[span];                                 \
   if (_##id##_seen[pidid] == 0) {                                             \
     if (number != 0) {                                                        \
       _##id##_seen[pidid] = 1;                                                \
@@ -191,11 +197,12 @@ static void tditrace_rewind();
   } else if (_##id##_seen[pidid] == 1) {                                      \
     if (_##id##_prev[pidid] != number) {                                      \
       _##id##_seen[pidid] = 2;                                                \
-      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * 10, _##id##_prev[pidid]); \
+      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                     \
+              _##id##_prev[pidid]);                                           \
     }                                                                         \
   } else if ((_##id##_prev[pidid] != number) ||                               \
              (_##id##_prevprev[pidid] != number)) {                           \
-    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * 10, _##id##_prev[pidid]);   \
+    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span, _##id##_prev[pidid]); \
   }                                                                           \
   _##id##_prevprev[pidid] = _##id##_prev[pidid];                              \
   _##id##_prev[pidid] = number;
@@ -216,14 +223,14 @@ static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
   }
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  docycle(numbers[0], 6500, 0);
-  docycle(numbers[1], 6501, 0);
-  docycle(numbers[2], 6502, 0);
-  docycle(numbers[3], 6503, 0);
-  docycle(numbers[4], 6504, 0);
-  docycle(numbers[5], 6505, 0);
-  docycle(numbers[6], 6506, 0);
-  docycle(numbers[7], 6507, 0);
+  docycle(numbers[0], 6500, 0, 1);
+  docycle(numbers[1], 6501, 0, 1);
+  docycle(numbers[2], 6502, 0, 1);
+  docycle(numbers[3], 6503, 0, 1);
+  docycle(numbers[4], 6504, 0, 1);
+  docycle(numbers[5], 6505, 0, 1);
+  docycle(numbers[6], 6506, 0, 1);
+  docycle(numbers[7], 6507, 0, 1);
 }
 
 static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
@@ -246,34 +253,85 @@ static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
     entries_added = 1;
   }
 
-  doqueue(numbers[0], 3500, 0, timestamp);
-  doqueue(numbers[1], 3501, 0, timestamp);
-  doqueue(numbers[2], 3502, 0, timestamp);
-  doqueue(numbers[3], 3503, 0, timestamp);
-  doqueue_base(numbers[4], 3504, 0, timestamp);
-  doqueue_base(numbers[5], 3505, 0, timestamp);
+  doqueue(numbers[0], 3500, 0, 1, timestamp);
+  doqueue(numbers[1], 3501, 0, 1, timestamp);
+  doqueue(numbers[2], 3502, 0, 1, timestamp);
+  doqueue(numbers[3], 3503, 0, 1, timestamp);
+  doqueue_base(numbers[4], 3504, 0, 1, timestamp);
+  doqueue_base(numbers[5], 3505, 0, 1, timestamp);
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[6], 5500, 0);
-  dovalue(numbers[7], 5501, 0);
-  dovalue(numbers[8], 5502, 0);
-  dovalue(numbers[9], 5503, 0);
-  dovalue(numbers[4], 5504, 0);
-  dovalue(numbers[5], 5505, 0);
+  dovalue(numbers[6], 5500, 0, 1);
+  dovalue(numbers[7], 5501, 0, 1);
+  dovalue(numbers[8], 5502, 0, 1);
+  dovalue(numbers[9], 5503, 0, 1);
+  dovalue(numbers[4], 5504, 0, 1);
+  dovalue(numbers[5], 5505, 0, 1);
+}
+
+static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
+#define MAXDISKS 4
+  static int entries_added = 0;
+  static int nrdisks;
+  static char disks[64][MAXDISKS];
+
+  if (!entries_added) {
+    char *saveptr;
+    char *pt = strtok_r(diskslist, ",", &saveptr);
+    while (pt != NULL) {
+      strcpy(disks[nrdisks], pt);
+      pt = strtok_r(NULL, ",", &saveptr);
+
+      fprintf(stdout, "NAM 5 %d %s:read\n", 5700 + nrdisks * MAXDISKS,
+              disks[nrdisks]);
+      fprintf(stdout, "NAM 5 %d %s:write\n", 5701 + nrdisks * MAXDISKS,
+              disks[nrdisks]);
+      nrdisks++;
+      if (nrdisks == MAXDISKS) break;
+    }
+    entries_added = 1;
+  }
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  int i;
+  for (i = 0; i < nrdisks; i++) {
+    dovalue(numbers[i * 2 + 0], 5700, i, MAXDISKS);
+    dovalue(numbers[i * 2 + 1], 5701, i, MAXDISKS);
+  }
+}
+
+static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
+#define MAXNETS 2
+  static int entries_added = 0;
+  static int nrnets;
+  static char nets[64][MAXNETS];
+
+  if (!entries_added) {
+    char *saveptr;
+    char *pt = strtok_r(netslist, ",", &saveptr);
+    while (pt != NULL) {
+      strcpy(nets[nrnets], pt);
+      pt = strtok_r(NULL, ",", &saveptr);
+
+      fprintf(stdout, "NAM 5 %d %s:receive\n", 5800 + nrnets * MAXNETS,
+              nets[nrnets]);
+      fprintf(stdout, "NAM 5 %d %s:transmit\n", 5801 + nrnets * MAXNETS,
+              nets[nrnets]);
+      nrnets++;
+      if (nrnets == MAXNETS) break;
+    }
+    entries_added = 1;
+  }
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  int i;
+  for (i = 0; i < nrnets; i++) {
+    dovalue(numbers[i * 2 + 0], 5800, i, MAXNETS);
+    dovalue(numbers[i * 2 + 1], 5801, i, MAXNETS);
+  }
 }
 
 static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
-  //    OUT1(rss, "%s~%u", "rss", (selfstatm.rss * 4));
-  //    OUT1(code_rss, "%s~%u", "code_rss", (selfsmaps.code_rss));
-  //    OUT1(code_ref, "%s~%u", "code_ref", (selfsmaps.code_ref));
-  //    OUT1(data_rss, "%s~%u", "data", (selfsmaps.data_rss));
-  //    OUT1(data_ref, "%s~%u", "data_ref", (selfsmaps.data_ref));
-  //    OUT1(data_swap, "%s~%u", "data_swap", selfsmaps.data_swap);
-  //    OUT1(brk, "%s~%u", "brk", (mi.arena / 1024));
-  //    OUT1(mmap, "%s~%u", "mmap", (mi.hblkhd / 1024));
-  //    OUT3(ru_minflt, "%s#%u", "minflt", (unsigned int)ru.ru_minflt);
-  //    OUT3(ru_majflt, "%s#%u", "majflt", (unsigned int)ru.ru_majflt);
-
   static unsigned int pidlist[16];
   static int nrpids_seen = 0;
 
@@ -308,34 +366,18 @@ static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
     fprintf(stdout, "NAM 5 %d [%d:%s]majflt\n", 5601 + i * 10, pid, procname);
   }
 
-  doqueue(numbers[1], 3600, i, timestamp);
-  doqueue(numbers[2], 3601, i, timestamp);
-  doqueue(numbers[3], 3602, i, timestamp);
-  doqueue(numbers[4], 3603, i, timestamp);
-  doqueue(numbers[5], 3604, i, timestamp);
-  doqueue(numbers[6], 3605, i, timestamp);
-  doqueue(numbers[7], 3606, i, timestamp);
-  doqueue(numbers[8], 3607, i, timestamp);
+  doqueue(numbers[1], 3600, i, 10, timestamp);
+  doqueue(numbers[2], 3601, i, 10, timestamp);
+  doqueue(numbers[3], 3602, i, 10, timestamp);
+  doqueue(numbers[4], 3603, i, 10, timestamp);
+  doqueue(numbers[5], 3604, i, 10, timestamp);
+  doqueue(numbers[6], 3605, i, 10, timestamp);
+  doqueue(numbers[7], 3606, i, 10, timestamp);
+  doqueue(numbers[8], 3607, i, 10, timestamp);
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[9], 5600, i);
-  dovalue(numbers[10], 5601, i);
-}
-
-static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
-  static int entries_added = 0;
-  if (!entries_added) {
-    fprintf(stdout, "NAM 3 5700 FREE\n");
-    fprintf(stdout, "NAM 3 5701 BUFFERS\n");
-  }
-}
-
-static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
-  static int entries_added = 0;
-  if (!entries_added) {
-    fprintf(stdout, "NAM 3 5800 FREE\n");
-    fprintf(stdout, "NAM 3 5801 BUFFERS\n");
-  }
+  dovalue(numbers[9], 5600, i, 10);
+  dovalue(numbers[10], 5601, i, 10);
 }
 
 static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
@@ -361,6 +403,19 @@ static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
     marker_color[i] += 1;
     marker_color[i] &= 7;
     fprintf(stdout, "DSC 3 0 %d\n", marker_color[i]);
+  }
+}
+
+static void addentry_envinfo(const char *text, int text_len) {
+  int i;
+  for (i = 0; i < envs_nr; i++) {
+    if (strncmp(text, envs[i], text_len) == 0) break;
+  }
+
+  if (strncmp(text, envs[i], text_len) != 0) {
+    strncpy(envs[i], text, text_len);
+    envs[i][text_len] = 0;
+    envs_nr++;
   }
 }
 
@@ -420,6 +475,16 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     return;
   } else if (identifier == MARKER) {
     addentry_marker(text_in, text_len, timestamp);
+    return;
+  } else if (identifier == ENVINFO) {
+    addentry_envinfo(text_in, text_len);
+  } else if (identifier == DISKSLIST) {
+    strncpy(diskslist, text_in, text_len);
+    diskslist[text_len] = 0;
+    return;
+  } else if (identifier == NETSLIST) {
+    strncpy(netslist, text_in, text_len);
+    netslist[text_len] = 0;
     return;
   }
 
@@ -1979,28 +2044,6 @@ static void sample_info(void) {
 #endif
 
   if (do_sysinfo) {
-#if 0
-    OUT1(free, "%s~%u", "FREE",
-         (unsigned int)((si.freeram / 1024) * si.mem_unit));
-
-    OUT1(buff, "%s~%u", "BUFF",
-         (unsigned int)((si.bufferram / 1024) * si.mem_unit));
-    OUT1(cach, "%s~%u", "CACH", (unsigned int)meminfo.cached);
-    OUT1(swap, "%s~%u", "SWAP",
-         (unsigned int)(((si.totalswap - si.freeswap) / 1024) * si.mem_unit));
-
-    OUT1base(pswpout2, "%s~%u", "SWOUT", ((unsigned int)(vmstat.pswpout * 4)));
-    OUT1base(pswpin2, "%s~%u", "SWIN", ((unsigned int)(vmstat.pswpin * 4)));
-
-    OUT3(pgpgin, "%s#%u", "PGIN", ((unsigned int)vmstat.pgpgin));
-    OUT3(pgpgout, "%s#%u", "PGOUT", ((unsigned int)vmstat.pgpgout));
-
-    OUT3(pgfault, "%s#%u", "MINFLT", (unsigned int)vmstat.pgfault);
-    OUT3(pgmajfault, "%s#%u", "MAJFLT", (unsigned int)vmstat.pgmajfault);
-
-    OUT3(pswpout, "%s#%u", "SWOUT", ((unsigned int)vmstat.pswpout));
-    OUT3(pswpin, "%s#%u", "SWIN", ((unsigned int)vmstat.pswpin));
-#else
     int m_numbers[10];
     m_numbers[0] = (unsigned int)((si.freeram / 1024) * si.mem_unit);
     m_numbers[1] = (unsigned int)((si.bufferram / 1024) * si.mem_unit);
@@ -2014,71 +2057,42 @@ static void sample_info(void) {
     m_numbers[8] = (unsigned int)vmstat.pgfault;
     m_numbers[9] = (unsigned int)vmstat.pgmajfault;
     tditrace("%M", m_numbers);
-#endif
 
-    // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
-    // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
+// tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
+// tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
 
+    unsigned int d_numbers[8];
     if (nrdisks >= 1) {
-      OUT3(sd0_reads, "%s_r#%u", diskstats[0].name, diskstats[0].reads_sectors);
-      OUT3(sd0_writes, "%s_w#%u", diskstats[0].name,
-           diskstats[0].writes_sectors);
+      d_numbers[0] = diskstats[0].reads_sectors;
+      d_numbers[1] = diskstats[0].writes_sectors;
     }
-
     if (nrdisks >= 2) {
-      OUT3(sd1_reads, "%s_r#%u", diskstats[1].name, diskstats[1].reads_sectors);
-      OUT3(sd1_writes, "%s_w#%u", diskstats[1].name,
-           diskstats[1].writes_sectors);
+      d_numbers[2] = diskstats[1].reads_sectors;
+      d_numbers[3] = diskstats[1].writes_sectors;
     }
-
     if (nrdisks >= 3) {
-      OUT3(sd2_reads, "%s_r#%u", diskstats[2].name, diskstats[2].reads_sectors);
-      OUT3(sd2_writes, "%s_w#%u", diskstats[2].name,
-           diskstats[2].writes_sectors);
+      d_numbers[4] = diskstats[2].reads_sectors;
+      d_numbers[5] = diskstats[2].writes_sectors;
     }
-
     if (nrdisks >= 4) {
-      OUT3(sd3_reads, "%s_r#%u", diskstats[3].name, diskstats[3].reads_sectors);
-      OUT3(sd3_writes, "%s_w#%u", diskstats[3].name,
-           diskstats[3].writes_sectors);
+      d_numbers[6] = diskstats[3].reads_sectors;
+      d_numbers[7] = diskstats[3].writes_sectors;
     }
+    if (nrdisks) tditrace("%D", d_numbers);
 
-    if (nrdisks >= 5) {
-      OUT3(sd4_reads, "%s_r#%u", diskstats[4].name, diskstats[4].reads_sectors);
-      OUT3(sd4_writes, "%s_w#%u", diskstats[4].name,
-           diskstats[4].writes_sectors);
-    }
-
-    if (nrdisks >= 6) {
-      OUT3(sd3_reads, "%s_r#%u", diskstats[5].name, diskstats[5].reads_sectors);
-      OUT3(sd3_writes, "%s_w#%u", diskstats[5].name,
-           diskstats[5].writes_sectors);
-    }
-
+    unsigned int n_numbers[4];
     if (nrnets >= 1) {
-      OUT3(nt0_reads, "%s_r#%u", netdev[0].name, netdev[0].r_packets);
-      OUT3(nt0_writes, "%s_t#%u", netdev[0].name, netdev[0].t_packets);
+      n_numbers[0] = netdev[0].r_packets;
+      n_numbers[1] = netdev[0].t_packets;
     }
-
     if (nrnets >= 2) {
-      OUT3(nt1_reads, "%s_r#%u", netdev[1].name, netdev[1].r_packets);
-      OUT3(nt1_writes, "%s_w#%u", netdev[1].name, netdev[1].t_packets);
+      n_numbers[2] = netdev[1].r_packets;
+      n_numbers[3] = netdev[1].t_packets;
     }
+    if (nrnets) tditrace("%N", n_numbers);
   }
 
   if (do_selfinfo) {
-#if 0
-    OUT1(rss, "%s~%u", "rss", (selfstatm.rss * 4));
-    OUT1(code_rss, "%s~%u", "code_rss", (selfsmaps.code_rss));
-    OUT1(code_ref, "%s~%u", "code_ref", (selfsmaps.code_ref));
-    OUT1(data_rss, "%s~%u", "data", (selfsmaps.data_rss));
-    OUT1(data_ref, "%s~%u", "data_ref", (selfsmaps.data_ref));
-    OUT1(data_swap, "%s~%u", "data_swap", selfsmaps.data_swap);
-    OUT1(brk, "%s~%u", "brk", (mi.arena / 1024));
-    OUT1(mmap, "%s~%u", "mmap", (mi.hblkhd / 1024));
-    OUT3(ru_minflt, "%s#%u", "minflt", (unsigned int)ru.ru_minflt);
-    OUT3(ru_majflt, "%s#%u", "majflt", (unsigned int)ru.ru_majflt);
-#else
     unsigned int s_numbers[11];
     s_numbers[0] = gpid;
     s_numbers[1] = selfstatm.rss * 4;
@@ -2091,9 +2105,7 @@ static void sample_info(void) {
     s_numbers[8] = mi.hblkhd / 1024;
     s_numbers[9] = (unsigned int)ru.ru_minflt;
     s_numbers[10] = (unsigned int)ru.ru_majflt;
-
     tditrace("%S", s_numbers);
-#endif
   }
 }
 
@@ -2105,7 +2117,7 @@ static void *socket_thread(void *param) {
   int fd, cl, rc;
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    fprintf(stderr, "socket error");
+    fprintf(stderr, "socket error\n");
   }
 
   memset(&addr, 0, sizeof(addr));
@@ -2432,6 +2444,15 @@ static int create_trace_buffer(void) {
   UNLOCK();
 
   tditrace("%P", gpid, gprocname);
+
+  char *e;
+  if ((e = getenv("DISKS"))) {
+    tditrace("%m%s", DISKSLIST, e);
+  }
+
+  if ((e = getenv("NETS"))) {
+    tditrace("%m%s", NETSLIST, e);
+  }
 
   return 0;
 }
@@ -3227,6 +3248,27 @@ void tditrace_internal(va_list args, const char *format) {
 
         case 'K': {
           identifier = MARKER;
+
+          char *s;
+          s = va_arg(args, char *);
+          if (s) {
+            int i = 0;
+            while (*s) {
+              *trace_text_ptr++ = *s++;
+              i++;
+              if (i > 256) break;
+            }
+          } else {
+            *trace_text_ptr++ = 'n';
+            *trace_text_ptr++ = 'i';
+            *trace_text_ptr++ = 'l';
+            *trace_text_ptr++ = 'l';
+          }
+          break;
+        }
+
+        case 'E': {
+          identifier = ENVINFO;
 
           char *s;
           s = va_arg(args, char *);

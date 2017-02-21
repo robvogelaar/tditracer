@@ -222,7 +222,12 @@ static int tditest(int argc, char *argv[]) {
   tditrace = (void (*)(const char *format, ...))dlsym(handle, "tditrace");
 
 
-#if 1
+  for (i = 0; (unsigned int)i < 10; i++) {
+    usleep(50 * 1000);
+  }
+
+
+#if 0
   for (i = 0; (unsigned int)i < 10; i++) {
     tditrace("%K", "general");
     tditrace("%K", "general2");
