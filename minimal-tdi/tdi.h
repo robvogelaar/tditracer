@@ -1,8 +1,3 @@
-#if 0
-extern void tditrace(const char *format, ...);
-extern void tditrace_ex(int mask, const char *format, ...);
-#endif
-
 
 /*
  * send new value
@@ -165,7 +160,7 @@ struct tdistructprocselfstatus {
 };
 typedef int (*pfntdiprocselfstatus)(struct tdistructprocselfstatus *s);
 
-struct tdistructprocselfsmaps {
+struct tdistructprocsmaps {
   unsigned int code_rss;
   unsigned int code_pss;
   unsigned int code_ref;
@@ -174,7 +169,7 @@ struct tdistructprocselfsmaps {
   unsigned int data_ref;
   unsigned int data_swap;
 };
-typedef int (*pfntdiprocselfsmaps)(struct tdistructprocselfsmaps *s);
+typedef int (*pfntdiprocsmaps)(const char* pathname, struct tdistructprocsmaps *s);
 
 struct tdistructprocdiskstats {
   char name[16];

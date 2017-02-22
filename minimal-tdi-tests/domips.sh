@@ -1,4 +1,4 @@
-mips-TiVo-linux-gnu-g++ -shared -fPIC -pthread -O2 -Wall -Wextra -Wno-unused-parameter libtdi.cpp -o libtdi.so -ldl -lrt && cp -v libtdi.so /home/rev/nfs
+mips-TiVo-linux-gnu-g++ -shared -pthread -O2 -Wall -Wextra -Wno-unused-parameter libtdi.cpp -o libtdi.so -ldl -lrt && cp -v libtdi.so /home/rev/nfs
 mips-TiVo-linux-gnu-g++ -pthread -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function tdi.cpp -ldl -lrt -o tdi && cp -v tdi /home/rev/nfs 
 
 mips-TiVo-linux-gnu-g++ sleeper.cpp -pthread -O0 -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs

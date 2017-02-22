@@ -1,10 +1,61 @@
 #
-g++ -m32 -shared -pthread -Os -Wall libtdi.cpp -o libtdi.so
-g++ -m32 -O2 tdi.cpp -Wall -ldl -o tdi
-gcc -m32 membench.c -Wall -o membench
+g++ -m32 -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdi.cpp -ldl -o libtdi.so
+g++ -m32 -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdi.cpp -ldl -o tdi
+g++ -m32 membench.cpp -Wall -Wno-unused-variable -o membench && cp -v membench /home/rev/nfs
 
 #
+# tdi -h
 # tdi -t
-# LD_PRELOAD=libtdi.so SELFINFO=100 SYSINFO=100 ./membench 500 10 10240 0 0 0.5
+# LD_PRELOAD=libtdi.so SELFINFO=5 SYSINFO=5 ./membench 100 5 5 1024 0 0 100 0 0
 # tdi
 # tdi -d > 1.tdi
+
+system
+------
+
+FREE            amount of unused memory [KB]
+BUFFERS         temporary storage for raw disk blocks [KB]
+CACHED          in-memory cache for files read from the disk (the page cache) [KB]
+SWAP            amount of memory currently in swap [KB]
+SWOUT           amount (cumulative) of KB that has traveled to swap [KB]
+SWIN            amount (cumulative) of KB that has traveled from swap [KB]
+
+PGIN            nr of pages paged in for this sample period [pages]
+PGOUT           nr of pages paged out for this sample period [pages]
+MINFLT          nr of minor page faults (ie. page reclaims not requiring io / only requiring page table updating) [pages]
+MAJFLT          nr of major page faults (ie. page claims requiring io) [pages]
+SWOUT           amount of KB that has traveled to swap for this sample period [KB]
+SWIN            amount of KB that has traveled from swap for this sample period [KB]
+
+CPU0_USER       cpu0 percentage of time (jiffies per sample period - granularity) spent in user mode for this sample period [%]
+CPU0_SYSTEM     cpu0 percentage of time (jiffies per sample period - granularity) spent in kernel mode for this sample period [%]
+CPU0_IO         cpu0 percentage of time (jiffies per sample period - granularity) spent in wait for io for this sample period [%]
+CPU0_IRQ        cpu0 percentage of time (jiffies per sample period - granularity) spent in interrupts for this sample period [%]
+CPU1_USER       cpu1 percentage of time (jiffies per sample period - granularity) spent in user mode for this sample period [%]
+CPU1_SYSTEM     cpu1 percentage of time (jiffies per sample period - granularity) spent in kernel mode for this sample period [%]
+CPU1_IO         cpu1 percentage of time (jiffies per sample period - granularity) spent in wait for io for this sample period [%]
+CPU1_IRQ        cpu1 percentage of time (jiffies per sample period - granularity) spent in interrupts for this sample period [%]
+
+diskX:read      amount of sectors read for this sample period for this disk device [sectors]
+diskX:write     amount of sectors written for this sample period for this disk device [sectors]
+
+ethX:receive    amount of packets received for this sample period for this network interface [packets]
+ethX:transmit   amount of packets transmitted for this sample period for this network interface [packets]
+
+self
+----
+
+rss             total resident set size [KB]
+code:rss        code rss [KB]
+code:ref        code referenced [KB]
+data            data rss [KB]
+data:ref        data referenced [KB]
+data:swap       data out in swap [KB]
+
+malloc:sbrk     amount of KB that was allocated thru malloc via sbrk (heap)
+malloc:mmap     amount of KB that was allocated thru malloc via mmap
+
+minflt          nr of minor page faults (ie. page reclaims not requiring io / only requiring page table updating) [pages]
+majflt          nr of major page faults (ie. page claims requiring io) [pages]
+
+

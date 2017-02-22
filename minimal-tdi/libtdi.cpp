@@ -28,8 +28,9 @@ extern "C" {
 #include <unistd.h>
 
 #include "tdi.h"
-extern void tditrace(const char *format, ...);
-extern void tditrace_ex(int mask, const char *format, ...);
+
+void tditrace(const char *format, ...);
+void tditrace_ex(int mask, const char *format, ...);
 
 static pid_t gpid;
 static char gprocname[128];
@@ -74,11 +75,11 @@ static char gsocket_path[128];
 static struct stat gtrace_buffer_st;
 
 static char *gtrace_buffer;
-static char *trace_buffer_byte_ptr;
-static unsigned int *trace_buffer_dword_ptr;
+static char *gtrace_buffer_byte_ptr;
+static unsigned int *gtrace_buffer_dword_ptr;
 static unsigned int *gtrace_buffer_rewind_ptr;
 
-static int tditrace_inited;
+static int gtditrace_inited;
 static int reported_full;
 static int report_tid;
 
@@ -1372,9 +1373,9 @@ static void tmpfs_message(void) {
   fprintf(stderr, "\n");
 }
 
-static char procbuf[256 * 1024];
+static char procbuf[384 * 1024] __attribute__((aligned(4)));
 
-static char *readprocbuf(const char *path) {
+static int readprocbuf(const char *path) {
   char *p = procbuf;
   int fd, bytes = 0;
 
@@ -1399,7 +1400,7 @@ static char *readprocbuf(const char *path) {
 #ifdef DEBUG
     tditrace("@A-readprocbuf");
 #endif
-    return procbuf;
+    return (int)(p - procbuf);
   }
 #ifdef DEBUG
   tditrace("@A-readprocbuf");
@@ -1416,8 +1417,8 @@ int tdiprocvmstat(struct tdistructprocvmstat *s) {
   tditrace("@A+do_procvmstat");
 #endif
 
-  char *buf;
-  if ((buf = readprocbuf("/proc/vmstat"))) {
+  char *buf = procbuf;
+  if (readprocbuf("/proc/vmstat")) {
     char *saveptr;
     char *line = strtok_r(buf, "\n", &saveptr);
 
@@ -1464,7 +1465,6 @@ int tdiprocmeminfo(struct tdistructprocmeminfo *s) {
       if (sscanf(line, "Inactive(anon): %d", &s->inactive_anon)) continue;
       if (sscanf(line, "Active(file): %d", &s->active_file)) continue;
       if (sscanf(line, "Inactive(file): %d", &s->inactive_file)) break;
-      // sscanf(line, "Mapped: %d", &mapped);
     }
     fclose(f);
   }
@@ -1511,12 +1511,14 @@ int tdiprocstat(struct tdistructprocstat *s) {
   tditrace("@A+tdiprocstat");
 #endif
 
-  f = fopen("/proc/stat", "r");
-  if (f) {
-    if (fgets(line, 256, f))
+  if ((f = fopen("/proc/stat", "r"))) {
+    if (fgets(line, 256, f)) {
+#if 0
       sscanf(line, "cpu %u %u %u %u %u %u %u", &s->cpu_user, &s->cpu_nice,
              &s->cpu_system, &s->cpu_idle, &s->cpu_iowait, &s->cpu_irq,
              &s->cpu_softirq);
+#endif
+    }
     if (fgets(line, 256, f))
       sscanf(line, "cpu0 %u %u %u %u %u %u %u", &s->cpu0_user, &s->cpu0_nice,
              &s->cpu0_system, &s->cpu0_idle, &s->cpu0_iowait, &s->cpu0_irq,
@@ -1595,22 +1597,96 @@ int tdiprocselfstatus(struct tdistructprocselfstatus *s) {
   return 0;
 }
 
-int tdiprocselfsmaps(tdistructprocselfsmaps *s) {
-// static int do_fullsmaps = 0;
-// static char proc_self_smaps[16 * 1024 + 1];
-// int fd;
-// int bytes;
+/*
+          1111111111222222222233333333
+01234567890123456789012345678901234567
 
-#ifdef DEBUG
-  tditrace("@A+tdiprocselfmaps");
+8007b000-80196000 r-xp 00000000 08:02 1418       /lib/systemd/systemd
+Size:               1132 kB
+Rss:                1044 kB
+Pss:                1044 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:      1044 kB
+Private_Dirty:         0 kB
+Referenced:         1044 kB
+Anonymous:             0 kB
+AnonHugePages:         0 kB
+Swap:                  0 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Locked:                0 kB
+VmFlags: rd ex mr mw me dw
+
+2b21c000-2b21d000 rw-p 00000000 00:00 0
+Size:                  4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+Swap:                  0 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+
+*/
+
+#define _Rss (1 * 28 + 19 + 4)
+#define _Ref (7 * 28 + 19 + 4)
+
+#if defined(__i386__)
+#define _Swap (10 * 28 + 19 + 4)
+#elif defined(__mips__)
+#define _Swap (9 * 28 + 19 + 4)
+#else
+#define _Swap (10 * 28 + 19 + 4)
 #endif
 
-  char *buf;
+#if defined(__i386__)
+#define _Block (15 * 28)
+#elif defined(__mips__)
+#define _Block (12 * 28)
+#else
+#define _Block (15 * 28)
+#endif
 
-  if ((buf = readprocbuf("/proc/self/smaps"))) {
-    char *saveptr;
-    char *line = strtok_r(buf, "\n", &saveptr);
+#define I(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
+#define I5(n) \
+  I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
+
+#define I5r(n) \
+  I(n) + I(n - 1) * 10 + I(n - 2) * 100 + I(n - 3) * 1000 + I(n - 4) * 10000;
+
+#define II(val, idx)                             \
+  if (p[idx] != ' ') {                           \
+    val += (p[idx] - '0');                       \
+    if (p[idx - 1] != ' ') {                     \
+      val += ((p[idx - 1] - '0') * 10);          \
+      if (p[idx - 2] != ' ') {                   \
+        val += ((p[idx - 2] - '0') * 100);       \
+        if (p[idx - 3] != ' ') {                 \
+          val += ((p[idx - 3] - '0') * 1000);    \
+          if (p[idx - 4] != ' ') {               \
+            val += ((p[idx - 4] - '0') * 10000); \
+          }                                      \
+        }                                        \
+      }                                          \
+    }                                            \
+  }
+
+int tdiprocsmaps(const char *pathname, tdistructprocsmaps *s) {
+  int bufbytes;
+
+#ifdef DEBUG
+  tditrace("@A+tdiprocsmaps");
+#endif
+
+  char *p = procbuf;
+  if ((bufbytes = readprocbuf(pathname))) {
     s->code_rss = 0;
     s->code_pss = 0;
     s->code_ref = 0;
@@ -1619,56 +1695,61 @@ int tdiprocselfsmaps(tdistructprocselfsmaps *s) {
     s->data_ref = 0;
     s->data_swap = 0;
 
-    while (line) {
-      if (1) {
-        unsigned long start, end;
-        char flags[5];
-        unsigned long long pgoff;
-        unsigned int maj, min;
-        unsigned long ino, dum;
-        char name[256];
-        int n;
+    while (((unsigned int)(p - procbuf) != (unsigned int)bufbytes)) {
+#ifdef DEBUG
+      tditrace("@A+scan");
+#endif
 
-        if (sscanf(line, "%08lx-%08lx", &dum, &dum) == 2) {
-          strcpy(name, "ANONYMOUS");
-          if ((n = sscanf(line, "%08lx-%08lx %s %08llx %02x:%02x %lu %s",
-                          &start, &end, flags, &pgoff, &maj, &min, &ino,
-                          name)) >= 7) {
-          }
-        }
-        int rss, pss, sc, sd, pc, pd, ref, anon, swap;
-        sscanf(line, "Rss:%d", &rss);
-        sscanf(line, "Pss:%d", &pss);
-        sscanf(line, "Shared_Clean:%d", &sc);
-        sscanf(line, "Shared_Dirty:%d", &sd);
-        sscanf(line, "Private_Clean:%d", &pc);
-        sscanf(line, "Private_Dirty:%d", &pd);
-        sscanf(line, "Referenced:%d", &ref);
-        sscanf(line, "Anonymous:%d", &anon);
-        sscanf(line, "Swap:%d", &swap);
-        if (strstr(line, "Swap")) {
-          if (strcmp(flags, "r-xp") == 0) {
-            s->code_rss += rss;
-            s->code_pss += pss;
-            s->code_ref += ref;
-          } else if ((strcmp(flags, "r--p") == 0) ||
-                     (strcmp(flags, "rw-p") == 0) ||
-                     (strcmp(flags, "rwxp") == 0)) {
-            s->data_rss += rss;
-            s->data_pss += pss;
-            s->data_ref += ref;
-            s->data_swap += swap;
-          }
-        }
+      // fprintf(stderr, "1[%c%c%c%c]\n", p[18], p[19], p[20], p[21]);
+
+      // r-xp
+      if ((p[18] == 'r') && (p[19] == '-') && (p[20] == 'x') &&
+          (p[21] == 'p')) {
+        p += 36;
+        while (*p++ != 0x0a)
+          ;
+
+        II(s->code_rss, _Rss);
+        II(s->code_ref, _Ref);
+
+        // r--p rw-p rwxp
+      } else if ((p[18] == 'r') && (p[21] == 'p')) {
+        p += 36;
+        while (*p++ != 0x0a)
+          ;
+
+        II(s->data_rss, _Rss);
+        II(s->data_ref, _Ref);
+        II(s->data_swap, _Swap);
+
+      } else {
+        p += 36;
+        while (*p++ != 0x0a)
+          ;
       }
 
-      line = strtok_r(NULL, "\n", &saveptr);
+#if defined(__i386__)
+      p += _Block - 28;
+      p += 10;
+      while (*p++ != 0x0a)
+        ;
+#elif defined(__mips__)
+      p += _Block;
+#else
+      p += _Block - 28;
+      p += 10;
+      while (*p++ != 0x0a)
+        ;
+#endif
+
+#ifdef DEBUG
+      tditrace("@A-scan");
+#endif
     }
-  } else {
   }
 
 #ifdef DEBUG
-  tditrace("@A-tdiprocselfmaps");
+  tditrace("@A-tdiprocsmaps");
 #endif
 
   return 0;
@@ -1702,8 +1783,8 @@ int tdiprocdiskstats(struct tdistructprocdiskstats s[], const char *disks,
 
   if (*nrdisks) {
     int d;
-    char *buf;
-    if ((buf = readprocbuf("/proc/diskstats"))) {
+    char *buf = procbuf;
+    if (readprocbuf("/proc/diskstats")) {
       char *saveptr;
       char *line = strtok_r(buf, "\n", &saveptr);
       while (line) {
@@ -1791,8 +1872,8 @@ void tdiproctest1(void) {
   tditrace("@A+tdiproctest1");
 #endif
 
-  char *buf;
-  if ((buf = readprocbuf("/proc/self/smaps"))) {
+  char *buf = procbuf;
+  if (readprocbuf("/proc/self/smaps")) {
     char *saveptr;
     char *line = strtok_r(buf, "\n", &saveptr);
     while (line) {
@@ -1837,20 +1918,52 @@ void tdiproctest1(void) {
 }
 
 static void sample_info(void) {
-  int do_structsysinfo = do_sysinfo;
-  int do_structmallinfo = do_selfinfo;
-  int do_structgetrusage = 1;  // do_selfinfo;
+  static int do_structsysinfo;
+  static int do_structmallinfo;
+  static int do_structgetrusage;
 
-  int do_procvmstat = do_sysinfo;
-  int do_procmeminfo = do_sysinfo;
-  int do_proctvbcmmeminfo = do_sysinfo;
-  int do_procstat = do_sysinfo;
-  int do_procdiskstats = do_sysinfo;
-  int do_procnetdev = do_sysinfo;
+  static int do_procvmstat;
+  static int do_procmeminfo;
+  static int do_proctvbcmmeminfo;
+  static int do_procstat;
+  static int do_procdiskstats;
+  static int do_procnetdev;
 
-  int do_procselfstatm = do_selfinfo;
-  int do_procselfstatus = 0;  // do_selfinfo;
-  int do_procselfsmaps = do_selfinfo;
+  static int do_procselfstatm;
+  static int do_procselfstatus;
+  static int do_procselfsmaps;
+
+  static int sample_info_init = 0;
+
+  if (!sample_info_init) {
+    sample_info_init = 1;
+
+    tditrace("%P", gpid, gprocname);
+
+    char *e;
+    if ((e = getenv("DISKS"))) {
+      tditrace("%m%s", DISKSLIST, e);
+    }
+
+    if ((e = getenv("NETS"))) {
+      tditrace("%m%s", NETSLIST, e);
+    }
+
+    do_structsysinfo = do_sysinfo;
+    do_structmallinfo = do_selfinfo;
+    do_structgetrusage = 1;  // do_selfinfo;
+
+    do_procvmstat = do_sysinfo;
+    do_procmeminfo = do_sysinfo;
+    do_proctvbcmmeminfo = do_sysinfo;
+    do_procstat = do_sysinfo;
+    do_procdiskstats = do_sysinfo;
+    do_procnetdev = do_sysinfo;
+
+    do_procselfstatm = do_selfinfo;
+    do_procselfstatus = 0;  // do_selfinfo;
+    do_procselfsmaps = do_selfinfo;
+  }
 
   struct sysinfo si;
   if (do_structsysinfo) {
@@ -2008,9 +2121,9 @@ static void sample_info(void) {
   /*
    * procselfsmaps
    */
-  struct tdistructprocselfsmaps selfsmaps;
+  struct tdistructprocsmaps selfsmaps;
   if (do_procselfsmaps) {
-    tdiprocselfsmaps(&selfsmaps);
+    tdiprocsmaps("/proc/self/smaps", &selfsmaps);
   }
 
   /*
@@ -2058,8 +2171,8 @@ static void sample_info(void) {
     m_numbers[9] = (unsigned int)vmstat.pgmajfault;
     tditrace("%M", m_numbers);
 
-// tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
-// tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
+    // tditrace("HEAP0FREE~%u", (unsigned int)(heap0free / 1024));
+    // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
 
     unsigned int d_numbers[8];
     if (nrdisks >= 1) {
@@ -2209,6 +2322,101 @@ static void *socket_thread(void *param) {
   return 0;
 }
 
+static void offload() {
+  static char offloadfilename[256];
+  static char *offload_buffer;
+  static FILE *offload_file;
+
+  if (!offload_over50) {
+    LOCK();
+    int check = (((unsigned int)gtrace_buffer_byte_ptr -
+                  (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
+    UNLOCK();
+
+    if (check) {
+      offload_over50 = 1;
+      fprintf(stderr, "tdi: at 50%%...[%d,%s]\n", gpid, gprocname);
+      // create a new file and fill with 0..50% data
+
+      offload_counter++;
+
+      sprintf(offloadfilename, (char *)"%s/tditracebuffer@%s@%d@%04d",
+              offload_location, gprocname, gpid, offload_counter);
+
+      if ((offload_file = fopen(offloadfilename, "w+")) == 0) {
+        int errsv = errno;
+        fprintf(stderr, "Error creating file \"%s\" [%d]\n", offloadfilename,
+                errsv);
+      }
+
+#ifndef __UCLIBC__
+      if (posix_fallocate(fileno(offload_file), 0, gtracebuffersize) != 0) {
+        fprintf(stderr,
+                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
+                gpid, gprocname, offloadfilename);
+        tmpfs_message();
+
+        fclose(offload_file);
+        unlink(offloadfilename);
+
+        pthread_exit(NULL);
+      }
+#else
+      if (ftruncate(fileno(offload_file), gtracebuffersize) == -1) {
+        fprintf(stderr,
+                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
+                gpid, gprocname, offloadfilename);
+        pthread_exit(NULL);
+        tmpfs_message();
+      }
+#endif
+
+      offload_buffer = (char *)mmap(0, gtracebuffersize, PROT_WRITE, MAP_SHARED,
+                                    fileno(offload_file), 0);
+
+      if (offload_buffer == MAP_FAILED) {
+        fprintf(stderr,
+                "tdi: [%d][%s], !!! failed to mmap offloadfile: \"%s\" \n",
+                gpid, gprocname, offloadfilename);
+        pthread_exit(NULL);
+      }
+
+      fprintf(stderr, "tdi: [%d][%s], created offloadfile: \"%s\" \n", gpid,
+              gprocname, offloadfilename);
+
+      memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
+
+      fprintf(stderr,
+              "tdi: [%d,%s], copied 0..50%% to "
+              "offloadfile: \"%s\"\n",
+              gpid, gprocname, offloadfilename);
+    }
+
+  } else {
+    LOCK();
+    int check = (((unsigned int)gtrace_buffer_byte_ptr -
+                  (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
+    UNLOCK();
+
+    if (check) {
+      offload_over50 = 0;
+      fprintf(stderr, "tdi: [%d,%s], at 100%%...\n", gpid, gprocname);
+      // fill remaining 50..100% data to existing file and close
+      // file
+
+      memcpy(offload_buffer + gtracebuffersize / 2,
+             gtrace_buffer + gtracebuffersize / 2, gtracebuffersize / 2);
+      munmap(offload_buffer, gtracebuffersize);
+      fclose(offload_file);
+
+      fprintf(stderr,
+              "tdi: [%d,%s], copied 50..100%% to "
+              "offloadfile: \"%s\"\n",
+              gpid, gprocname, offloadfilename);
+    }
+  }
+}
+
 static void *monitor_thread(void *param) {
   if (do_maps) {
     sample_info();
@@ -2230,100 +2438,7 @@ static void *monitor_thread(void *param) {
     // tditrace("@A-sample");
 
     if (do_offload) {
-      static char offloadfilename[256];
-      static char *offload_buffer;
-      static FILE *offload_file;
-
-      if (!offload_over50) {
-        LOCK();
-        int check = (((unsigned int)trace_buffer_byte_ptr -
-                      (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
-        UNLOCK();
-
-        if (check) {
-          offload_over50 = 1;
-          fprintf(stderr, "tdi: at 50%%...[%d,%s]\n", gpid, gprocname);
-          // create a new file and fill with 0..50% data
-
-          offload_counter++;
-
-          sprintf(offloadfilename, (char *)"%s/tditracebuffer@%s@%d@%04d",
-                  offload_location, gprocname, gpid, offload_counter);
-
-          if ((offload_file = fopen(offloadfilename, "w+")) == 0) {
-            int errsv = errno;
-            fprintf(stderr, "Error creating file \"%s\" [%d]\n",
-                    offloadfilename, errsv);
-          }
-
-#ifndef __UCLIBC__
-          if (posix_fallocate(fileno(offload_file), 0, gtracebuffersize) != 0) {
-            fprintf(
-                stderr,
-                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
-                gpid, gprocname, offloadfilename);
-            tmpfs_message();
-
-            fclose(offload_file);
-            unlink(offloadfilename);
-
-            pthread_exit(NULL);
-          }
-#else
-          if (ftruncate(fileno(offload_file), gtracebuffersize) == -1) {
-            fprintf(
-                stderr,
-                "tdi: [%d][%s], !!! failed to resize offloadfile: \"%s\" \n",
-                gpid, gprocname, offloadfilename);
-            pthread_exit(NULL);
-            tmpfs_message();
-          }
-#endif
-
-          offload_buffer = (char *)mmap(0, gtracebuffersize, PROT_WRITE,
-                                        MAP_SHARED, fileno(offload_file), 0);
-
-          if (offload_buffer == MAP_FAILED) {
-            fprintf(stderr,
-                    "tdi: [%d][%s], !!! failed to mmap offloadfile: \"%s\" \n",
-                    gpid, gprocname, offloadfilename);
-            pthread_exit(NULL);
-          }
-
-          fprintf(stderr, "tdi: [%d][%s], created offloadfile: \"%s\" \n", gpid,
-                  gprocname, offloadfilename);
-
-          memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
-
-          fprintf(stderr,
-                  "tdi: [%d,%s], copied 0..50%% to "
-                  "offloadfile: \"%s\"\n",
-                  gpid, gprocname, offloadfilename);
-        }
-
-      } else {
-        LOCK();
-        int check = (((unsigned int)trace_buffer_byte_ptr -
-                      (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
-        UNLOCK();
-
-        if (check) {
-          offload_over50 = 0;
-          fprintf(stderr, "tdi: [%d,%s], at 100%%...\n", gpid, gprocname);
-          // fill remaining 50..100% data to existing file and close
-          // file
-
-          memcpy(offload_buffer + gtracebuffersize / 2,
-                 gtrace_buffer + gtracebuffersize / 2, gtracebuffersize / 2);
-          munmap(offload_buffer, gtracebuffersize);
-          fclose(offload_file);
-
-          fprintf(stderr,
-                  "tdi: [%d,%s], copied 50..100%% to "
-                  "offloadfile: \"%s\"\n",
-                  gpid, gprocname, offloadfilename);
-        }
-      }
+      offload();
     }
 
     usleep(1000 * 1000 / do_persecond);
@@ -2401,22 +2516,22 @@ static int create_trace_buffer(void) {
   fprintf(stderr, "tdi: init[%s][%d], allocated \"%s\" (%dMB)\n", gprocname,
           gpid, gtracebufferfilename, gtracebuffersize / (1024 * 1024));
 
-  trace_buffer_byte_ptr = gtrace_buffer;
-  trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
+  gtrace_buffer_byte_ptr = gtrace_buffer;
+  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
 
   /*
    * write one time start text
    */
-  sprintf((char *)trace_buffer_dword_ptr, (char *)"TDITRACE");
-  trace_buffer_dword_ptr += 2;
+  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
+  gtrace_buffer_dword_ptr += 2;
 
-  unsigned int *p = trace_buffer_dword_ptr;
+  unsigned int *p = gtrace_buffer_dword_ptr;
 
-  gettimeofday((struct timeval *)trace_buffer_dword_ptr, 0);
-  trace_buffer_dword_ptr += 2;
+  gettimeofday((struct timeval *)gtrace_buffer_dword_ptr, 0);
+  gtrace_buffer_dword_ptr += 2;
 
-  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
-  trace_buffer_dword_ptr += 2;
+  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)gtrace_buffer_dword_ptr);
+  gtrace_buffer_dword_ptr += 2;
 
   _u64 atimeofday_start = (_u64)*p++ * 1000000000;
   atimeofday_start += (_u64)*p++ * 1000;
@@ -2434,25 +2549,14 @@ static int create_trace_buffer(void) {
   /*
    * rewind ptr is used for offloading set to after start timestamps
    */
-  gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
-  *trace_buffer_dword_ptr = 0;
+  gtrace_buffer_rewind_ptr = gtrace_buffer_dword_ptr;
+  *gtrace_buffer_dword_ptr = 0;
 
   reported_full = 0;
 
   LOCK();
-  tditrace_inited = 1;
+  gtditrace_inited = 1;
   UNLOCK();
-
-  tditrace("%P", gpid, gprocname);
-
-  char *e;
-  if ((e = getenv("DISKS"))) {
-    tditrace("%m%s", DISKSLIST, e);
-  }
-
-  if ((e = getenv("NETS"))) {
-    tditrace("%m%s", NETSLIST, e);
-  }
 
   return 0;
 }
@@ -2578,7 +2682,7 @@ void start_monitor_thread(void) {
 int tditrace_init(void) {
   unsigned int i;
 
-  if (tditrace_inited) {
+  if (gtditrace_inited) {
     return 0;
   }
 
@@ -2586,7 +2690,22 @@ int tditrace_init(void) {
   get_process_name_by_pid(gpid, gprocname);
 
   if (strcmp(gprocname, "tdi") == 0) {
-    if (!getenv("NOSKIPINIT")) return -1;
+    if (!getenv("NOSKIPINIT")) {
+#if 0
+      fprintf(
+          stderr,
+          "tdi: init[%s][%d], procname=tdi, and no NOSKIPINIT, exiting init\n",
+          gprocname, gpid);
+#endif
+      return -1;
+    } else {
+#if 0
+      fprintf(stderr,
+              "tdi: init[%s][%d], procname=tdi, and NOSKIPINIT, continuing "
+              "init\n",
+              gprocname, gpid);
+#endif
+    }
   }
 
   if (strcmp(gprocname, "mkdir") == 0) {
@@ -2814,31 +2933,31 @@ int tditrace_init(void) {
 
 static void tditrace_rewind() {
   LOCK();
-  tditrace_inited = 0;
+  gtditrace_inited = 0;
   UNLOCK();
 
-  trace_buffer_byte_ptr = gtrace_buffer;
-  trace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
+  gtrace_buffer_byte_ptr = gtrace_buffer;
+  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
 
   /*
    * write one time start text
    */
-  sprintf((char *)trace_buffer_dword_ptr, (char *)"TDITRACE");
-  trace_buffer_dword_ptr += 2;
+  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
+  gtrace_buffer_dword_ptr += 2;
 
-  gettimeofday((struct timeval *)trace_buffer_dword_ptr, 0);
-  trace_buffer_dword_ptr += 2;
+  gettimeofday((struct timeval *)gtrace_buffer_dword_ptr, 0);
+  gtrace_buffer_dword_ptr += 2;
 
-  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)trace_buffer_dword_ptr);
-  trace_buffer_dword_ptr += 2;
+  clock_gettime(CLOCK_MONOTONIC, (struct timespec *)gtrace_buffer_dword_ptr);
+  gtrace_buffer_dword_ptr += 2;
 
-  gtrace_buffer_rewind_ptr = trace_buffer_dword_ptr;
-  *trace_buffer_dword_ptr = 0;
+  gtrace_buffer_rewind_ptr = gtrace_buffer_dword_ptr;
+  *gtrace_buffer_dword_ptr = 0;
 
   reported_full = 0;
 
   LOCK();
-  tditrace_inited = 1;
+  gtditrace_inited = 1;
   UNLOCK();
 }
 
@@ -3070,7 +3189,7 @@ void tditrace_ex(int mask, const char *format, ...) {
  */
 
 void tditrace_internal(va_list args, const char *format) {
-  if (!tditrace_inited) {
+  if (!gtditrace_inited) {
     return;
   }
 
@@ -3330,44 +3449,44 @@ void tditrace_internal(va_list args, const char *format) {
    *       byte    3 hold 00..ff
    */
 
-  *trace_buffer_dword_ptr++ = (0x0003 + nr_numbers + nr_textdwords) |
-                              ((nr_numbers & 0xff) << 16) |
-                              ((identifier & 0xff) << 24);
-  *trace_buffer_dword_ptr++ = mytime.tv_sec;
-  *trace_buffer_dword_ptr++ = mytime.tv_nsec;
+  *gtrace_buffer_dword_ptr++ = (0x0003 + nr_numbers + nr_textdwords) |
+                               ((nr_numbers & 0xff) << 16) |
+                               ((identifier & 0xff) << 24);
+  *gtrace_buffer_dword_ptr++ = mytime.tv_sec;
+  *gtrace_buffer_dword_ptr++ = mytime.tv_nsec;
 
   i = 0;
   while (i != nr_numbers) {
-    *trace_buffer_dword_ptr++ = pnumbers[i];
+    *gtrace_buffer_dword_ptr++ = pnumbers[i];
     i++;
   }
 
   i = nr_textdwords;
   while (i--) {
-    *trace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
+    *gtrace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
   }
 
   /*
    * mark the next marker as invalid
    */
-  *trace_buffer_dword_ptr = 0;
+  *gtrace_buffer_dword_ptr = 0;
 
-  if (((unsigned int)trace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
+  if (((unsigned int)gtrace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
       (gtracebuffersize - 1024)) {
     if (do_offload || do_wrap) {
       // clear unused and rewind to rewind ptr
       fprintf(stderr, "tdi: rewind[%d,%s]\n", gpid, gprocname);
       unsigned int i;
-      for (i = (unsigned int)trace_buffer_dword_ptr -
+      for (i = (unsigned int)gtrace_buffer_dword_ptr -
                (unsigned int)gtrace_buffer;
            i < gtracebuffersize; i++) {
         gtrace_buffer[i] = 0;
       }
-      trace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
+      gtrace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
       if (!do_offload) do_dump_proc_self_maps = 1;
     } else {
       fprintf(stderr, "tdi: full[%s][%d]\n", gprocname, gpid);
-      tditrace_inited = 0;
+      gtditrace_inited = 0;
     }
   }
 
