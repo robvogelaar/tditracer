@@ -2683,7 +2683,7 @@ int tditrace_init(void) {
   gpid = getpid();
   get_process_name_by_pid(gpid, gprocname);
 
-  if (strcmp(gprocname, "tdi") == 0) {
+  if (strcmp(gprocname, "tdim") == 0) {
     if (!getenv("NOSKIPINIT")) {
 #if 0
       fprintf(

@@ -20,19 +20,23 @@ extern "C" {
 }
 
 void usage(void) {
-  printf("tdi v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
-  printf("\nUsage: tdi -d [tracebuffer]\n");
-  printf("         tdidump : convert tditracebuffer(s) to tdi format.\n");
-  printf("\nUsage: tdi -s\n");
+  printf("tdim v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
+  printf("\nUsage: tdim\n");
+  printf("       tdim -s\n");
   printf("         tdistat : report tditracebuffer(s) status.\n");
-  printf("\nUsage: tdi -t\n");
+  printf("\n       tdim -d [tracebuffer]\n");
+  printf("         tdidump : convert tditracebuffer(s) to tdi format.\n");
+  printf("\n       tdim -t\n");
   printf(
-      "         tditest : create tracebuffer with small set of tracepoints.\n");
-  printf("\nUsage: tdi -m <message>\n");
+      "         tditest : run an internal test that creates a tracebuffer with "
+      "small set of tracepoints.\n");
+  printf("\n       tdim -m <message>\n");
   printf("         tdimessage: send a message to the tditracer(s)\n");
   printf("         'rewind' = rewind the tditracebuffer(s)\n");
-  printf("\nUsage: tdi -p\n");
-  printf("         tdiproc : report procfs data.\n\n");
+  printf("\n       tdim -p [pid]\n");
+  printf("         tdiproc : report procfs data.\n");
+  printf("\n       tdim -h\n");
+  printf("         display this help message.\n\n");
 }
 
 static int tdidump(int argc, char *argv[]);
@@ -82,7 +86,7 @@ static int tdidump(int argc, char *argv[]) {
   void *handle;
   void (*tditrace_exit)(int argc, char *argv[]);
 
-  handle = dlopen("libtdi.so", RTLD_LAZY);
+  handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
     exit(EXIT_FAILURE);
@@ -184,7 +188,8 @@ static void *thread_task(void *param) {
   int *p = (int *)param;
   srand((unsigned)time(&t));
 
-  while (1) {
+  int loops = 100;
+  while (loops--) {
     tditrace("%m%n", *p, 10000);
 
     tditrace("@%d+task%d", *p & 7, *p);
@@ -233,7 +238,7 @@ static int tditest(int argc, char *argv[]) {
 
   setenv("NOSKIPINIT", "1", -1);
 
-  handle = dlopen("libtdi.so", RTLD_LAZY);
+  handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
     exit(EXIT_FAILURE);
@@ -270,10 +275,10 @@ static int tditest(int argc, char *argv[]) {
     }                                            \
   }
 
-#if 1
+#if 0
 
   for (int j = 0; j < 10; j++) {
-#if 1
+#if 0
     char p[255] =
         "Rss:                2140 kB\r"
         "Referenced:         1076 kB\r"
@@ -419,7 +424,7 @@ static int tditest(int argc, char *argv[]) {
   }
 #endif
 
-#if 0
+#if 1
 #define NR_THREADS_TASK 10
   static pthread_t thread_id_task[NR_THREADS_TASK];
   static int param_task[NR_THREADS_TASK];
@@ -514,7 +519,7 @@ static int tdiproc(int argc, char *argv[]) {
 
   // setenv("NOSKIPINIT", "1", -1);
 
-  handle = dlopen("libtdi.so", RTLD_LAZY);
+  handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
     exit(EXIT_FAILURE);
