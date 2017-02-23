@@ -1,5 +1,5 @@
-mips-TiVo-linux-gnu-g++ -shared -pthread -O2 -Wall -Wextra -Wno-unused-parameter libtdi.cpp -o libtdi.so -ldl -lrt && cp -v libtdi.so /home/rev/nfs
-mips-TiVo-linux-gnu-g++ -pthread -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function tdi.cpp -ldl -lrt -o tdi && cp -v tdi /home/rev/nfs 
+mips-TiVo-linux-gnu-g++ -shared -pthread -O2 -Wall -Wextra -Wno-unused-parameter libtdim.cpp -o libtdim.so -ldl -lrt && cp -v libtdim.so /home/rev/nfs
+mips-TiVo-linux-gnu-g++ -pthread -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function tdim.cpp -ldl -lrt -o tdim && cp -v tdim /home/rev/nfs 
 
 mips-TiVo-linux-gnu-g++ sleeper.cpp -pthread -O0 -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs
 mips-TiVo-linux-gnu-g++ simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver && cp -v simserver /home/rev/nfs

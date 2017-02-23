@@ -16,7 +16,7 @@
 #include <sys/un.h>
 
 extern "C" {
-#include "tdi.h"
+#include "tdim.h"
 }
 
 void usage(void) {

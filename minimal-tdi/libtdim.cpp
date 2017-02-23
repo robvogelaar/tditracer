@@ -27,7 +27,7 @@ extern "C" {
 #include <syscall.h>
 #include <unistd.h>
 
-#include "tdi.h"
+#include "tdim.h"
 
 void tditrace(const char *format, ...);
 void tditrace_ex(int mask, const char *format, ...);
@@ -209,9 +209,9 @@ static void tditrace_rewind();
   _##id##_prev[pidid] = number;
 
 static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
-  static int entries_added = 0;
+  static int nams_added = 0;
 
-  if (!entries_added) {
+  if (!nams_added) {
     fprintf(stdout, "NAM 6 6500 CPU0_USER\n");
     fprintf(stdout, "NAM 6 6501 CPU0_SYSTEM\n");
     fprintf(stdout, "NAM 6 6502 CPU0_IO\n");
@@ -220,7 +220,7 @@ static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
     fprintf(stdout, "NAM 6 6505 CPU1_SYSTEM\n");
     fprintf(stdout, "NAM 6 6506 CPU1_IO\n");
     fprintf(stdout, "NAM 6 6507 CPU1_IRQ\n");
-    entries_added = 1;
+    nams_added = 1;
   }
 
   fprintf(stdout, "TIM %lld\n", timestamp);
@@ -235,9 +235,9 @@ static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
 }
 
 static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
-  static int entries_added = 0;
+  static int nams_added = 0;
 
-  if (!entries_added) {
+  if (!nams_added) {
     fprintf(stdout, "NAM 3 3500 FREE\n");
     fprintf(stdout, "NAM 3 3501 BUFFERS\n");
     fprintf(stdout, "NAM 3 3502 CACHED\n");
@@ -251,7 +251,7 @@ static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
     fprintf(stdout, "NAM 5 5503 MAJFLT\n");
     fprintf(stdout, "NAM 5 5504 SWOUT\n");
     fprintf(stdout, "NAM 5 5505 SWIN\n");
-    entries_added = 1;
+    nams_added = 1;
   }
 
   doqueue(numbers[0], 3500, 0, 1, timestamp);
@@ -479,6 +479,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     return;
   } else if (identifier == ENVINFO) {
     addentry_envinfo(text_in, text_len);
+    return;
   } else if (identifier == DISKSLIST) {
     strncpy(diskslist, text_in, text_len);
     diskslist[text_len] = 0;
@@ -1164,7 +1165,6 @@ typedef struct {
   unsigned short identifier;
   int nr_numbers;
   unsigned int *numbers;
-
   char *text;
   int text_len;
   int tid;
@@ -1192,10 +1192,7 @@ static void parse(int bid) {
   unsigned int *p = tracebuffers[bid].dword_ptr;
   unsigned int marker = *p++;
 
-  // fprintf(stderr,"marker[0x%08x]\n", marker);
-
   tracebuffers[bid].identifier = marker >> 24;
-
   tracebuffers[bid].dword_ptr += marker & 0xffff;
 
   int tvsec = *p++;
@@ -1216,7 +1213,6 @@ static void parse(int bid) {
 
   // fprintf(stderr,"marker[0x%08x](%d)(%d)\n", marker,
   // tracebuffers[bid].nr_numbers, tracebuffers[bid].text_len);
-
   // fprintf(stderr, "monotonic_timestamp:%lld, [%s]\n",
   //       tracebuffers[bid].monotonic_timestamp, tracebuffers[bid].text);
 }
@@ -1303,10 +1299,8 @@ static void dump_proc_self_maps(void) {
       /* keep trying */;
     else if (bytes > 0) {
       proc_self_maps[bytes] = '\0';
-
       char *saveptr;
       char *line = strtok_r(proc_self_maps, "\n", &saveptr);
-
       while (line) {
         if (strlen(line) > 50) {
           tditrace("MAPS [%s][%d] %s", gprocname, gpid, line);
@@ -1318,9 +1312,20 @@ static void dump_proc_self_maps(void) {
       break;
   }
 
-  close(fd);
-
   tditrace("MAPS [%s][%d] end", gprocname, gpid);
+  close(fd);
+}
+
+static void procversion(int *version, int *major, int *minor) {
+  char line[256];
+  FILE *f = NULL;
+
+  if ((f = fopen("/proc/version", "r"))) {
+    if (fgets(line, 255, f)) {
+      sscanf(line, "Linux version: %d.%d.%d", version, major, minor);
+    }
+    fclose(f);
+  }
 }
 
 static int gmask = 0x0;
@@ -1337,10 +1342,10 @@ static int offload_counter = 0;
 static int offload_over50 = 0;
 
 static int do_wrap = 0;
-
 static int do_maps = 0;
-
 static int do_dump_proc_self_maps = 0;
+
+static int sample_info_init = 0;
 
 extern void shadercapture_writeshaders(void) __attribute__((weak));
 extern void texturecapture_writepngtextures(void) __attribute__((weak));
@@ -1460,11 +1465,13 @@ int tdiprocmeminfo(struct tdistructprocmeminfo *s) {
   f = fopen("/proc/meminfo", "r");
   if (f) {
     while (fgets(line, 255, f)) {
-      if (sscanf(line, "Cached: %d", &s->cached)) continue;
+      if (sscanf(line, "Cached: %d", &s->cached)) break;
+#if 0
       if (sscanf(line, "Active(anon): %d", &s->active_anon)) continue;
       if (sscanf(line, "Inactive(anon): %d", &s->inactive_anon)) continue;
       if (sscanf(line, "Active(file): %d", &s->active_file)) continue;
       if (sscanf(line, "Inactive(file): %d", &s->inactive_file)) break;
+#endif
     }
     fclose(f);
   }
@@ -1933,8 +1940,6 @@ static void sample_info(void) {
   static int do_procselfstatus;
   static int do_procselfsmaps;
 
-  static int sample_info_init = 0;
-
   if (!sample_info_init) {
     sample_info_init = 1;
 
@@ -2082,74 +2087,62 @@ static void sample_info(void) {
   /*
    * procstat
    */
-  struct tdistructprocstat stat;
+  struct tdistructprocstat procstat;
   if (do_procstat) {
-    tdiprocstat(&stat);
+    tdiprocstat(&procstat);
 
-#if 0
-    OUT1(cpu0_user, "%s^%u", "0_usr", (stat.cpu0_user + stat.cpu0_nice));
-    OUT1(cpu0_system, "%s^%u", "0_sys", (stat.cpu0_system));
-    OUT1(cpu0_io, "%s^%u", "0_io", (stat.cpu0_iowait));
-    OUT1(cpu0_irq, "%s^%u", "0_irq", (stat.cpu0_irq + stat.cpu0_softirq));
-
-    OUT1(cpu1_user, "%s^%u", "1_usr", (stat.cpu1_user + stat.cpu1_nice));
-    OUT1(cpu1_system, "%s^%u", "1_sys", (stat.cpu1_system));
-    OUT1(cpu1_io, "%s^%u", "1_io", (stat.cpu1_iowait));
-    OUT1(cpu1_irq, "%s^%u", "1_irq", (stat.cpu1_irq + stat.cpu1_softirq));
-#else
     int c_numbers[8];
-    c_numbers[0] = stat.cpu0_user + stat.cpu0_nice;
-    c_numbers[1] = stat.cpu0_system;
-    c_numbers[2] = stat.cpu0_iowait;
-    c_numbers[3] = stat.cpu0_irq + stat.cpu0_softirq;
-    c_numbers[4] = stat.cpu1_user + stat.cpu1_nice;
-    c_numbers[5] = stat.cpu1_system;
-    c_numbers[6] = stat.cpu1_iowait;
-    c_numbers[7] = stat.cpu1_irq + stat.cpu1_softirq;
+    c_numbers[0] = procstat.cpu0_user + procstat.cpu0_nice;
+    c_numbers[1] = procstat.cpu0_system;
+    c_numbers[2] = procstat.cpu0_iowait;
+    c_numbers[3] = procstat.cpu0_irq + procstat.cpu0_softirq;
+    c_numbers[4] = procstat.cpu1_user + procstat.cpu1_nice;
+    c_numbers[5] = procstat.cpu1_system;
+    c_numbers[6] = procstat.cpu1_iowait;
+    c_numbers[7] = procstat.cpu1_irq + procstat.cpu1_softirq;
     tditrace("%C", c_numbers);
-#endif
   }
 
   /*
    * procselfstatm
    */
-  struct tdistructprocselfstatm selfstatm;
+  struct tdistructprocselfstatm procselfstatm;
   if (do_procselfstatm) {
-    tdiprocselfstatm(&selfstatm);
+    tdiprocselfstatm(&procselfstatm);
   }
 
   /*
    * procselfsmaps
    */
-  struct tdistructprocsmaps selfsmaps;
+  struct tdistructprocsmaps procselfsmaps;
   if (do_procselfsmaps) {
-    tdiprocsmaps("/proc/self/smaps", &selfsmaps);
+    tdiprocsmaps("/proc/self/smaps", &procselfsmaps);
   }
 
   /*
    * procselfstatus
    */
-  struct tdistructprocselfstatus selfstatus;
+  struct tdistructprocselfstatus procselfstatus;
   if (do_procselfstatus) {
-    tdiprocselfstatus(&selfstatus);
+    tdiprocselfstatus(&procselfstatus);
   }
 
   /*
    * procdiskstats
    */
-  struct tdistructprocdiskstats diskstats[6];
+  struct tdistructprocdiskstats procdiskstats[6];
   int nrdisks;
   if (do_procdiskstats) {
-    tdiprocdiskstats(diskstats, getenv("DISKS"), &nrdisks);
+    tdiprocdiskstats(procdiskstats, getenv("DISKS"), &nrdisks);
   }
 
   /*
    * procnetdev
    */
-  struct tdistructprocnetdev netdev[4];
+  struct tdistructprocnetdev procnetdev[4];
   int nrnets;
   if (do_procnetdev) {
-    tdiprocnetdev(netdev, getenv("NETS"), &nrnets);
+    tdiprocnetdev(procnetdev, getenv("NETS"), &nrnets);
   }
 
 #if 0
@@ -2176,31 +2169,31 @@ static void sample_info(void) {
 
     unsigned int d_numbers[8];
     if (nrdisks >= 1) {
-      d_numbers[0] = diskstats[0].reads_sectors;
-      d_numbers[1] = diskstats[0].writes_sectors;
+      d_numbers[0] = procdiskstats[0].reads_sectors;
+      d_numbers[1] = procdiskstats[0].writes_sectors;
     }
     if (nrdisks >= 2) {
-      d_numbers[2] = diskstats[1].reads_sectors;
-      d_numbers[3] = diskstats[1].writes_sectors;
+      d_numbers[2] = procdiskstats[1].reads_sectors;
+      d_numbers[3] = procdiskstats[1].writes_sectors;
     }
     if (nrdisks >= 3) {
-      d_numbers[4] = diskstats[2].reads_sectors;
-      d_numbers[5] = diskstats[2].writes_sectors;
+      d_numbers[4] = procdiskstats[2].reads_sectors;
+      d_numbers[5] = procdiskstats[2].writes_sectors;
     }
     if (nrdisks >= 4) {
-      d_numbers[6] = diskstats[3].reads_sectors;
-      d_numbers[7] = diskstats[3].writes_sectors;
+      d_numbers[6] = procdiskstats[3].reads_sectors;
+      d_numbers[7] = procdiskstats[3].writes_sectors;
     }
     if (nrdisks) tditrace("%D", d_numbers);
 
     unsigned int n_numbers[4];
     if (nrnets >= 1) {
-      n_numbers[0] = netdev[0].r_packets;
-      n_numbers[1] = netdev[0].t_packets;
+      n_numbers[0] = procnetdev[0].r_packets;
+      n_numbers[1] = procnetdev[0].t_packets;
     }
     if (nrnets >= 2) {
-      n_numbers[2] = netdev[1].r_packets;
-      n_numbers[3] = netdev[1].t_packets;
+      n_numbers[2] = procnetdev[1].r_packets;
+      n_numbers[3] = procnetdev[1].t_packets;
     }
     if (nrnets) tditrace("%N", n_numbers);
   }
@@ -2208,12 +2201,12 @@ static void sample_info(void) {
   if (do_selfinfo) {
     unsigned int s_numbers[11];
     s_numbers[0] = gpid;
-    s_numbers[1] = selfstatm.rss * 4;
-    s_numbers[2] = selfsmaps.code_rss;
-    s_numbers[3] = selfsmaps.code_ref;
-    s_numbers[4] = selfsmaps.data_rss;
-    s_numbers[5] = selfsmaps.data_ref;
-    s_numbers[6] = selfsmaps.data_swap;
+    s_numbers[1] = procselfstatm.rss * 4;
+    s_numbers[2] = procselfsmaps.code_rss;
+    s_numbers[3] = procselfsmaps.code_ref;
+    s_numbers[4] = procselfsmaps.data_rss;
+    s_numbers[5] = procselfsmaps.data_ref;
+    s_numbers[6] = procselfsmaps.data_swap;
     s_numbers[7] = mi.arena / 1024;
     s_numbers[8] = mi.hblkhd / 1024;
     s_numbers[9] = (unsigned int)ru.ru_minflt;
@@ -2276,6 +2269,7 @@ static void *socket_thread(void *param) {
         fprintf(stderr, "tdi: rewinding...[%s][%d]\n", gprocname, gpid);
         tditrace_rewind();
         do_dump_proc_self_maps = 1;
+        sample_info_init = 0;
 
       } else if (strstr(buf, "version")) {
         rc = sprintf(buf, "v%s (%s %s)", VERSION, __DATE__, __TIME__);
@@ -2761,6 +2755,9 @@ int tditrace_init(void) {
   } else {
     // fprintf(stderr, "tdi: init[%s][%d]\n", gprocname, gpid);
   }
+
+  static int gversion, gmajor, gminor;
+  procversion(&gversion, &gmajor, &gminor);
 
   char *env;
 

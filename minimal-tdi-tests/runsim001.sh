@@ -6,7 +6,7 @@ kill -9 $(pidof sleeper)
 proc()
 {
 
-LD_PRELOAD=libtdi.so TRACEBUFFERSIZE=1 REMOVE=0 SELFINFO=100 ./simserver /tmp/s$1 &
+LD_PRELOAD=libtdim.so TRACEBUFFERSIZE=1 REMOVE=0 SELFINFO=100 ./simserver /tmp/s$1 &
 sleep 1
 
 local fcounter=1
@@ -28,7 +28,7 @@ echo "code libcode$1.so f$2 $3 $4"  | ./simclient /tmp/s$1
 
 ###############################################################################
 
-LD_PRELOAD=libtdi.so TRACEBUFFERSIZE=1 SYSINFO=100 ./sleeper & 
+LD_PRELOAD=libtdim.so TRACEBUFFERSIZE=1 SYSINFO=100 ./sleeper & 
 sleep 1
 
 proc 1 8M 1024 4
