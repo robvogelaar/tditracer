@@ -729,12 +729,19 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       }
       buf[j] = 0;
 
-      //  'Feb 24 01:04:41'
-      //  '   18.947554'
+      // journalctl                     'Feb 24 01:04:41'
+      // journalctl -o short-monotonic  '   18.947554'
+      // strace -tt                     '13:05:27.499299'
       if (strchr(buf, ':')) {
-        *tstamp =
-            (atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13])) *
-            1000000000LL;
+        if (strchr(buf, '.')) {
+          *tstamp =
+              (atoi(&buf[0]) * 3600 + atoi(&buf[3]) * 60 + atof(&buf[6])) *
+              1000000000LL;
+        } else {
+          *tstamp =
+              (atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13])) *
+              1000000000LL;
+        }
       } else {
         *tstamp = (long long int)(atof(buf) * 1000000000LL);
       }
@@ -742,8 +749,13 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       static int ts_once = 0;
       if (!ts_once) {
         if (strchr(buf, ':')) {
-          fprintf(stderr, "timestamps (UTC) = \"%s\" = %lldnsec\n", buf,
-                  *tstamp);
+          if (strchr(buf, '.')) {
+            fprintf(stderr, "timestamps (UTC usecs) = \"%s\" = %lldnsec\n", buf,
+                    *tstamp);
+          } else {
+            fprintf(stderr, "timestamps (UTC) = \"%s\" = %lldnsec\n", buf,
+                    *tstamp);
+          }
         } else {
           fprintf(stderr, "timestamps (short-monotonic) = \"%s\" = %lldnsec\n",
                   buf, *tstamp);

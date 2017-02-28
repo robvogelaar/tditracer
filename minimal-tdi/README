@@ -1,17 +1,39 @@
-#
+minimal-tdi
+-----------
+
+-(temporary separately maintained) addition to legacy tditracer (legacy tditracer = libtditracer.so libtdi.so tdidump tdistat tditest)
+-source files:
+  libtdim.cpp
+  tdim.cpp
+  tdim.h
+-compiles to:
+  libtdim.so
+  tdim
+-libtdim.so is identical to libtdi.so and adds high rate and detailed sampling of procfs entries (vm / cpu / disk / net) into tdi tracepoints
+-tdim is combined replacement for tdidump, tdistat, tditest, plus additions
+-there is no interpositioning code here (what is normally in libtditracer.so) but some custom interpositioning code can be added directly
+ into libtdim.cpp
+
 g++ -m32 -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdi.cpp -ldl -o libtdi.so
 g++ -m32 -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdi.cpp -ldl -o tdi
-g++ -m32 membench.cpp -Wall -Wno-unused-variable -o membench && cp -v membench /home/rev/nfs
 
-#
-# tdi -h
-# tdi -t
-# LD_PRELOAD=libtdi.so SELFINFO=5 SYSINFO=5 ./membench 100 5 5 1024 0 0 100 0 0
-# tdi
-# tdi -d > 1.tdi
+/minimal-tdi-tests/do.sh
+/minimal-tdi-tests/domips.sh
+/minimal-tdi-tests/doarm.sh
 
-system
-------
+bitbake tditracer
+tmp/work/x/tditracer/1.0-r0/build/libtdim.so
+tmp/work/x/tditracer/1.0-r0/build/tdim
+
+tdim -h
+tdim -t
+LD_PRELOAD=libtdim.so SELFINFO=5 SYSINFO=5 ./membench 100 5 5 1024 0 0 100 0 0
+tdim -s
+tdim -d > 1.tdi
+tdim -m rewind
+
+SYSINFO=n (n specifies sampling rate (Hz))
+---------
 
 FREE            amount of unused memory [KB]
 BUFFERS         temporary storage for raw disk blocks [KB]
@@ -42,8 +64,8 @@ diskX:write     amount of sectors written for this sample period for this disk d
 ethX:receive    amount of packets received for this sample period for this network interface [packets]
 ethX:transmit   amount of packets transmitted for this sample period for this network interface [packets]
 
-self
-----
+SELFINFO=n (n specifies sampling rate (Hz))
+----------
 
 rss             total resident set size [KB]
 code:rss        code rss [KB]
@@ -59,3 +81,74 @@ minflt          nr of minor page faults (ie. page reclaims not requiring io / on
 majflt          nr of major page faults (ie. page claims requiring io) [pages]
 
 
+LOG 2 TDI conversion using tdim
+------------------------------
+-convert any logfile (e.g. journalctl output or strace output) to a tdi file.
+
+--t timestamp_regex
+	if ommitted each line will receive an ever increasing (by 100msec) timestamp starting at 0sec.
+	eg. '[0-9]\+\.[0-9]\{6\}'  matches the timestamps produced by 'journalclt -o short-monotonic' eg. '2.123456'
+	eg. '[a-zA-Z]\{3\} [0-9]\{1,2\} [0-9]\{1,2\}:[0-9]\{1,2\}:[0-9]\{1,2\}' matches the timestamps produced by
+	'journalctl' eg. 'Feb 24 01:04:41'
+
+--s semaphore_regex
+--e event_regex
+--n notes_regex
+
+	-regexes must always contain a single sub match in escaped parentheses which is identifies new entries (lines) in the trace,
+	and optional surrounding regexp is used to match larger	part of	the logline
+    -regexes are posix extended regexes.
+    -regexes are always greedy and cannot be non-greedy.
+
+example1:
+
+journalctl -o short-monotonic | ./tdim --t '[0-9]\+\.[0-9]\{6\}' --s 'dcx960-debug \([a-zA-Z_\.]\+\)\[[0-9]\+\]: ' --n 'rmfStreamer.*tid=[0-9]\+\] \([->a-zA-Z:_ ~]\+\).*' --e '\(KeyCode = [0-9]\+, keyType = [A-Z]\+\)'  > journal.tdi
+
+example2:
+
+strace -tt ls -alR / 2>&1 > /dev/null | ./tdim --t '[0-9]\{2\}:[0-9]\{2\}:[0-9]\+\.[0-9]\{6\}' --n '\([a-z]\+\)(' > strace.tdi
+
+
+Custom interpositions
+---------------------
+NEXUS_Frontend_GetQamStatus()
+NEXUS_Frontend_TuneQam()
+NEXUS_Message_Close()
+NEXUS_Message_GetBuffer()
+NEXUS_Message_GetDefaultSettings()
+NEXUS_Message_GetDefaultStartSettings()
+NEXUS_Message_GetSettings()
+NEXUS_Message_Open()
+NEXUS_Message_ReadComplete()
+NEXUS_Message_SetSettings()
+NEXUS_Message_Start()
+NEXUS_Message_Stop()
+NEXUS_PidChannel_Close()
+NEXUS_PidChannel_GetDefaultSettings()
+NEXUS_PidChannel_Open()
+NEXUS_Recpump_AddPidChannel()
+NEXUS_Recpump_DataReadComplete()
+NEXUS_Recpump_GetDataBuffer()
+NEXUS_Recpump_GetStatus()
+NEXUS_Recpump_RemoveAllPidChannels()
+NEXUS_Recpump_Start()
+NEXUS_Recpump_Stop()
+NEXUS_SimpleAudioDecoder_Start()
+NEXUS_SimpleAudioDecoder_Stop()
+NEXUS_SimpleVideoDecoder_StartPrimer()
+NEXUS_SimpleVideoDecoder_StopDecodeAndStartPrime()
+NEXUS_SimpleVideoDecoder_StopPrimer()
+NEXUS_SimpleVideoDecoder_StopPrimerAndStartDecode()
+NEXUS_SurfaceClient_GetSettings()
+NEXUS_SurfaceClient_SetSettings()
+NEXUS_SurfaceClient_SetSurface()
+NEXUS_Surface_Create()
+NEXUS_Surface_Destroy()
+NEXUS_Surface_GetDefaultCreateSettings()
+NEXUS_Timebase_Close()
+NEXUS_Timebase_Open()
+
+
+Merging tdi files
+-----------------
+tditracer/utils/tdimerge2 10_FromLog.tdi 10.tdi > 10_merged.tdi
