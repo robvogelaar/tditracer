@@ -21,8 +21,7 @@ extern "C" {
 
 void usage(void) {
   printf("tdim v%s (%s %s)\n", VERSION, __DATE__, __TIME__);
-  printf("\nUsage: tdim\n");
-  printf("       tdim -s\n");
+  printf("\nUsage: tdim -s\n");
   printf("         tdistat : report tditracebuffer(s) status.\n");
   printf("\n       tdim -d [tracebuffer]\n");
   printf("         tdidump : convert tditracebuffer(s) to tdi format.\n");
@@ -44,6 +43,7 @@ static int tdistat(int argc, char *argv[]);
 static int tditest(int argc, char *argv[]);
 static int tdimessage(int argc, char *argv[]);
 static int tdiproc(int argc, char *argv[]);
+static int tdipipe(int argc, char *argv[]);
 
 /******************************************************************************/
 int main(int argc, char *argv[]) {
@@ -72,12 +72,16 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  else if (argc == 1) {
-    tdistat(argc, argv);
+  else if (argc > 1 && (strcmp(argv[1], "-h") == 0)) {
+    usage();
+    return -1;
+  }
+
+  else {
+    tdipipe(argc, argv);
     return 0;
   }
 
-  usage();
   return -1;
 }
 
@@ -517,7 +521,7 @@ static int tdimessage(int argc, char *argv[]) {
 static int tdiproc(int argc, char *argv[]) {
   void *handle;
 
-  // setenv("NOSKIPINIT", "1", -1);
+  setenv("NOSKIPINIT", "1", -1);
 
   handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
@@ -527,11 +531,16 @@ static int tdiproc(int argc, char *argv[]) {
 
   dlerror(); /* Clear any existing error */
 
+  tditrace = (void (*)(const char *format, ...))dlsym(handle, "tditrace");
+
   pfntdiprocvmstat tdiprocvmstat =
       (pfntdiprocvmstat)dlsym(handle, "tdiprocvmstat");
   struct tdistructprocvmstat vmstat;
   if (tdiprocvmstat) {
+    tditrace("@A+tdiprocvmstat");
     tdiprocvmstat(&vmstat);
+    tditrace("@A-tdiprocvmstat");
+
     fprintf(stdout,
             "vmstat          pswpin:%d, pswpout:%d, pgpgin:%d, pgpgout:%d, "
             "pgfault:%d, "
@@ -544,20 +553,19 @@ static int tdiproc(int argc, char *argv[]) {
       (pfntdiprocmeminfo)dlsym(handle, "tdiprocmeminfo");
   struct tdistructprocmeminfo meminfo;
   if (tdiprocmeminfo) {
+    tditrace("@A+tdiprocmeminfo");
     tdiprocmeminfo(&meminfo);
-    fprintf(stdout,
-            "meminfo         cached:%d, active_anon:%d, inactive_anon:%d, "
-            "active_file:%d, "
-            "inactive_file:%d\n",
-            meminfo.cached, meminfo.active_anon, meminfo.inactive_anon,
-            meminfo.active_file, meminfo.inactive_file);
+    tditrace("@A-tdiprocmeminfo");
+    fprintf(stdout, "meminfo         cached:%d\n", meminfo.cached);
   }
 
   pfntdiproctvbcmmeminfo tdiproctvbcmmeminfo =
       (pfntdiproctvbcmmeminfo)dlsym(handle, "tdiproctvbcmmeminfo");
   struct tdistructproctvbcmmeminfo tvbcmmeminfo;
   if (tdiproctvbcmmeminfo) {
+    tditrace("@A+tdiproctvbcmmeminfo");
     tdiproctvbcmmeminfo(&tvbcmmeminfo);
+    tditrace("@A-tdiproctvbcmmeminfo");
     fprintf(stdout, "tvbcmmeminfo    heap0free:%d, heap1free:%d\n",
             tvbcmmeminfo.heap0free / 1024, tvbcmmeminfo.heap1free / 1024);
   }
@@ -565,7 +573,9 @@ static int tdiproc(int argc, char *argv[]) {
   pfntdiprocstat tdiprocstat = (pfntdiprocstat)dlsym(handle, "tdiprocstat");
   struct tdistructprocstat stat;
   if (tdiprocstat) {
+    tditrace("@A+tdiprocstat");
     tdiprocstat(&stat);
+    tditrace("@A-tdiprocstat");
 #if 0
     fprintf(stdout,
             "stat= cpu_user:%u, cpu_nice:%u, cpu_sys:%u, cpu_idle:%u, "
@@ -591,7 +601,9 @@ static int tdiproc(int argc, char *argv[]) {
       (pfntdiprocselfstatm)dlsym(handle, "tdiprocselfstatm");
   struct tdistructprocselfstatm selfstatm;
   if (tdiprocselfstatm) {
+    tditrace("@A+tdiselfstatm");
     tdiprocselfstatm(&selfstatm);
+    tditrace("@A-tdiselfstatm");
     fprintf(stdout, "selfstatm       vmsize:%lu, rss:%lu\n", selfstatm.vmsize,
             selfstatm.rss);
   }
@@ -600,7 +612,9 @@ static int tdiproc(int argc, char *argv[]) {
       (pfntdiprocselfstatus)dlsym(handle, "tdiprocselfstatus");
   struct tdistructprocselfstatus selfstatus;
   if (tdiprocselfstatus) {
+    tditrace("@A-tdiprocvmstat");
     tdiprocselfstatus(&selfstatus);
+    tditrace("@A-tdiprocvmstat");
     fprintf(stdout, "selfstatus      vmswap:%d\n", selfstatus.vmswap);
   }
 
@@ -609,7 +623,9 @@ static int tdiproc(int argc, char *argv[]) {
   static struct tdistructprocdiskstats diskstats[10];
   if (tdiprocdiskstats) {
     int m, n;
+    tditrace("@A+tdiprocdiskstats");
     tdiprocdiskstats(diskstats, getenv("DISKS"), &n);
+    tditrace("@A-tdiprocdiskstats");
 
     for (m = 0; m < n; m++) {
       fprintf(stdout,
@@ -629,7 +645,9 @@ static int tdiproc(int argc, char *argv[]) {
   static struct tdistructprocnetdev netdev[10];
   if (tdiprocnetdev) {
     int m, n;
+    tditrace("@A+tdiprocnetdev");
     tdiprocnetdev(netdev, getenv("NETS"), &n);
+    tditrace("@A-tdiprocnetdev");
 
     for (m = 0; m < n; m++) {
       fprintf(stdout,
@@ -653,7 +671,9 @@ static int tdiproc(int argc, char *argv[]) {
   char pathname[256];
   sprintf(pathname, "/proc/%s/smaps", (argc > 1) ? argv[1] : "self");
   if (tdiprocsmaps) {
+    tditrace("@A+tdiprocsmaps");
     tdiprocsmaps(pathname, &smaps);
+    tditrace("@A-tdiprocsmaps");
     fprintf(stdout,
             "smaps           code_rss:%d, code_ref:%d, data:%d, data_ref:%d, "
             "data_swap:%d\n",
@@ -662,5 +682,199 @@ static int tdiproc(int argc, char *argv[]) {
   }
 
   dlclose(handle);
+  return 0;
+}
+
+const char *const eventnames[] = {"TASKS",  "ISRS",        "SEMAS",  "QUEUES",
+                                  "EVENTS", "VALUES",      "CYCLES", "NOTES",
+                                  "AGENTS", "MEMORYCYCLES"};
+
+#include <getopt.h>
+#include <regex.h>
+#include <algorithm>
+#include <string>
+#include <vector>
+
+std::vector<std::string> SemaphoreNams;
+std::vector<std::string> EventNams;
+std::vector<std::string> NoteNams;
+
+static char *ptimestamp_regex;
+static char *pnote_regex;
+static char *psemaphore_regex;
+static char *pevent_regex;
+
+static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
+  static long long int itstamp = 0;
+  if (p) {
+    size_t nmatch = 1;
+    regmatch_t pmatch[1];
+    regex_t regex_ts;
+    int reti;
+
+    reti = regcomp(&regex_ts, p, 0);
+    if (reti) {
+      fprintf(stderr, "Could not compile timestamp regex\n");
+      exit(1);
+    }
+
+    reti = regexec(&regex_ts, buffer, nmatch, pmatch, REG_EXTENDED);
+    if (!reti) {
+      char buf[1024];
+      int j = 0;
+      for (int i = pmatch[0].rm_so; i < pmatch[0].rm_eo; i++) {
+        buf[j] = buffer[i];
+        j++;
+      }
+      buf[j] = 0;
+
+      //  Feb 24 01:04:41
+      //  [   18.947554]
+      if (strchr(buffer, ':')) {
+        *tstamp = atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13]);
+      } else {
+        *tstamp = (long long int)(atof(buf) * 1000000000LL);
+      }
+
+      static int ts_once = 0;
+      if (!ts_once) {
+        if (strchr(buf, ':')) {
+          fprintf(stderr, "timestamps (UTC) = \"%s\" = %lld\n", buf, *tstamp);
+        } else {
+          *tstamp = (long long int)(atof(buf) * 1000000000LL);
+          fprintf(stderr, "timestamps (short-monotonic) = \"%s\" = %lld\n", buf, *tstamp);
+        }
+        ts_once = 1;
+      }
+
+    } else if (reti == REG_NOMATCH) {
+      // fprintf(stderr, "Regex tstamp no match\n");
+      return 0;
+    } else {
+      char msgbuf[100];
+      regerror(reti, &regex_ts, msgbuf, sizeof(msgbuf));
+      fprintf(stderr, "Regex tstamp match failed: %s\n", msgbuf);
+      exit(1);
+    }
+
+    regfree(&regex_ts);
+  } else {
+    itstamp += 100000000LL;
+    *tstamp = itstamp;
+  }
+  return 1;
+}
+
+static void do_line(char *buffer, char *p, int id,
+                    std::vector<std::string> &Nams, long long int tstamp) {
+  regex_t regex;
+  int reti;
+  size_t nmatch = 2;
+  regmatch_t pmatch[2];
+  char buf[1024];
+
+  if (!p) return;
+
+  reti = regcomp(&regex, p, 0);
+  if (reti) {
+    fprintf(stderr, "Could not compile regex\n");
+    exit(1);
+  }
+
+  reti = regexec(&regex, buffer, nmatch, pmatch, REG_EXTENDED);
+  if (!reti) {
+    unsigned int i, index;
+    strncpy(buf, &buffer[pmatch[1].rm_so], pmatch[1].rm_eo - pmatch[1].rm_so);
+    buf[pmatch[1].rm_eo - pmatch[1].rm_so] = 0;
+
+    for (i = 0; i < strlen(buffer); i++) {
+      buf[i] = buf[i];
+      if ((buf[i] == ' ') || (buf[i] == '\n')) buf[i] = '_';
+    }
+
+    if (std::find(Nams.begin(), Nams.end(), buf) == Nams.end()) {
+      Nams.push_back(buf);
+      index =
+          std::distance(Nams.begin(), std::find(Nams.begin(), Nams.end(), buf));
+
+      fprintf(stdout, "NAM %d %d %s\n", id, (id * 1000) + index, buf);
+      fprintf(stderr, "[%s]\"%s\"\n", eventnames[id], buf);
+    }
+
+    index =
+        std::distance(Nams.begin(), std::find(Nams.begin(), Nams.end(), buf));
+
+    for (i = 0; i < strlen(buffer); i++) {
+      buf[i] = buffer[i];
+      if (buf[i] == ' ') buf[i] = '_';
+      if (buf[i] == '\n') {
+        buf[i] = 0;
+        break;
+      }
+    }
+
+    fprintf(stdout, "OCC %d %d %lld\n", id, (id * 1000) + index, tstamp);
+    fprintf(stdout, "DSC 0 0 %s\n", buf);
+  }
+  regfree(&regex);
+}
+
+static int tdipipe(int argc, char *argv[]) {
+  int c;
+  while (1) {
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"v", no_argument, 0, 0},       {"t", required_argument, 0, 0},
+        {"s", required_argument, 0, 0}, {"e", required_argument, 0, 0},
+        {"n", required_argument, 0, 0}, {0, 0, 0, 0}};
+
+    c = getopt_long(argc, argv, "", long_options, &option_index);
+    if (c == -1) break;
+
+    switch (c) {
+      case 0:
+        fprintf(stderr, "option %s", long_options[option_index].name);
+        if (optarg) fprintf(stderr, " with arg %s", optarg);
+        fprintf(stderr, "\n");
+
+        if (option_index == 1) {
+          ptimestamp_regex = optarg;
+        }
+        if (option_index == 2) {
+          psemaphore_regex = optarg;
+        }
+        if (option_index == 3) {
+          pevent_regex = optarg;
+        }
+        if (option_index == 4) {
+          pnote_regex = optarg;
+        }
+        break;
+
+      default:
+        printf("?? getopt returned character code 0%o ??\n", c);
+    }
+  }
+
+#define BLOCK_SIZE 4096
+  char buffer[BLOCK_SIZE];
+  static int do_once = 0;
+  long long int tstamp;
+
+  while (fgets(buffer, 255, stdin)) {
+    if (!do_once) {
+      do_once = 1;
+      fprintf(stdout, "TIME 1000000000\n");
+      fprintf(stdout, "SPEED 1000000000\n");
+      fprintf(stdout, "MEMSPEED 1000000000\n");
+    }
+
+    if (do_tstamp(buffer, ptimestamp_regex, &tstamp)) {
+      do_line(buffer, psemaphore_regex, SEMAS, SemaphoreNams, tstamp);
+      do_line(buffer, pevent_regex, EVENTS, EventNams, tstamp);
+      do_line(buffer, pnote_regex, NOTES, NoteNams, tstamp);
+    }
+  }
+
   return 0;
 }

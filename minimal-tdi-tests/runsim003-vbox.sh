@@ -3,6 +3,8 @@
 kill -9 $(pidof simserver)
 kill -9 $(pidof sleeper)
 
+loops=100
+
 proc()
 {
 
@@ -14,7 +16,7 @@ while [ $fcounter -le `expr $4` ]
 do
 
 echo "mmap $2"                              | ./simclient /tmp/s$1
-echo "code libcode$1.so f$fcounter 100 $3"  | ./simclient /tmp/s$1
+echo "code rev/libcode$1.so f$fcounter $loops $3"  | ./simclient /tmp/s$1
 
 fcounter=`expr $fcounter + 1`
 done
@@ -22,7 +24,7 @@ done
 
 code()
 {
-echo "code libcode$1.so f$2 $3 $4"  | ./simclient /tmp/s$1
+echo "code rev/libcode$1.so f$2 $3 $4"  | ./simclient /tmp/s$1
 }
 
 memset()
@@ -38,7 +40,7 @@ echo "mark" | ./simclient /tmp/s1
 
 ###############################################################################
 
-LD_PRELOAD=libtdim.so DISKS=sda2,sdb1 TRACEBUFFERSIZE=1 SYSINFO=5 ./sleeper & 
+LD_PRELOAD=libtdim.so DISKS=sdc2,sdc1 NETS=enp0s3 TRACEBUFFERSIZE=1 SYSINFO=5 ./sleeper & 
 sleep 1
 
 proc 1 8M 1024 4
@@ -51,20 +53,22 @@ counter=1
 while [ $counter -le `expr 10` ]
 do
 
-code 1 1 100 1024
-code 1 2 100 1024
-code 1 3 100 1024
-code 1 4 100 1024
+code 1 1 $loops 1024
+code 1 2 $loops 1024
+code 1 3 $loops 1024
+code 1 4 $loops 1024
 
-code 2 1 100 1024
-code 2 2 100 1024
-code 2 3 100 1024
-code 2 4 100 1024
+code 2 1 $loops 1024
+code 2 2 $loops 1024
+code 2 3 $loops 1024
+code 2 4 $loops 1024
 
-code 3 1 100 1024
-code 3 2 100 1024
-code 3 3 100 1024
-code 3 4 100 1024
+code 3 1 $loops 1024
+code 3 2 $loops 1024
+code 3 3 $loops 1024
+code 3 4 $loops 1024
+
+mark
 
 counter=`expr $counter + 1`
 done
@@ -76,28 +80,30 @@ proc 4 24M 2048 4
 mark
 
 counter=1
-while [ $counter -le `expr 20` ]
+while [ $counter -le `expr 10` ]
 do
 
-code 1 1 100 1024
-code 1 2 100 1024
-code 1 3 100 1024
-code 1 4 100 1024
+code 1 1 $loops 1024
+code 1 2 $loops 1024
+code 1 3 $loops 1024
+code 1 4 $loops 1024
 
-code 2 1 100 1024
-code 2 2 100 1024
-code 2 3 100 1024
-code 2 4 100 1024
+code 2 1 $loops 1024
+code 2 2 $loops 1024
+code 2 3 $loops 1024
+code 2 4 $loops 1024
 
-code 3 1 100 1024
-code 3 2 100 1024
-code 3 3 100 1024
-code 3 4 100 1024
+code 3 1 $loops 1024
+code 3 2 $loops 1024
+code 3 3 $loops 1024
+code 3 4 $loops 1024
 
-code 4 1 100 1024
-code 4 2 100 1024
-code 4 3 100 1024
-code 4 4 100 1024
+code 4 1 $loops 1024
+code 4 2 $loops 1024
+code 4 3 $loops 1024
+code 4 4 $loops 1024
+
+mark
 
 counter=`expr $counter + 1`
 done
@@ -131,30 +137,36 @@ sleep 2
 mark
 
 counter=1
-while [ $counter -le `expr 20` ]
+while [ $counter -le `expr 10` ]
 do
 
-code 1 1 100 1024
-code 1 2 100 1024
-code 1 3 100 1024
-code 1 4 100 1024
+code 1 1 $loops 1024
+code 1 2 $loops 1024
+code 1 3 $loops 1024
+code 1 4 $loops 1024
 
-code 2 1 100 1024
-code 2 2 100 1024
-code 2 3 100 1024
-code 2 4 100 1024
+code 2 1 $loops 1024
+code 2 2 $loops 1024
+code 2 3 $loops 1024
+code 2 4 $loops 1024
 
-code 3 1 100 1024
-code 3 2 100 1024
-code 3 3 100 1024
-code 3 4 100 1024
+code 3 1 $loops 1024
+code 3 2 $loops 1024
+code 3 3 $loops 1024
+code 3 4 $loops 1024
 
-code 4 1 100 1024
-code 4 2 100 1024
-code 4 3 100 1024
-code 4 4 100 1024
+code 4 1 $loops 1024
+code 4 2 $loops 1024
+code 4 3 $loops 1024
+code 4 4 $loops 1024
+
+mark
 
 counter=`expr $counter + 1`
 done
 
 mark
+
+sleep 3
+
+tdim -d > /nfs/1.tdi

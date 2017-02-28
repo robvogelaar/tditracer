@@ -1,3 +1,13 @@
+#define TASKS 0
+#define ISRS 1
+#define SEMAS 2
+#define QUEUES 3
+#define EVENTS 4
+#define VALUES 5
+#define CYCLES 6
+#define NOTES 7
+#define AGENTS 8
+#define MEMORYCYCLES 9
 
 /*
  * send new value
@@ -111,10 +121,6 @@ typedef int (*pfntdiprocvmstat)(struct tdistructprocvmstat *s);
 
 struct tdistructprocmeminfo {
   int cached;
-  int active_anon;
-  int inactive_anon;
-  int active_file;
-  int inactive_file;
 };
 typedef int (*pfntdiprocmeminfo)(struct tdistructprocmeminfo *s);
 

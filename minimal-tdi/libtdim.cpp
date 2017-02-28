@@ -56,17 +56,6 @@ static void LOCK_init(void) {
 static void LOCK(void) { pthread_mutex_lock(&lock); }
 static void UNLOCK(void) { pthread_mutex_unlock(&lock); }
 
-#define TASKS 0
-#define ISRS 1
-#define SEMAS 2
-#define QUEUES 3
-#define EVENTS 4
-#define VALUES 5
-#define CYCLES 6
-#define NOTES 7
-#define AGENTS 8
-#define MEMORYCYCLES 9
-
 static unsigned int gtracebuffersize = 16 * 1024 * 1024;
 
 static char gtracebufferfilename[128];
@@ -1466,12 +1455,6 @@ int tdiprocmeminfo(struct tdistructprocmeminfo *s) {
   if (f) {
     while (fgets(line, 255, f)) {
       if (sscanf(line, "Cached: %d", &s->cached)) break;
-#if 0
-      if (sscanf(line, "Active(anon): %d", &s->active_anon)) continue;
-      if (sscanf(line, "Inactive(anon): %d", &s->inactive_anon)) continue;
-      if (sscanf(line, "Active(file): %d", &s->active_file)) continue;
-      if (sscanf(line, "Inactive(file): %d", &s->inactive_file)) break;
-#endif
     }
     fclose(f);
   }

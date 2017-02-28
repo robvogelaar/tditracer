@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+
+import sys
+import re
+import time
+from datetime import datetime
+import os
+import fnmatch
+
+ids = []
+
+def run(tdifilename, fileindex):
+
+   global ids
+
+   f = open(tdifilename)
+
+   '''
+   offset = 0
+
+   for line in f:
+      if line.startswith('END'):
+
+         #
+         # END 0 1301636265522843000 20281195856967 20281196250458 Fri Apr  1 05:37:45 2011
+         #
+         # Obtained from log2tdi - time stamp with a date
+         # END 0 1301636265522843000 20281090149000 20281090149000 Fri Apr  1 05:37:45 2011
+         #
+         # Obtained from log2tdi - time stamp without a date
+         # END 0 0 20281090149000 20281090149000 1970-01-01 00:00:00
+         #
+
+         offset = int(line.split()[4])
+         offset = 0
+
+   f.seek(0)
+   '''
+
+   for line in f:
+
+      #TIM 46190073564
+      #DSC 0 0 PMT_streamtype_0x6_prog=61af_pid=836
+      #DSC 3 0 0
+
+      #VAL 6 6500 6490000000
+      #OCC 4 4011 46172633860
+      #STA 8 8011 46172637934
+      #STO 0 12 46263053490
+      #NAM 4 4012 [4700:rmfStreamer]PAT_prog=0x7d01_pid=0x17d4
+
+      #####
+      if line.startswith('TIM ') or line.startswith('DSC'):
+         print line[:-1];
+
+      elif line.startswith('VAL') or line.startswith('OCC') or line.startswith('STA') or line.startswith('STO') or line.startswith('NAM'):
+
+         words = line.split()
+         id = int(words[2])
+
+         if id not in ids:
+            ids.append(id)
+
+         if len(words) == 4:
+            print(words[0] + ' ' + words[1] + ' ' + str(ids.index(id) + int(fileindex) * 1000) + ' ' + words[3]);
+
+         elif len(words) == 5:
+            print(words[0] + ' ' + words[1] + ' ' + str(ids.index(id) + int(fileindex) * 1000) + ' ' + words[3] + ' ' + words[4]);
+
+         else:
+            sys.stderr.write('no-wordlen-match: \"%s\"\n' %(line[:-1]))
+
+      #else:
+         #sys.stderr.write('no-match: \"%s\"\n' %(line[:-1]))
+
+
+def main():
+
+   if len(sys.argv) >= 2:
+
+      filelist = []
+      for filespec in sys.argv[1:]:
+
+         for afile in os.listdir('.'):
+            if fnmatch.fnmatch(afile, filespec):
+               if afile not in filelist:
+                  filelist.append(afile)
+
+      print('TIME 1000000000')
+      print('SPEED 1000000000')
+      print('MEMSPEED 1000000000')
+
+      for tdifilename in filelist:
+         run(tdifilename, filelist.index(tdifilename))
+
+      print('END')
+
+   else:
+      print("Usage: %s tdifile1 tdifile2..." % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
