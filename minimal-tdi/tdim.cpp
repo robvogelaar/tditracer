@@ -700,9 +700,10 @@ std::vector<std::string> EventNams;
 std::vector<std::string> NoteNams;
 
 static char *ptimestamp_regex;
-static char *pnote_regex;
-static char *psemaphore_regex;
-static char *pevent_regex;
+
+std::vector<std::string> SemaphoreRegexes;
+std::vector<std::string> EventRegexes;
+std::vector<std::string> NoteRegexes;
 
 static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
   static long long int itstamp = 0;
@@ -714,7 +715,7 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
 
     reti = regcomp(&regex_ts, p, 0);
     if (reti) {
-      fprintf(stderr, "Could not compile timestamp regex\n");
+      fprintf(stderr, "Could not compile timestamp regex '%s'\n", p);
       exit(1);
     }
 
@@ -728,10 +729,12 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       }
       buf[j] = 0;
 
-      //  Feb 24 01:04:41
-      //  [   18.947554]
-      if (strchr(buffer, ':')) {
-        *tstamp = atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13]);
+      //  'Feb 24 01:04:41'
+      //  '   18.947554'
+      if (strchr(buf, ':')) {
+        *tstamp =
+            (atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13])) *
+            1000000000LL;
       } else {
         *tstamp = (long long int)(atof(buf) * 1000000000LL);
       }
@@ -739,16 +742,17 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       static int ts_once = 0;
       if (!ts_once) {
         if (strchr(buf, ':')) {
-          fprintf(stderr, "timestamps (UTC) = \"%s\" = %lld\n", buf, *tstamp);
+          fprintf(stderr, "timestamps (UTC) = \"%s\" = %lldnsec\n", buf,
+                  *tstamp);
         } else {
-          *tstamp = (long long int)(atof(buf) * 1000000000LL);
-          fprintf(stderr, "timestamps (short-monotonic) = \"%s\" = %lld\n", buf, *tstamp);
+          fprintf(stderr, "timestamps (short-monotonic) = \"%s\" = %lldnsec\n",
+                  buf, *tstamp);
         }
         ts_once = 1;
       }
 
     } else if (reti == REG_NOMATCH) {
-      // fprintf(stderr, "Regex tstamp no match\n");
+      // fprintf(stderr, "Regex tstamp no match [%s]\n", buffer);
       return 0;
     } else {
       char msgbuf[100];
@@ -765,7 +769,7 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
   return 1;
 }
 
-static void do_line(char *buffer, char *p, int id,
+static void do_line(char *buffer, const char *p, int id,
                     std::vector<std::string> &Nams, long long int tstamp) {
   regex_t regex;
   int reti;
@@ -777,7 +781,7 @@ static void do_line(char *buffer, char *p, int id,
 
   reti = regcomp(&regex, p, 0);
   if (reti) {
-    fprintf(stderr, "Could not compile regex\n");
+    fprintf(stderr, "Could not compile regex '%s'\n", p);
     exit(1);
   }
 
@@ -834,20 +838,16 @@ static int tdipipe(int argc, char *argv[]) {
     switch (c) {
       case 0:
         fprintf(stderr, "option %s", long_options[option_index].name);
-        if (optarg) fprintf(stderr, " with arg %s", optarg);
-        fprintf(stderr, "\n");
+        if (optarg) fprintf(stderr, " with arg '%s'\n", optarg);
 
         if (option_index == 1) {
           ptimestamp_regex = optarg;
-        }
-        if (option_index == 2) {
-          psemaphore_regex = optarg;
-        }
-        if (option_index == 3) {
-          pevent_regex = optarg;
-        }
-        if (option_index == 4) {
-          pnote_regex = optarg;
+        } else if (option_index == 2) {
+          SemaphoreRegexes.push_back(optarg);
+        } else if (option_index == 3) {
+          EventRegexes.push_back(optarg);
+        } else if (option_index == 4) {
+          NoteRegexes.push_back(optarg);
         }
         break;
 
@@ -870,11 +870,19 @@ static int tdipipe(int argc, char *argv[]) {
     }
 
     if (do_tstamp(buffer, ptimestamp_regex, &tstamp)) {
-      do_line(buffer, psemaphore_regex, SEMAS, SemaphoreNams, tstamp);
-      do_line(buffer, pevent_regex, EVENTS, EventNams, tstamp);
-      do_line(buffer, pnote_regex, NOTES, NoteNams, tstamp);
+      std::vector<std::string>::iterator itr;
+
+      for (itr = SemaphoreRegexes.begin(); itr != SemaphoreRegexes.end(); ++itr)
+        do_line(buffer, itr->c_str(), SEMAS, SemaphoreNams, tstamp);
+
+      for (itr = EventRegexes.begin(); itr != EventRegexes.end(); ++itr)
+        do_line(buffer, itr->c_str(), EVENTS, EventNams, tstamp);
+
+      for (itr = NoteRegexes.begin(); itr != NoteRegexes.end(); ++itr)
+        do_line(buffer, itr->c_str(), NOTES, NoteNams, tstamp);
     }
   }
+  fprintf(stdout, "END\n");
 
   return 0;
 }
