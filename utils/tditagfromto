@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+AGENT = 8
+
+red = 0
+blue = 1
+yellow = 2
+pink = 3
+purple = 4
+beige = 5
+lightblue = 6
+green = 7
+
+def main():
+
+   if len(sys.argv) == 4:
+
+      from_ids = []
+      to_ids = []
+
+      f = open(sys.argv[1])
+
+      tagid = 0
+      for line in f:
+         if line.startswith('NAM'):
+            namwords = line.split(' ');
+            if int(namwords[2]) > tagid:
+               tagid = int(namwords[2])
+
+            if re.compile(sys.argv[2]).findall(namwords[3]):
+               #sys.stderr.write('matched:%s\n' % dscwords[3])
+               if not namwords[2] in from_ids:
+                  from_ids.append(namwords[2])
+
+            if re.compile(sys.argv[3]).findall(namwords[3]):
+               #sys.stderr.write('matched:%s\n' % dscwords[3])
+               if not namwords[2] in to_ids:
+                  to_ids.append(namwords[2])
+
+
+      tagid+=1;
+      #sys.stderr.write('tagid   : %d\n' % tagid)
+
+      sys.stderr.write('from_id : ')
+      for id in from_ids:
+         sys.stderr.write(' %s' % id)
+      sys.stderr.write('\n')
+
+      sys.stderr.write('  to_id : ')
+      for id in to_ids:
+         sys.stderr.write(' %s' % id)
+      sys.stderr.write('\n')
+
+
+      didnam = 0;
+      f.seek(0)
+      from_ids_stamps=[]
+      to_ids_stamps=[]
+
+      for line in f:
+
+         if line.startswith('OCC') or line.startswith('STA 0') or line.startswith('STA 1') or line.startswith('STA 8'):
+            words = line.split(' ');
+            if words[2] in from_ids:
+               #sys.stderr.write('from %s@%d\n' % (words[2], int(words[3])))
+               from_ids_stamps.append(int(words[3]))
+            if words[2] in to_ids:
+               #sys.stderr.write('  to %s@%d\n' % (words[2], int(words[3])))
+               to_ids_stamps.append(int(words[3]))
+
+         if line.startswith('END'):
+
+            print 'NAM 8 %d %s..%s' % (tagid, sys.argv[2], sys.argv[3]);
+
+            for tostamp in to_ids_stamps:
+
+               thestamp = 0;
+               for fromstamp in from_ids_stamps:
+                  if fromstamp < tostamp:
+                     if fromstamp > thestamp:
+                        thestamp = fromstamp
+
+               if thestamp != 0:
+                  #sys.stderr.write('tag %d .. %d\n' % (thestamp, tostamp))
+                  print 'STA 8 %d %d' % (tagid, thestamp)
+                  print 'DSC 3 0 2'
+                  print 'STO 8 %d %d' % (tagid, tostamp)
+
+         print line,
+
+      f.close()
+
+   else:
+      sys.stderr.write("Usage: %s tdifile from-regex to-regex" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()

@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+import sys
+import re
+
+def main():
+
+   ids_to_keep = []
+
+   highest_kept_id = 0
+   highest_kept_tstamp = 0
+
+   if len(sys.argv) == 3:
+
+      keep_dsc = False;
+      f = open(sys.argv[1])
+      for line in f:
+
+         if line.startswith('NAM'):
+            if re.findall(sys.argv[2], line):
+               id = int(line.split()[2])
+               if id > highest_kept_id:
+                  highest_kept_id = id;
+               ids_to_keep.append(id)
+               sys.stderr.write('keeping : \"%s\"\n' % line[:-1])
+               print line[:-1]
+
+         elif line.startswith('STA') or line.startswith('STO') or line.startswith('OCC') or line.startswith('VAL'):
+
+            if int(line.split()[2]) in ids_to_keep:
+               print line[:-1]
+               keep_dsc = True;
+               if line.startswith('STA') or line.startswith('STO') or line.startswith('OCC'):
+                  if int(line.split()[3]) > highest_kept_tstamp:
+                     highest_kept_tstamp = int(line.split()[3])
+
+            else:
+               keep_dsc = False;
+
+         elif line.startswith('DSC'):
+            if keep_dsc:
+               print line[:-1]
+
+         elif line.startswith('END'):
+            print 'NAM 7 %d END' % (highest_kept_id + 1);
+            print 'OCC 7 %d %d' % (highest_kept_id + 1, highest_kept_tstamp + 5000000000)
+            print line[:-1]
+
+         else:
+            print line[:-1]
+
+      f.close()
+
+   else:
+      sys.stderr.write("Usage: %s tdifile NAM-regex\n" % sys.argv[0])
+
+if __name__ == "__main__":
+   main()
