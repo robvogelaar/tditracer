@@ -45,6 +45,10 @@ static int tdimessage(int argc, char *argv[]);
 static int tdiproc(int argc, char *argv[]);
 static int tdipipe(int argc, char *argv[]);
 
+#ifndef TMPFS
+#define TMPFS "/tmp/"
+#endif
+
 /******************************************************************************/
 int main(int argc, char *argv[]) {
   if (argc > 1 && (strcmp(argv[1], "-d") == 0)) {
@@ -113,7 +117,7 @@ static int tdistat(int argc, char *argv[]) {
   DIR *dp;
   struct dirent *ep;
 
-  dp = opendir("/tmp/");
+  dp = opendir(TMPFS);
   if (dp != NULL) {
     while ((ep = readdir(dp))) {
       if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
@@ -121,7 +125,7 @@ static int tdistat(int argc, char *argv[]) {
         char filename[128];
         char *bufmmapped;
 
-        sprintf(filename, "/tmp/%s", ep->d_name);
+        sprintf(filename, "%s%s", TMPFS, ep->d_name);
 
         if ((file = fopen(filename, "r")) != NULL) {
           // /tmp/tditracebuffer@proc@pid
@@ -139,9 +143,8 @@ static int tdistat(int argc, char *argv[]) {
 
           // token should hold "TDITRACE"
           if (strncmp("TDITRACE", bufmmapped, 8) != 0) {
-            fprintf(stderr,
-                    "invalid "
-                    "tracebuffer, skipping\n");
+            fprintf(stderr, "invalid "
+                            "tracebuffer, skipping\n");
             break;
           }
 
@@ -217,7 +220,7 @@ static void *thread_task(void *param) {
 
 #define I(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
-#define I5(n) \
+#define I5(n)                                                                  \
   I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
 
 #if 0
@@ -256,27 +259,27 @@ static int tditest(int argc, char *argv[]) {
 
 #define I2(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
-#define I5(n) \
+#define I5(n)                                                                  \
   I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
 
-#define I5r(n) \
+#define I5r(n)                                                                 \
   I(n) + I(n - 1) * 10 + I(n - 2) * 100 + I(n - 3) * 1000 + I(n - 4) * 10000;
 
-#define II(val, idx)                             \
-  if (p[idx] != ' ') {                           \
-    val += (p[idx] - '0');                       \
-    if (p[idx - 1] != ' ') {                     \
-      val += ((p[idx - 1] - '0') * 10);          \
-      if (p[idx - 2] != ' ') {                   \
-        val += ((p[idx - 2] - '0') * 100);       \
-        if (p[idx - 3] != ' ') {                 \
-          val += ((p[idx - 3] - '0') * 1000);    \
-          if (p[idx - 4] != ' ') {               \
-            val += ((p[idx - 4] - '0') * 10000); \
-          }                                      \
-        }                                        \
-      }                                          \
-    }                                            \
+#define II(val, idx)                                                           \
+  if (p[idx] != ' ') {                                                         \
+    val += (p[idx] - '0');                                                     \
+    if (p[idx - 1] != ' ') {                                                   \
+      val += ((p[idx - 1] - '0') * 10);                                        \
+      if (p[idx - 2] != ' ') {                                                 \
+        val += ((p[idx - 2] - '0') * 100);                                     \
+        if (p[idx - 3] != ' ') {                                               \
+          val += ((p[idx - 3] - '0') * 1000);                                  \
+          if (p[idx - 4] != ' ') {                                             \
+            val += ((p[idx - 4] - '0') * 10000);                               \
+          }                                                                    \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
   }
 
 #if 0
@@ -453,13 +456,13 @@ int send(const char *msg) {
   struct dirent *ep;
   char socket_path[128];
 
-  dp = opendir("/tmp/");
+  dp = opendir(TMPFS);
   if (dp != NULL) {
     while ((ep = readdir(dp))) {
       if (strncmp(ep->d_name, "tditracesocket@", 15) == 0) {
         fprintf(stdout, "\"%s\"\n", ep->d_name);
 
-        sprintf(socket_path, "/tmp/%s", ep->d_name);
+        sprintf(socket_path, "%s%s", TMPFS, ep->d_name);
 
         struct sockaddr_un addr;
         int fd;
@@ -583,16 +586,14 @@ static int tdiproc(int argc, char *argv[]) {
             stat.cpu_user, stat.cpu_nice, stat.cpu_system, stat.cpu_idle,
             stat.cpu_iowait, stat.cpu_irq, stat.cpu_softirq);
 #endif
-    fprintf(stdout,
-            "stat            cpu0_user:%u, cpu0_nice:%u, cpu0_sys:%u, "
-            "cpu0_idle:%u, "
-            "cpu0_iowait:%u, cpu0_irq:%u, cpu0_softirq:%u\n",
+    fprintf(stdout, "stat            cpu0_user:%u, cpu0_nice:%u, cpu0_sys:%u, "
+                    "cpu0_idle:%u, "
+                    "cpu0_iowait:%u, cpu0_irq:%u, cpu0_softirq:%u\n",
             stat.cpu0_user, stat.cpu0_nice, stat.cpu0_system, stat.cpu0_idle,
             stat.cpu0_iowait, stat.cpu0_irq, stat.cpu0_softirq);
-    fprintf(stdout,
-            "stat            cpu1_user:%u, cpu1_nice:%u, cpu1_sys:%u, "
-            "cpu1_idle:%u, "
-            "cpu1_iowait:%u, cpu1_irq:%u, cpu1_softirq:%u\n",
+    fprintf(stdout, "stat            cpu1_user:%u, cpu1_nice:%u, cpu1_sys:%u, "
+                    "cpu1_idle:%u, "
+                    "cpu1_iowait:%u, cpu1_irq:%u, cpu1_softirq:%u\n",
             stat.cpu1_user, stat.cpu1_nice, stat.cpu1_system, stat.cpu1_idle,
             stat.cpu1_iowait, stat.cpu1_irq, stat.cpu1_softirq);
   }
@@ -650,13 +651,12 @@ static int tdiproc(int argc, char *argv[]) {
     tditrace("@A-tdiprocnetdev");
 
     for (m = 0; m < n; m++) {
-      fprintf(stdout,
-              "netdev          name:%s, r_bytes: %lu, r_packets: %u, "
-              "r_errs: %u, "
-              "r_drop: %u, r_fifo: %u, r_frame: %u, r_compressed: %u, "
-              "r_multicast: %u, t_bytes: %lu, t_packets: %u, "
-              "t_errs: %u, t_drop: %u, t_fifo: %u, t_frame: %u, "
-              "t_compressed: %u, t_multicast:%u\n",
+      fprintf(stdout, "netdev          name:%s, r_bytes: %lu, r_packets: %u, "
+                      "r_errs: %u, "
+                      "r_drop: %u, r_fifo: %u, r_frame: %u, r_compressed: %u, "
+                      "r_multicast: %u, t_bytes: %lu, t_packets: %u, "
+                      "t_errs: %u, t_drop: %u, t_fifo: %u, t_frame: %u, "
+                      "t_compressed: %u, t_multicast:%u\n",
               netdev[m].name, netdev[m].r_bytes, netdev[m].r_packets,
               netdev[m].r_errs, netdev[m].r_drop, netdev[m].r_fifo,
               netdev[m].r_frame, netdev[m].r_compressed, netdev[m].r_multicast,
@@ -689,9 +689,9 @@ const char *const eventnames[] = {"TASKS",  "ISRS",        "SEMAS",  "QUEUES",
                                   "EVENTS", "VALUES",      "CYCLES", "NOTES",
                                   "AGENTS", "MEMORYCYCLES"};
 
+#include <algorithm>
 #include <getopt.h>
 #include <regex.h>
-#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -789,7 +789,8 @@ static void do_line(char *buffer, const char *p, int id,
   regmatch_t pmatch[2];
   char buf[1024];
 
-  if (!p) return;
+  if (!p)
+    return;
 
   reti = regcomp(&regex, p, 0);
   if (reti) {
@@ -805,7 +806,8 @@ static void do_line(char *buffer, const char *p, int id,
 
     for (i = 0; i < strlen(buffer); i++) {
       buf[i] = buf[i];
-      if ((buf[i] == ' ') || (buf[i] == '\n')) buf[i] = '_';
+      if ((buf[i] == ' ') || (buf[i] == '\n'))
+        buf[i] = '_';
     }
 
     if (std::find(Nams.begin(), Nams.end(), buf) == Nams.end()) {
@@ -822,7 +824,8 @@ static void do_line(char *buffer, const char *p, int id,
 
     for (i = 0; i < strlen(buffer); i++) {
       buf[i] = buffer[i];
-      if (buf[i] == ' ') buf[i] = '_';
+      if (buf[i] == ' ')
+        buf[i] = '_';
       if (buf[i] == '\n') {
         buf[i] = 0;
         break;
@@ -845,26 +848,28 @@ static int tdipipe(int argc, char *argv[]) {
         {"n", required_argument, 0, 0}, {0, 0, 0, 0}};
 
     c = getopt_long(argc, argv, "", long_options, &option_index);
-    if (c == -1) break;
+    if (c == -1)
+      break;
 
     switch (c) {
-      case 0:
-        fprintf(stderr, "option %s", long_options[option_index].name);
-        if (optarg) fprintf(stderr, " with arg '%s'\n", optarg);
+    case 0:
+      fprintf(stderr, "option %s", long_options[option_index].name);
+      if (optarg)
+        fprintf(stderr, " with arg '%s'\n", optarg);
 
-        if (option_index == 1) {
-          ptimestamp_regex = optarg;
-        } else if (option_index == 2) {
-          SemaphoreRegexes.push_back(optarg);
-        } else if (option_index == 3) {
-          EventRegexes.push_back(optarg);
-        } else if (option_index == 4) {
-          NoteRegexes.push_back(optarg);
-        }
-        break;
+      if (option_index == 1) {
+        ptimestamp_regex = optarg;
+      } else if (option_index == 2) {
+        SemaphoreRegexes.push_back(optarg);
+      } else if (option_index == 3) {
+        EventRegexes.push_back(optarg);
+      } else if (option_index == 4) {
+        NoteRegexes.push_back(optarg);
+      }
+      break;
 
-      default:
-        printf("?? getopt returned character code 0%o ??\n", c);
+    default:
+      printf("?? getopt returned character code 0%o ??\n", c);
     }
   }
 
