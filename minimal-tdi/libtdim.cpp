@@ -2294,7 +2294,9 @@ static void *socket_thread(void *param) {
           framecapture_deleteframes();
         }
       } else {
-        rc = sprintf(buf, "unrecognized message, not taking action");
+        tditrace("%s", buf);
+
+        rc = sprintf(buf, "unrecognized message, created a tracepoint for it, not taking other action");
         write(cl, buf, rc);
       }
       close(cl);
