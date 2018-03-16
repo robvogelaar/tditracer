@@ -22,13 +22,10 @@
 #
 #
 
-export SR="--sysroot=/opt/puma6-gw-6.1-toolchain/usr/armeb-buildroot-linux-uclibcgnueabi/sysroot"
+#export SR="--sysroot=/opt/puma6-gw-6.1-toolchain/usr/armeb-buildroot-linux-uclibcgnueabi/sysroot"
 
 #arm-rdk-linux-gnueabi-g++ $SR -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so && cp -v libtdim.so /home/rev/nfs
 #arm-rdk-linux-gnueabi-g++ $SR -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim && cp -v tdim /home/rev/nfs
-
-armeb-linux-gcc $SR -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so
-armeb-linux-gcc $SR -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
 
 
 #arm-rdk-linux-gnueabi-g++ $SR -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs
@@ -39,10 +36,8 @@ armeb-linux-gcc $SR -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused
 #arm-rdk-linux-gnueabi-g++ memspeed.cpp -Wall -o memspeed && cp memspeed /home/rev/nfs
 
 #arm-rdk-linux-gnueabi-gcc smemcap.c -Wall -o smemcap && cp -v smemcap /home/rev/nfs
-armeb-linux-gcc smemcap.c -Wall -o smemcap
 
 #arm-rdk-linux-gnueabi-gcc fincore.c -Wall -lm -o fincore && cp -v fincore /home/rev/nfs
-armeb-linux-gcc fincore.c -Wall -lm -o fincore
 
 #arm-rdk-linux-gnueabi-gcc memlock.c -Wall -o memlock && cp memlock /home/rev/nfs
 
@@ -60,3 +55,15 @@ armeb-linux-gcc fincore.c -Wall -lm -o fincore
 #cp -v libcode.so /home/rev/nfs/libcode4.so
 #cp -v libcode.so /home/rev/nfs/libcode5.so
 #cp -v libcode.so /home/rev/nfs/libcode6.so
+
+export extra="-g0"
+
+armeb-linux-gcc $extra -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.arm.so
+armeb-linux-gcc $extra -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function ../minimal-tdi/tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim.arm
+
+armeb-linux-gcc $extra -pthread sleeper.cpp -O0 -Wall -o sleeper.arm
+armeb-linux-gcc $extra smemcap.c -O2 -Wall -o smemcap.arm
+armeb-linux-gcc $extra fincore.c -O2 -Wall -lm -o fincore.arm
+
+armeb-linux-strip *.arm*
+

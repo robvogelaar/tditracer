@@ -1358,11 +1358,11 @@ static void tmpfs_message(void) {
   fprintf(stderr, "tdi: init[%s][%d],     \"TRACEBUFFERSIZE=<MB>\"\n",
           gprocname, gpid);
   fprintf(stderr, "tdi: init[%s][%d], adjust the %s size:\n", gprocname, gpid,
-          TMPFS);
+          getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
   fprintf(stderr,
           "tdi: init[%s][%d],     \"mount -o "
           "remount,noexec,nosuid,nr_blocks=15000 %s\"\n",
-          gprocname, gpid, TMPFS);
+          gprocname, gpid, getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
   fprintf(stderr,
           "tdi: init[%s][%d], "
           "----------------------------------------------------------------"
@@ -2203,8 +2203,8 @@ static void sample_info(void) {
 }
 
 static void *socket_thread(void *param) {
-  sprintf(gsocket_path, (char *)"%stditracesocket@%s@%d", TMPFS, gprocname,
-          gpid);
+  sprintf(gsocket_path, (char *)"%stditracesocket@%s@%d",
+          getenv("TMPFS") ? getenv("TMPFS") : TMPFS, gprocname, gpid);
 
   struct sockaddr_un addr;
   char buf[100];
@@ -2296,7 +2296,9 @@ static void *socket_thread(void *param) {
       } else {
         tditrace("%s", buf);
 
-        rc = sprintf(buf, "unrecognized message, created a tracepoint for it, not taking other action");
+        rc = sprintf(buf,
+                     "unrecognized message, created a tracepoint for it, not "
+                     "taking other action");
         write(cl, buf, rc);
       }
       close(cl);
@@ -2448,8 +2450,8 @@ static int create_trace_buffer(void) {
    * ...
    * ------
    */
-  sprintf(gtracebufferfilename, (char *)"%s/tditracebuffer@%s@%d", TMPFS,
-          gprocname, gpid);
+  sprintf(gtracebufferfilename, (char *)"%s/tditracebuffer@%s@%d",
+          getenv("TMPFS") ? getenv("TMPFS") : TMPFS, gprocname, gpid);
   FILE *file;
   if ((file = fopen(gtracebufferfilename, "w+")) == 0) {
     fprintf(stderr, "tdi: [%s][%d], !!! failed to create \"%s\"\n", gprocname,
@@ -2839,7 +2841,7 @@ int tditrace_init(void) {
     DIR *dp;
     struct dirent *ep;
 
-    dp = opendir(TMPFS);
+    dp = opendir(getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
     if (dp != NULL) {
       while ((ep = readdir(dp))) {
         if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
@@ -2848,7 +2850,8 @@ int tditrace_init(void) {
                   atoi(strrchr(ep->d_name, '@') + 1));
 
           char fullname[128];
-          sprintf(fullname, "%s%s", TMPFS, ep->d_name);
+          sprintf(fullname, "%s%s", getenv("TMPFS") ? getenv("TMPFS") : TMPFS,
+                  ep->d_name);
 
           struct stat sts;
 
@@ -2875,7 +2878,7 @@ int tditrace_init(void) {
     DIR *dp;
     struct dirent *ep;
 
-    dp = opendir(TMPFS);
+    dp = opendir(getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
     if (dp != NULL) {
       while ((ep = readdir(dp))) {
         if (strncmp(ep->d_name, "tditracesocket@", 15) == 0) {
@@ -2884,7 +2887,8 @@ int tditrace_init(void) {
                   atoi(strrchr(ep->d_name, '@') + 1));
 
           char fullname[128];
-          sprintf(fullname, "%s%s", TMPFS, ep->d_name);
+          sprintf(fullname, "%s%s", getenv("TMPFS") ? getenv("TMPFS") : TMPFS,
+                  ep->d_name);
 
           struct stat sts;
 
@@ -3033,11 +3037,12 @@ void tditrace_exit(int argc, char *argv[]) {
     DIR *dp;
     struct dirent *ep;
 
-    dp = opendir(TMPFS);
+    dp = opendir(getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
     if (dp != NULL) {
       while ((ep = readdir(dp))) {
         if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
-          sprintf(tracebuffers[buffers].filename, "%s%s", TMPFS, ep->d_name);
+          sprintf(tracebuffers[buffers].filename, "%s%s",
+                  getenv("TMPFS") ? getenv("TMPFS") : TMPFS, ep->d_name);
           check_trace_buffer(buffers);
           buffers++;
         }
@@ -3047,7 +3052,10 @@ void tditrace_exit(int argc, char *argv[]) {
   }
 
   if (buffers == 0) {
-    fprintf(stderr, "Not found: \"" TMPFS "tditracebuffer@*@*\"\n");
+    fprintf(stderr,
+            "Not found: \""
+            "TMPFS/"
+            "tditracebuffer@*@*\"\n");
     return;
   }
 

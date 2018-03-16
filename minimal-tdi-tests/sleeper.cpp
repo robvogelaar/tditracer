@@ -9,8 +9,8 @@
 #include <unistd.h>
 
 static void *thread_task(void *param) {
-  time_t t;
-  int *p = (int *)param;
+  // time_t t;
+  // int *p = (int *)param;
   //  srand((unsigned)time(&t));
   //  usleep((rand() % 100) * 1000);
 

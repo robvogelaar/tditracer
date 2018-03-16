@@ -24,14 +24,11 @@
 
 #export SR="--sysroot=/opt/puma6-gw-6.1-toolchain/usr/armeb-buildroot-linux-uclibcgnueabi/sysroot"
 
-gcc -m32 -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so
-gcc -m32 -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
 
 #armeb-linux-gcc $SR -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so
 #armeb-linux-gcc $SR -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
 
 
-gcc -m32 -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper
 #arm-rdk-linux-gnueabi-g++ $SR simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver && cp -v simserver /home/rev/nfs
 #arm-rdk-linux-gnueabi-g++ $SR simclient.cpp -Wall -Wno-unused-variable -o simclient && cp -v simclient /home/rev/nfs
 
@@ -39,10 +36,8 @@ gcc -m32 -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper
 #arm-rdk-linux-gnueabi-g++ memspeed.cpp -Wall -o memspeed && cp memspeed /home/rev/nfs
 
 #arm-rdk-linux-gnueabi-gcc smemcap.c -Wall -o smemcap && cp -v smemcap /home/rev/nfs
-gcc -m32 smemcap.c -Wall -o smemcap
 
 #arm-rdk-linux-gnueabi-gcc fincore.c -Wall -lm -o fincore && cp -v fincore /home/rev/nfs
-gcc -m32 fincore.c -Wall -lm -o fincore
 
 #arm-rdk-linux-gnueabi-gcc memlock.c -Wall -o memlock && cp memlock /home/rev/nfs
 
@@ -60,3 +55,13 @@ gcc -m32 fincore.c -Wall -lm -o fincore
 #cp -v libcode.so /home/rev/nfs/libcode4.so
 #cp -v libcode.so /home/rev/nfs/libcode5.so
 #cp -v libcode.so /home/rev/nfs/libcode6.so
+
+export extra="-g0"
+gcc -m32 $extra -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.atom.so
+gcc -m32 $extra -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations ../minimal-tdi/tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim.atom
+
+gcc -m32 $extra -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper.atom
+gcc -m32 $extra smemcap.c -O2 -Wall -Wno-unused-result -o smemcap.atom
+gcc -m32 $extra fincore.c -O2 -Wall -Wno-unused-result -lm -o fincore.atom
+
+strip *.atom*

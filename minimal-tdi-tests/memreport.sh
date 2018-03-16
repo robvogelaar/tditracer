@@ -31,7 +31,7 @@ echo 'Physical:          252.0 MB'
 #echo 'Available:         252.0 MB (due to : 256M - 4M for DSP)'
 #echo "Memory: 250120K/258048K available (3355K kernel code, 175K rwdata, 964K rodata, 150K init, 982K bss, 7928K reserved, 0K highmem)"
 memtot=$(cat /proc/meminfo | grep MemTotal: | grep -o '[0-9]*')
-echo $memtot | awk '{printf "Kernel Static:     %5.1f MB\n", 252 - ($1 / 1024)}'
+echo $memtot | awk '{printf "Kernel Static:     %5.1f MB\n", 252 - ($1 / 1024 - 0.2)}'
 echo $memtot | awk '{printf "Available:         %5.1f MB\n", ($1 / 1024) - 0.2}'
 echo 'init:                0.2 MB'
 fi
@@ -68,16 +68,16 @@ meminfo Slab _slab
 meminfo SReclaimable _sreclaimable
 meminfo SUnreclaim _sunreclaim
 
-cat /proc/slabinfo | awk '{ SUM += ($3 * $4 / (1024 * 1024))} END { printf "Slabinfo:          %5.1f MB\n", SUM }'
+cat /proc/slabinfo | awk '{SUM += ($3 * $4 / (1024 * 1024))} END {printf "Slabinfo:          %5.1f MB\n", SUM}'
 
-lsmod | awk '{SUM += $2} END {printf "Kernel Modules: %8.1f MB\n", SUM / (1024*1024) }'
+lsmod | awk '{SUM += $2} END {printf "Kernel Modules: %8.1f MB\n", SUM / (1024*1024)}'
 _kmodules=$(lsmod | awk '{SUM += $2} END {printf SUM / 1024}')
 
-cat /proc/vmallocinfo | grep vmalloc | awk '{ SUM += ($2 / (1024 * 1024))} END { printf "Kernel VMalloced:%7.1f MB\n", SUM }'
-_vmalloced=$(cat /proc/vmallocinfo | grep vmalloc | awk '{ SUM += ($2 / (1 * 1024))} END { print SUM }')
+cat /proc/vmallocinfo | grep vmalloc | awk '{SUM += ($2 / (1024 * 1024))} END { printf "Kernel VMalloced:%7.1f MB\n", SUM}'
+_vmalloced=$(cat /proc/vmallocinfo | grep vmalloc | awk '{SUM += ($2 / (1 * 1024))} END { print SUM}')
 
 echo '                   ------ +'
-echo $_kernelstack $_pagetables $_slab $_kmodules $_vmalloced | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3 + $4 + $5) / 1024 }'
+echo $_kernelstack $_pagetables $_slab $_kmodules $_vmalloced | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3 + $4 + $5) / 1024}'
 
 echo '---------------------------'
 
@@ -86,7 +86,7 @@ meminfo Cached _cached
 meminfo AnonPages _anonpages
 
 echo '                   ------ +'
-echo $_buffers $_cached $_anonpages | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3) / 1024 }'
+echo $_buffers $_cached $_anonpages | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3) / 1024}'
 #find / -path /sys -prune -o -path /proc -prune -o -type f -exec fincore --pages=false --only-cached {} \; | grep -E '^/' | awk '{ SUM += $5} END { print SUM/1024 }'
 
 echo '---------------------------'
@@ -99,7 +99,7 @@ meminfo "Inactive(file):"
 meminfo Mlocked _mlocked
 
 echo '                   ------ +'
-echo $_active $_inactive $_mlocked | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3) / 1024 }'
+echo $_active $_inactive $_mlocked | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3) / 1024}'
 
 echo '---------------------------'
 
