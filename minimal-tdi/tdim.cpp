@@ -94,7 +94,6 @@ static int tdidump(int argc, char *argv[]) {
   void *handle;
   void (*tditrace_exit)(int argc, char *argv[]);
 
-  printf("opening libtdim.so...");
   handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
