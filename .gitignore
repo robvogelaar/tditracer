@@ -15,13 +15,12 @@ config.*
 ltmain.sh
 libtool
 /stamp-h1
+*.so*
 *.o
 *.lo
 *.la
 *.deps
 *.libs
-Makefile
 tdistat
 tdidump
 tditest
-
