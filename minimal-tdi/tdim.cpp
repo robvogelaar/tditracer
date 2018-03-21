@@ -534,7 +534,7 @@ static int tdimessage(int argc, char *argv[]) {
 static int tdiproc(int argc, char *argv[]) {
   void *handle;
 
-  setenv("NOSKIPINIT", "1", -1);
+  //setenv("NOSKIPINIT", "1", -1);
 
   handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
