@@ -100,11 +100,15 @@ static struct file_operations timedoctor_proc_fops = {
     .llseek = seq_lseek,
     .release = seq_release};
 
+
+
 /******************************************************************************
 * FUNCTION IMPLEMENTATION                                                     *
 *******************************************************************************/
 
 static int timeDoctor_BufferInit(void) {
+
+
   gtimeDoctorData =
       (timeDoctorRecord_t *)__get_free_pages(GFP_KERNEL, get_order(DATA_SIZE));
   gtimeDoctorSharedPage = virt_to_page(gtimeDoctorData);
@@ -392,6 +396,8 @@ static int timedoctor_Mmap(struct file *file, struct vm_area_struct *vma) {
                          size, vma->vm_page_prot);
 }
 
+static char *gmybuf;
+
 /** Module initialisation. */
 static int __init timeDoctor_Init(void) {
   int ret;
@@ -409,35 +415,26 @@ static int __init timeDoctor_Init(void) {
     return ret;
   }
 
-#if 0
-extern struct proc_dir_entry *create_proc_entry(const char *name, umode_t mode,
-            struct proc_dir_entry *parent);
-
-#define proc_create(name, mode, parent, proc_fops) ({ NULL; })
-#endif
-
-  entry =
-      proc_create(TIME_DOCTOR_DEVNAME, S_IFREG | S_IRUGO | S_IWUSR, NULL,
-                  &timedoctor_proc_fops);
+  entry = proc_create(TIME_DOCTOR_DEVNAME, S_IFREG | S_IRUGO | S_IWUSR, NULL,
+                      &timedoctor_proc_fops);
   if (entry == NULL) return -ENOMEM;
-  return 0;
-
-#if 0
-  entry = create_proc_entry(TIME_DOCTOR_DEVNAME,
-                            S_IFREG | S_IRUGO | S_IWUSR,  // protection mode
-                            NULL);                        // parent dir: /proc
-
-  if (!entry) {
-    printk("%screate_proc_entry : failed\n", TIME_DOCTOR_DESCRIPTION);
-    return -ENOMEM;
-  } else {
-    entry->proc_fops = &timedoctor_proc_fops;
-  }
 
   printk("%s (%s-%s) [%i events]\n", TIME_DOCTOR_DESCRIPTION, __DATE__,
          __TIME__, NB_DATA);
+
+
+
+
+  gmybuf = kmalloc(4096 * 1024, GFP_KERNEL);
+  if (!gmybuf) {
+    printk("%s kmalloc 4MB ENOMEM\n", TIME_DOCTOR_DESCRIPTION);
+    return -ENOMEM;
+  }
+  else {
+    printk("%s kmalloc 4MB OK\n", TIME_DOCTOR_DESCRIPTION);
+  }
+
   return 0;
-#endif
 } /* End of timeDoctor_Init */
 
 /** Module deinitialisation */
@@ -452,6 +449,13 @@ static void __exit timeDoctor_Exit(void) {
 
   /* undo proc stuff */
   remove_proc_entry(TIME_DOCTOR_DEVNAME, NULL);
+
+
+  kfree gmybuf = kmalloc(4096 * 1024, GFP_KERNEL);
+  if (!gmybuf) {
+    printk("%s kmalloc 4MB ENOMEM\n", TIME_DOCTOR_DESCRIPTION);
+    return -ENOMEM;
+  }
 
 } /* End of timeDoctor_Exit */
 
