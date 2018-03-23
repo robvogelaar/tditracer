@@ -105,7 +105,6 @@ static struct file_operations timedoctor_proc_fops = {
 *******************************************************************************/
 
 static int timeDoctor_BufferInit(void) {
-
   gtimeDoctorData =
       (timeDoctorRecord_t *)__get_free_pages(GFP_KERNEL, get_order(DATA_SIZE));
   gtimeDoctorSharedPage = virt_to_page(gtimeDoctorData);
@@ -132,8 +131,7 @@ static void *timeDoctor_SeqStart(struct seq_file *s, loff_t *pos) {
     dataLimit = NB_DATA;
   }
 
-  if ((*pos) >= dataLimit)
-    return NULL; /* No more to read */
+  if ((*pos) >= dataLimit) return NULL; /* No more to read */
   return gtimeDoctorData + localPos;
 }
 
@@ -148,8 +146,7 @@ static void *timeDoctor_SeqNext(struct seq_file *s, void *v, loff_t *pos) {
     localPos = (gtimeDoctorIndex + (*pos)) % NB_DATA;
     dataLimit = NB_DATA;
   }
-  if ((*pos) >= dataLimit)
-    return NULL;
+  if ((*pos) >= dataLimit) return NULL;
   return gtimeDoctorData + localPos;
 }
 
@@ -212,7 +209,7 @@ static ssize_t timeDoctor_WriteProc(struct file *file,
 
 void timeDoctor_Info(unsigned int data1, unsigned int data2,
                      unsigned int data3) {
-  unsigned int time; //, status;
+  unsigned int time;  //, status;
 
   /* Read status, disable ints */
   // __asm__ __volatile__ (
@@ -331,8 +328,8 @@ static int timeDoctor_GetEntries(void) {
   }
 }
 
-static int timedoctor_Ioctl(struct inode *inode, struct file *filp,
-                            unsigned int cmd, unsigned long arg);
+static long timedoctor_Ioctl(struct file *filp, unsigned int cmd,
+                             unsigned long arg);
 
 static int timedoctor_Mmap(struct file *file, struct vm_area_struct *vma);
 
@@ -343,34 +340,35 @@ static struct miscdevice gtimeDoctorMiscDev = {.minor = MISC_DYNAMIC_MINOR,
                                                .name = TIME_DOCTOR_DEVNAME,
                                                .fops = &gtimeDoctorFops};
 
-static int timedoctor_Ioctl(struct inode *inode, struct file *filp,
-                            unsigned int cmd, unsigned long arg) {
+static long timedoctor_Ioctl(struct file *filp, unsigned int cmd,
+                             unsigned long arg)
+{
   switch (cmd) {
-  case TIMEDOCTOR_IOCTL_RESET:
-    timeDoctor_Reset();
-    return 0;
+    case TIMEDOCTOR_IOCTL_RESET:
+      timeDoctor_Reset();
+      return 0;
 
-  case TIMEDOCTOR_IOCTL_START:
-    timeDoctor_SetLevel(1);
-    return 0;
+    case TIMEDOCTOR_IOCTL_START:
+      timeDoctor_SetLevel(1);
+      return 0;
 
-  case TIMEDOCTOR_IOCTL_STOP:
-    timeDoctor_SetLevel(0);
-    return 0;
+    case TIMEDOCTOR_IOCTL_STOP:
+      timeDoctor_SetLevel(0);
+      return 0;
 
-  case TIMEDOCTOR_IOCTL_GET_ENTRIES:
-    return timeDoctor_GetEntries();
+    case TIMEDOCTOR_IOCTL_GET_ENTRIES:
+      return timeDoctor_GetEntries();
 
-  case TIMEDOCTOR_IOCTL_GET_MAX_ENTRIES:
-    return (NB_DATA * NB_FIELDS_PER_RECORD);
+    case TIMEDOCTOR_IOCTL_GET_MAX_ENTRIES:
+      return (NB_DATA * NB_FIELDS_PER_RECORD);
 
-  case TIMEDOCTOR_IOCTL_INFO: {
-    unsigned int data[TIMEDOCTOR_INFO_DATASIZE];
-    copy_from_user(&data, (unsigned int *)arg,
-                   sizeof(unsigned int) * TIMEDOCTOR_INFO_DATASIZE);
-    timeDoctor_Info(data[0], data[1], data[2]);
-  }
-    return 0;
+    case TIMEDOCTOR_IOCTL_INFO: {
+      unsigned int data[TIMEDOCTOR_INFO_DATASIZE];
+      copy_from_user(&data, (unsigned int *)arg,
+                     sizeof(unsigned int) * TIMEDOCTOR_INFO_DATASIZE);
+      timeDoctor_Info(data[0], data[1], data[2]);
+    }
+      return 0;
   }
 
   return -ENOSYS;
@@ -414,8 +412,7 @@ static int __init timeDoctor_Init(void) {
 
   entry = proc_create(TIME_DOCTOR_DEVNAME, S_IFREG | S_IRUGO | S_IWUSR, NULL,
                       &timedoctor_proc_fops);
-  if (entry == NULL)
-    return -ENOMEM;
+  if (entry == NULL) return -ENOMEM;
 
   printk("%s (%s-%s) [%i events]\n", TIME_DOCTOR_DESCRIPTION, __DATE__,
          __TIME__, NB_DATA);
