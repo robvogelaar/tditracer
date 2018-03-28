@@ -24,6 +24,7 @@ extern "C" {
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
 #include <syscall.h>
 #include <unistd.h>
 
@@ -117,88 +118,88 @@ static int nr_agents = 0;
 
 static void tditrace_rewind();
 
-#define docycle(number, id, pidid, span)  \
-  static unsigned int _##id##_seen[span]; \
-                                          \
-  if (_##id##_seen[pidid] == 0) {         \
-    _##id##_seen[pidid] = 1;              \
-  }                                       \
+#define docycle(number, id, pidid, span)                                       \
+  static unsigned int _##id##_seen[span];                                      \
+                                                                               \
+  if (_##id##_seen[pidid] == 0) {                                              \
+    _##id##_seen[pidid] = 1;                                                   \
+  }                                                                            \
   fprintf(stdout, "VAL 6 %d %lld\n", id + pidid * span, number * 10000000LL);
 
-#define doqueue(number, id, pidid, span, tstamp)                         \
-  static unsigned int _##id##_seen[span];                                \
-  static unsigned int _##id##_prev[span];                                \
-                                                                         \
-  if (_##id##_seen[pidid] == 0) {                                        \
-    if (number != 0) {                                                   \
-      _##id##_seen[pidid] = 1;                                           \
-      if (number >= _##id##_prev[pidid])                                 \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                number - _##id##_prev[pidid]);                           \
-      else                                                               \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                _##id##_prev[pidid] - number);                           \
-    }                                                                    \
-  } else {                                                               \
-    if (number != _##id##_prev[pidid]) {                                 \
-      if (number >= _##id##_prev[pidid])                                 \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                number - _##id##_prev[pidid]);                           \
-      else                                                               \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                _##id##_prev[pidid] - number);                           \
-    }                                                                    \
-  }                                                                      \
+#define doqueue(number, id, pidid, span, tstamp)                               \
+  static unsigned int _##id##_seen[span];                                      \
+  static unsigned int _##id##_prev[span];                                      \
+                                                                               \
+  if (_##id##_seen[pidid] == 0) {                                              \
+    if (number != 0) {                                                         \
+      _##id##_seen[pidid] = 1;                                                 \
+      if (number >= _##id##_prev[pidid])                                       \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                number - _##id##_prev[pidid]);                                 \
+      else                                                                     \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                _##id##_prev[pidid] - number);                                 \
+    }                                                                          \
+  } else {                                                                     \
+    if (number != _##id##_prev[pidid]) {                                       \
+      if (number >= _##id##_prev[pidid])                                       \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                number - _##id##_prev[pidid]);                                 \
+      else                                                                     \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                _##id##_prev[pidid] - number);                                 \
+    }                                                                          \
+  }                                                                            \
   _##id##_prev[pidid] = number;
 
-#define doqueue_base(number, id, pidid, span, tstamp)                    \
-  static unsigned int _##id##_seen[span];                                \
-  static unsigned int _##id##_prev[span];                                \
-  static unsigned int _##id##_base[span];                                \
-                                                                         \
-  if (_##id##_seen[pidid] == 0) {                                        \
-    if (number != 0) {                                                   \
-      _##id##_seen[pidid] = 1;                                           \
-      _##id##_base[pidid] = number;                                      \
-      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])         \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);   \
-      else                                                               \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                _##id##_prev[pidid] - (number - _##id##_base[pidid]));   \
-    }                                                                    \
-  } else {                                                               \
-    if ((number - _##id##_base[pidid]) != _##id##_prev[pidid]) {         \
-      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])         \
-        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);   \
-      else                                                               \
-        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp, \
-                _##id##_prev[pidid] - (number - _##id##_base[pidid]));   \
-    }                                                                    \
-  }                                                                      \
+#define doqueue_base(number, id, pidid, span, tstamp)                          \
+  static unsigned int _##id##_seen[span];                                      \
+  static unsigned int _##id##_prev[span];                                      \
+  static unsigned int _##id##_base[span];                                      \
+                                                                               \
+  if (_##id##_seen[pidid] == 0) {                                              \
+    if (number != 0) {                                                         \
+      _##id##_seen[pidid] = 1;                                                 \
+      _##id##_base[pidid] = number;                                            \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])               \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);         \
+      else                                                                     \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid]));         \
+    }                                                                          \
+  } else {                                                                     \
+    if ((number - _##id##_base[pidid]) != _##id##_prev[pidid]) {               \
+      if ((number - _##id##_base[pidid]) >= _##id##_prev[pidid])               \
+        fprintf(stdout, "STA 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                (number - _##id##_base[pidid]) - _##id##_prev[pidid]);         \
+      else                                                                     \
+        fprintf(stdout, "STO 3 %d %lld %d\n", id + pidid * span, tstamp,       \
+                _##id##_prev[pidid] - (number - _##id##_base[pidid]));         \
+    }                                                                          \
+  }                                                                            \
   _##id##_prev[pidid] = (number - _##id##_base[pidid]);
 
-#define dovalue(number, id, pidid, span)                                      \
-                                                                              \
-  static unsigned int _##id##_seen[span];                                     \
-  static unsigned int _##id##_prev[span];                                     \
-  static unsigned int _##id##_prevprev[span];                                 \
-  if (_##id##_seen[pidid] == 0) {                                             \
-    if (number != 0) {                                                        \
-      _##id##_seen[pidid] = 1;                                                \
-    }                                                                         \
-  } else if (_##id##_seen[pidid] == 1) {                                      \
-    if (_##id##_prev[pidid] != number) {                                      \
-      _##id##_seen[pidid] = 2;                                                \
-      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                     \
-              _##id##_prev[pidid]);                                           \
-    }                                                                         \
-  } else if ((_##id##_prev[pidid] != number) ||                               \
-             (_##id##_prevprev[pidid] != number)) {                           \
-    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span, _##id##_prev[pidid]); \
-  }                                                                           \
-  _##id##_prevprev[pidid] = _##id##_prev[pidid];                              \
+#define dovalue(number, id, pidid, span)                                       \
+                                                                               \
+  static unsigned int _##id##_seen[span];                                      \
+  static unsigned int _##id##_prev[span];                                      \
+  static unsigned int _##id##_prevprev[span];                                  \
+  if (_##id##_seen[pidid] == 0) {                                              \
+    if (number != 0) {                                                         \
+      _##id##_seen[pidid] = 1;                                                 \
+    }                                                                          \
+  } else if (_##id##_seen[pidid] == 1) {                                       \
+    if (_##id##_prev[pidid] != number) {                                       \
+      _##id##_seen[pidid] = 2;                                                 \
+      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                      \
+              _##id##_prev[pidid]);                                            \
+    }                                                                          \
+  } else if ((_##id##_prev[pidid] != number) ||                                \
+             (_##id##_prevprev[pidid] != number)) {                            \
+    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span, _##id##_prev[pidid]);  \
+  }                                                                            \
+  _##id##_prevprev[pidid] = _##id##_prev[pidid];                               \
   _##id##_prev[pidid] = number;
 
 static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
@@ -281,7 +282,8 @@ static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
       fprintf(stdout, "NAM 5 %d %s:write\n", 5701 + nrdisks * MAXDISKS,
               disks[nrdisks]);
       nrdisks++;
-      if (nrdisks == MAXDISKS) break;
+      if (nrdisks == MAXDISKS)
+        break;
     }
     entries_added = 1;
   }
@@ -312,7 +314,8 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
       fprintf(stdout, "NAM 5 %d %s:transmit\n", 5801 + nrnets * MAXNETS,
               nets[nrnets]);
       nrnets++;
-      if (nrnets == MAXNETS) break;
+      if (nrnets == MAXNETS)
+        break;
     }
     entries_added = 1;
   }
@@ -338,7 +341,8 @@ static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
   }
 
   for (i = 0; i < nrpids_seen; i++) {
-    if (pid == pidlist[i]) break;
+    if (pid == pidlist[i])
+      break;
   }
   if (pid != pidlist[i]) {
     pidlist[i] = pid;
@@ -381,7 +385,8 @@ static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
   int i;
 
   for (i = 0; i < markers_nr; i++) {
-    if (strncmp(text, markers[i], text_len) == 0) break;
+    if (strncmp(text, markers[i], text_len) == 0)
+      break;
   }
 
   if (strncmp(text, markers[i], text_len) != 0) {
@@ -403,7 +408,8 @@ static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
 static void addentry_envinfo(const char *text, int text_len) {
   int i;
   for (i = 0; i < envs_nr; i++) {
-    if (strncmp(text, envs[i], text_len) == 0) break;
+    if (strncmp(text, envs[i], text_len) == 0)
+      break;
   }
 
   if (strncmp(text, envs[i], text_len) != 0) {
@@ -458,7 +464,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     int i;
     unsigned int pid = numbers[0];
     for (i = 0; i < pid_procname_table_nr; i++) {
-      if (pid == pid_procname_table_pid[i]) break;
+      if (pid == pid_procname_table_pid[i])
+        break;
     }
     if (pid != pid_procname_table_pid[i]) {
       pid_procname_table_pid[i] = pid;
@@ -613,7 +620,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
 
       for (i = 8; i < (int)strlen(fullentry); i++) {
-        if (fullentry[i] == 32) fullentry[i] = 0x2c;
+        if (fullentry[i] == 32)
+          fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -680,7 +688,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
       for (i = 8; i < (int)strlen(fullentry); i++) {
-        if (fullentry[i] == 32) fullentry[i] = 0x2c;
+        if (fullentry[i] == 32)
+          fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -749,7 +758,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
       for (i = 8; i < (int)strlen(fullentry); i++) {
-        if (fullentry[i] == 32) fullentry[i] = 0x2c;
+        if (fullentry[i] == 32)
+          fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -816,7 +826,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
       for (i = 8; i < (int)strlen(fullentry); i++) {
-        if (fullentry[i] == 32) fullentry[i] = 0x2c;
+        if (fullentry[i] == 32)
+          fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -894,7 +905,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
       for (i = 8; i < (int)strlen(fullentry); i++) {
-        if (fullentry[i] == 32) fullentry[i] = 0x2c;
+        if (fullentry[i] == 32)
+          fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
@@ -919,14 +931,15 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   q = strchr(text, '~');
   if (q && isdigit(q[1])) {
     for (i = 0; i < (int)strlen(text); i++) {
-      if (text[i] == 32) break;
+      if (text[i] == 32)
+        break;
       if (text[i] == 126) {
         // fprintf(stderr, "text1=\"%s\"\n", text);
 
         strncpy(name, text, i);
         name[i] = 0;
         value = atoi(text + i + 1);
-        text[i] = 32;  // create split marker
+        text[i] = 32; // create split marker
       }
     }
 
@@ -984,12 +997,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   v = strchr(text, '#');
   if (v && isdigit(v[1])) {
     for (i = 0; i < (int)strlen(text); i++) {
-      if (text[i] == 32) break;
+      if (text[i] == 32)
+        break;
       if (text[i] == 35) {
         strncpy(name, text, i);
         name[i] = 0;
         value = atoi(text + i + 1);
-        text[i] = 32;  // create split marker
+        text[i] = 32; // create split marker
       }
     }
 
@@ -1038,12 +1052,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   c = strchr(text, '^');
   if (c && isdigit(c[1])) {
     for (i = 0; i < (int)strlen(text); i++) {
-      if (text[i] == 32) break;
+      if (text[i] == 32)
+        break;
       if (text[i] == 94) {
         strncpy(name, text, i);
         name[i] = 0;
         value = atoi(text + i + 1);
-        text[i] = 32;  // create split marker
+        text[i] = 32; // create split marker
       }
     }
 
@@ -1138,7 +1153,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   // Add the DSC entry, replace any spaces with commas
   sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
   for (i = 8; i < (int)strlen(fullentry); i++) {
-    if (fullentry[i] == 32) fullentry[i] = 0x2c;
+    if (fullentry[i] == 32)
+      fullentry[i] = 0x2c;
   }
   fwrite(fullentry, strlen(fullentry), 1, stdout);
 }
@@ -1196,7 +1212,8 @@ static void parse(int bid) {
   tracebuffers[bid].nr_numbers = (marker >> 16) & 0xff;
   tracebuffers[bid].numbers = p;
   int i = (marker >> 16) & 0xff;
-  while (i--) p++;
+  while (i--)
+    p++;
 
   tracebuffers[bid].tid = 0;
   tracebuffers[bid].text = (char *)p;
@@ -1258,7 +1275,8 @@ static void get_process_name_by_pid(const int pid, char *name) {
       size = fread(fullname, sizeof(char), 1024, f);
 
       if (size > 0) {
-        if ('\n' == fullname[size - 1]) fullname[size - 1] = '\0';
+        if ('\n' == fullname[size - 1])
+          fullname[size - 1] = '\0';
 
         if (strrchr(fullname, '/')) {
           strcpy(name, strrchr(fullname, '/') + 1);
@@ -1359,9 +1377,8 @@ static void tmpfs_message(void) {
           gprocname, gpid);
   fprintf(stderr, "tdi: init[%s][%d], adjust the %s size:\n", gprocname, gpid,
           getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
-  fprintf(stderr,
-          "tdi: init[%s][%d],     \"mount -o "
-          "remount,noexec,nosuid,nr_blocks=15000 %s\"\n",
+  fprintf(stderr, "tdi: init[%s][%d],     \"mount -o "
+                  "remount,noexec,nosuid,nr_blocks=15000 %s\"\n",
           gprocname, gpid, getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
   fprintf(stderr,
           "tdi: init[%s][%d], "
@@ -1458,7 +1475,8 @@ int tdiprocmeminfo(struct tdistructprocmeminfo *s) {
   f = fopen("/proc/meminfo", "r");
   if (f) {
     while (fgets(line, 255, f)) {
-      if (sscanf(line, "Cached: %d", &s->cached)) break;
+      if (sscanf(line, "Cached: %d", &s->cached))
+        break;
     }
     fclose(f);
   }
@@ -1575,7 +1593,8 @@ int tdiprocselfstatus(struct tdistructprocselfstatus *s) {
         char *saveptr;
         char *line = strtok_r(proc_self_status, "\n", &saveptr);
         while (line) {
-          if (sscanf(line, "VmSwap: %d", &s->vmswap)) break;
+          if (sscanf(line, "VmSwap: %d", &s->vmswap))
+            break;
           line = strtok_r(NULL, "\n", &saveptr);
         }
       } else
@@ -1649,27 +1668,27 @@ MMUPageSize:           4 kB
 
 #define I(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
-#define I5(n) \
+#define I5(n)                                                                  \
   I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
 
-#define I5r(n) \
+#define I5r(n)                                                                 \
   I(n) + I(n - 1) * 10 + I(n - 2) * 100 + I(n - 3) * 1000 + I(n - 4) * 10000;
 
-#define II(val, idx)                             \
-  if (p[idx] != ' ') {                           \
-    val += (p[idx] - '0');                       \
-    if (p[idx - 1] != ' ') {                     \
-      val += ((p[idx - 1] - '0') * 10);          \
-      if (p[idx - 2] != ' ') {                   \
-        val += ((p[idx - 2] - '0') * 100);       \
-        if (p[idx - 3] != ' ') {                 \
-          val += ((p[idx - 3] - '0') * 1000);    \
-          if (p[idx - 4] != ' ') {               \
-            val += ((p[idx - 4] - '0') * 10000); \
-          }                                      \
-        }                                        \
-      }                                          \
-    }                                            \
+#define II(val, idx)                                                           \
+  if (p[idx] != ' ') {                                                         \
+    val += (p[idx] - '0');                                                     \
+    if (p[idx - 1] != ' ') {                                                   \
+      val += ((p[idx - 1] - '0') * 10);                                        \
+      if (p[idx - 2] != ' ') {                                                 \
+        val += ((p[idx - 2] - '0') * 100);                                     \
+        if (p[idx - 3] != ' ') {                                               \
+          val += ((p[idx - 3] - '0') * 1000);                                  \
+          if (p[idx - 4] != ' ') {                                             \
+            val += ((p[idx - 4] - '0') * 10000);                               \
+          }                                                                    \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
   }
 
 int tdiprocsmaps(const char *pathname, tdistructprocsmaps *s) {
@@ -1943,7 +1962,7 @@ static void sample_info(void) {
 
     do_structsysinfo = do_sysinfo;
     do_structmallinfo = do_selfinfo;
-    do_structgetrusage = 1;  // do_selfinfo;
+    do_structgetrusage = 1; // do_selfinfo;
 
     do_procvmstat = do_sysinfo;
     do_procmeminfo = do_sysinfo;
@@ -1953,7 +1972,7 @@ static void sample_info(void) {
     do_procnetdev = do_sysinfo;
 
     do_procselfstatm = do_selfinfo;
-    do_procselfstatus = 0;  // do_selfinfo;
+    do_procselfstatus = 0; // do_selfinfo;
     do_procselfsmaps = do_selfinfo;
   }
 
@@ -2171,7 +2190,8 @@ static void sample_info(void) {
       d_numbers[6] = procdiskstats[3].reads_sectors;
       d_numbers[7] = procdiskstats[3].writes_sectors;
     }
-    if (nrdisks) tditrace("%D", d_numbers);
+    if (nrdisks)
+      tditrace("%D", d_numbers);
 
     unsigned int n_numbers[4];
     if (nrnets >= 1) {
@@ -2182,7 +2202,8 @@ static void sample_info(void) {
       n_numbers[2] = procnetdev[1].r_packets;
       n_numbers[3] = procnetdev[1].t_packets;
     }
-    if (nrnets) tditrace("%N", n_numbers);
+    if (nrnets)
+      tditrace("%N", n_numbers);
   }
 
   if (do_selfinfo) {
@@ -2372,9 +2393,8 @@ static void offload() {
 
       memcpy(offload_buffer, gtrace_buffer, gtracebuffersize / 2);
 
-      fprintf(stderr,
-              "tdi: [%d,%s], copied 0..50%% to "
-              "offloadfile: \"%s\"\n",
+      fprintf(stderr, "tdi: [%d,%s], copied 0..50%% to "
+                      "offloadfile: \"%s\"\n",
               gpid, gprocname, offloadfilename);
     }
 
@@ -2395,9 +2415,8 @@ static void offload() {
       munmap(offload_buffer, gtracebuffersize);
       fclose(offload_file);
 
-      fprintf(stderr,
-              "tdi: [%d,%s], copied 50..100%% to "
-              "offloadfile: \"%s\"\n",
+      fprintf(stderr, "tdi: [%d,%s], copied 50..100%% to "
+                      "offloadfile: \"%s\"\n",
               gpid, gprocname, offloadfilename);
     }
   }
@@ -2638,21 +2657,21 @@ static void *delayed_init_thread(void *param) {
   pthread_exit(NULL);
 }
 
-static const char *instruments[] = {"console",     // 0x00000001
-                                    "render",      // 0x00000002
-                                    "css",         // 0x00000004
-                                    "dom",         // 0x00000008
-                                    "canvas",      // 0x00000010
-                                    "webgl",       // 0x00000020
-                                    "image",       // 0x00000040
-                                    "graphics",    // 0x00000080
-                                    "graphicsqt",  // 0x00000100
-                                    "texmap",      // 0x00000200
-                                    "opengl",      // 0x00000400
-                                    "qweb",        // 0x00000800
-                                    "resource",    // 0x00001000
-                                    "javascript",  // 0x00002000
-                                    "allocator"};  // 0x00004000
+static const char *instruments[] = {"console",    // 0x00000001
+                                    "render",     // 0x00000002
+                                    "css",        // 0x00000004
+                                    "dom",        // 0x00000008
+                                    "canvas",     // 0x00000010
+                                    "webgl",      // 0x00000020
+                                    "image",      // 0x00000040
+                                    "graphics",   // 0x00000080
+                                    "graphicsqt", // 0x00000100
+                                    "texmap",     // 0x00000200
+                                    "opengl",     // 0x00000400
+                                    "qweb",       // 0x00000800
+                                    "resource",   // 0x00001000
+                                    "javascript", // 0x00002000
+                                    "allocator"}; // 0x00004000
 
 void start_monitor_thread(void) {
   static pthread_t monitor_thread_id;
@@ -2770,9 +2789,11 @@ int tditrace_init(void) {
   gmask = 0x0;
   if ((env = getenv("MASK"))) {
     for (i = 0; i < sizeof(instruments) / sizeof(char *); i++) {
-      if (strstr(env, instruments[i])) gmask |= (1 << i);
+      if (strstr(env, instruments[i]))
+        gmask |= (1 << i);
     }
-    if (gmask == 0x0) gmask = strtoul(env, 0, 16);
+    if (gmask == 0x0)
+      gmask = strtoul(env, 0, 16);
   }
 
   if (gmask) {
@@ -2793,13 +2814,15 @@ int tditrace_init(void) {
   do_sysinfo = 0;
   if ((env = getenv("SYSINFO"))) {
     do_sysinfo = atoi(env);
-    if (do_sysinfo > do_persecond) do_persecond = do_sysinfo;
+    if (do_sysinfo > do_persecond)
+      do_persecond = do_sysinfo;
   }
 
   do_selfinfo = 0;
   if ((env = getenv("SELFINFO"))) {
     do_selfinfo = atoi(env);
-    if (do_selfinfo > do_persecond) do_persecond = do_selfinfo;
+    if (do_selfinfo > do_persecond)
+      do_persecond = do_selfinfo;
   }
 
   do_offload = 0;
@@ -2962,31 +2985,45 @@ static void check_trace_buffer(int b) {
   FILE *file;
 
   if ((file = fopen(tracebuffers[b].filename, "r")) != NULL) {
-    /* /tmp/tditracebuffer@xxx@xxx */
+    /* dev/ktdim */
+    if (strncmp("/dev/", tracebuffers[b].filename, 5) == 0) {
+      long size = ioctl(fileno(file), _IO('T', 0), NULL);
+      sprintf(tracebuffers[b].procname, "K");
+      tracebuffers[b].pid = 0;
+      tracebuffers[b].bufmmapped =
+          (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+      fprintf(stderr, "\"%s\" (%lluMB) ...\n", tracebuffers[b].filename,
+              (unsigned long long)size / (1024 * 1024));
+      tracebuffers[b].bufsize = size;
+      tracebuffers[b].ptr = tracebuffers[b].bufmmapped;
+      tracebuffers[b].dword_ptr = (unsigned int *)tracebuffers[b].bufmmapped;
+    } else {
+      /* /tmp/tditracebuffer@xxx@xxx */
 
-    struct stat st;
-    stat(tracebuffers[b].filename, &st);
+      struct stat st;
+      stat(tracebuffers[b].filename, &st);
 
-    fprintf(stderr, "\"%s\" (%lluMB) ...\n", tracebuffers[b].filename,
-            (unsigned long long)st.st_size / (1024 * 1024));
+      fprintf(stderr, "\"%s\" (%lluMB) ...\n", tracebuffers[b].filename,
+              (unsigned long long)st.st_size / (1024 * 1024));
 
-    char *s1 = strchr(tracebuffers[b].filename, '@');
-    char *s2 = strchr(s1 + 1, '@');
+      char *s1 = strchr(tracebuffers[b].filename, '@');
+      char *s2 = strchr(s1 + 1, '@');
 
-    strncpy(tracebuffers[b].procname, s1 + 1, s2 - s1);
-    tracebuffers[b].procname[(s2 - s1) - 1] = 0;
-    tracebuffers[b].pid = atoi(s2 + 1);
+      strncpy(tracebuffers[b].procname, s1 + 1, s2 - s1);
+      tracebuffers[b].procname[(s2 - s1) - 1] = 0;
+      tracebuffers[b].pid = atoi(s2 + 1);
 
-    if (st.st_size == 0) {
-      fprintf(stderr, "empty tracebuffer, skipping\n");
-      return;
+      if (st.st_size == 0) {
+        fprintf(stderr, "empty tracebuffer, skipping\n");
+        return;
+      }
+
+      tracebuffers[b].bufmmapped = (char *)mmap(
+          0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
+      tracebuffers[b].bufsize = st.st_size;
+      tracebuffers[b].ptr = tracebuffers[b].bufmmapped;
+      tracebuffers[b].dword_ptr = (unsigned int *)tracebuffers[b].bufmmapped;
     }
-
-    tracebuffers[b].bufmmapped = (char *)mmap(
-        0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(file), 0);
-    tracebuffers[b].bufsize = st.st_size;
-    tracebuffers[b].ptr = tracebuffers[b].bufmmapped;
-    tracebuffers[b].dword_ptr = (unsigned int *)tracebuffers[b].bufmmapped;
 
     // should hold "TDITRACE"
     if (strncmp("TDITRACE", tracebuffers[b].ptr, 8) != 0) {
@@ -3020,6 +3057,7 @@ static void check_trace_buffer(int b) {
 void tditrace_exit(int argc, char *argv[]) {
   int i, nr_entries;
   int buffers = 0;
+  FILE *file;
 
   if (argc > 1) {
     int tracebufferid = argc;
@@ -3051,11 +3089,17 @@ void tditrace_exit(int argc, char *argv[]) {
     closedir(dp);
   }
 
+  sprintf(tracebuffers[buffers].filename, "/dev/ktdim");
+  if ((file = fopen(tracebuffers[buffers].filename, "r")) != NULL) {
+    fclose(file);
+    check_trace_buffer(buffers);
+    buffers++;
+  }
+
   if (buffers == 0) {
-    fprintf(stderr,
-            "Not found: \""
-            "TMPFS/"
-            "tditracebuffer@*@*\"\n");
+    fprintf(stderr, "Not found: \""
+                    "TMPFS/"
+                    "tditracebuffer@*@*, /dev/ktdim\"\n");
     return;
   }
 
@@ -3218,214 +3262,221 @@ void tditrace_internal(va_list args, const char *format) {
   while ((ch = *(format++))) {
     if (ch == '%') {
       switch (ch = (*format++)) {
-        case 's': {
-          char *s;
-          s = va_arg(args, char *);
-          if (s) {
-            int i = 0;
-            while (*s) {
-              *trace_text_ptr++ = *s++;
-              i++;
-              if (i > 256) break;
-            }
-          } else {
-            *trace_text_ptr++ = 'n';
-            *trace_text_ptr++ = 'i';
-            *trace_text_ptr++ = 'l';
-            *trace_text_ptr++ = 'l';
+      case 's': {
+        char *s;
+        s = va_arg(args, char *);
+        if (s) {
+          int i = 0;
+          while (*s) {
+            *trace_text_ptr++ = *s++;
+            i++;
+            if (i > 256)
+              break;
           }
-          break;
+        } else {
+          *trace_text_ptr++ = 'n';
+          *trace_text_ptr++ = 'i';
+          *trace_text_ptr++ = 'l';
+          *trace_text_ptr++ = 'l';
         }
-        case 'd': {
-          int n = 0;
-          unsigned int d = 1;
-          int num = va_arg(args, int);
-          if (num < 0) {
-            num = -num;
-            *trace_text_ptr++ = '-';
+        break;
+      }
+      case 'd': {
+        int n = 0;
+        unsigned int d = 1;
+        int num = va_arg(args, int);
+        if (num < 0) {
+          num = -num;
+          *trace_text_ptr++ = '-';
+        }
+
+        while (num / d >= 10)
+          d *= 10;
+
+        while (d != 0) {
+          int digit = num / d;
+          num %= d;
+          d /= 10;
+          if (n || digit > 0 || d == 0) {
+            *trace_text_ptr++ = digit + '0';
+            n++;
           }
+        }
+        break;
+      }
+      case 'u': {
+        int n = 0;
+        unsigned int d = 1;
+        unsigned int num = va_arg(args, int);
 
-          while (num / d >= 10) d *= 10;
+        while (num / d >= 10)
+          d *= 10;
 
-          while (d != 0) {
-            int digit = num / d;
-            num %= d;
-            d /= 10;
-            if (n || digit > 0 || d == 0) {
-              *trace_text_ptr++ = digit + '0';
-              n++;
-            }
+        while (d != 0) {
+          int digit = num / d;
+          num %= d;
+          d /= 10;
+          if (n || digit > 0 || d == 0) {
+            *trace_text_ptr++ = digit + '0';
+            n++;
           }
-          break;
         }
-        case 'u': {
-          int n = 0;
-          unsigned int d = 1;
-          unsigned int num = va_arg(args, int);
+        break;
+      }
 
-          while (num / d >= 10) d *= 10;
+      case 'x':
+      case 'p': {
+        int n = 0;
+        unsigned int d = 1;
+        unsigned int num = va_arg(args, int);
 
-          while (d != 0) {
-            int digit = num / d;
-            num %= d;
-            d /= 10;
-            if (n || digit > 0 || d == 0) {
-              *trace_text_ptr++ = digit + '0';
-              n++;
-            }
+        while (num / d >= 16)
+          d *= 16;
+
+        while (d != 0) {
+          int dgt = num / d;
+          num %= d;
+          d /= 16;
+          if (n || dgt > 0 || d == 0) {
+            *trace_text_ptr++ = dgt + (dgt < 10 ? '0' : 'a' - 10);
+            ++n;
           }
-          break;
         }
+        break;
+      }
 
-        case 'x':
-        case 'p': {
-          int n = 0;
-          unsigned int d = 1;
-          unsigned int num = va_arg(args, int);
+      case 'n': {
+        pnumbers[nr_numbers] = va_arg(args, int);
+        nr_numbers++;
+        break;
+      }
 
-          while (num / d >= 16) d *= 16;
+      case 'm': {
+        identifier = va_arg(args, int) & 0xff;
+        break;
+      }
 
-          while (d != 0) {
-            int dgt = num / d;
-            num %= d;
-            d /= 16;
-            if (n || dgt > 0 || d == 0) {
-              *trace_text_ptr++ = dgt + (dgt < 10 ? '0' : 'a' - 10);
-              ++n;
-            }
+      case 'C': {
+        identifier = CPUINFO;
+        nr_numbers = CPUINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
+
+      case 'M': {
+        identifier = MEMINFO;
+        nr_numbers = MEMINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
+
+      case 'S': {
+        identifier = SLFINFO;
+        nr_numbers = SLFINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
+
+      case 'D': {
+        identifier = DSKINFO;
+        nr_numbers = DSKINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
+
+      case 'N': {
+        identifier = NETINFO;
+        nr_numbers = NETINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
+
+      case 'P': {
+        identifier = PIDINFO;
+        nr_numbers = 1;
+        numbers[0] = va_arg(args, int);
+
+        char *s;
+        s = va_arg(args, char *);
+        if (s) {
+          int i = 0;
+          while (*s) {
+            *trace_text_ptr++ = *s++;
+            i++;
+            if (i > 256)
+              break;
           }
-          break;
+        } else {
+          *trace_text_ptr++ = 'n';
+          *trace_text_ptr++ = 'i';
+          *trace_text_ptr++ = 'l';
+          *trace_text_ptr++ = 'l';
         }
+        break;
+      }
 
-        case 'n': {
-          pnumbers[nr_numbers] = va_arg(args, int);
-          nr_numbers++;
-          break;
-        }
+      case 'K': {
+        identifier = MARKER;
 
-        case 'm': {
-          identifier = va_arg(args, int) & 0xff;
-          break;
-        }
-
-        case 'C': {
-          identifier = CPUINFO;
-          nr_numbers = CPUINFO_MAXNUMBER + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        case 'M': {
-          identifier = MEMINFO;
-          nr_numbers = MEMINFO_MAXNUMBER + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        case 'S': {
-          identifier = SLFINFO;
-          nr_numbers = SLFINFO_MAXNUMBER + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        case 'D': {
-          identifier = DSKINFO;
-          nr_numbers = DSKINFO_MAXNUMBER + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        case 'N': {
-          identifier = NETINFO;
-          nr_numbers = NETINFO_MAXNUMBER + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        case 'P': {
-          identifier = PIDINFO;
-          nr_numbers = 1;
-          numbers[0] = va_arg(args, int);
-
-          char *s;
-          s = va_arg(args, char *);
-          if (s) {
-            int i = 0;
-            while (*s) {
-              *trace_text_ptr++ = *s++;
-              i++;
-              if (i > 256) break;
-            }
-          } else {
-            *trace_text_ptr++ = 'n';
-            *trace_text_ptr++ = 'i';
-            *trace_text_ptr++ = 'l';
-            *trace_text_ptr++ = 'l';
+        char *s;
+        s = va_arg(args, char *);
+        if (s) {
+          int i = 0;
+          while (*s) {
+            *trace_text_ptr++ = *s++;
+            i++;
+            if (i > 256)
+              break;
           }
-          break;
+        } else {
+          *trace_text_ptr++ = 'n';
+          *trace_text_ptr++ = 'i';
+          *trace_text_ptr++ = 'l';
+          *trace_text_ptr++ = 'l';
         }
+        break;
+      }
 
-        case 'K': {
-          identifier = MARKER;
+      case 'E': {
+        identifier = ENVINFO;
 
-          char *s;
-          s = va_arg(args, char *);
-          if (s) {
-            int i = 0;
-            while (*s) {
-              *trace_text_ptr++ = *s++;
-              i++;
-              if (i > 256) break;
-            }
-          } else {
-            *trace_text_ptr++ = 'n';
-            *trace_text_ptr++ = 'i';
-            *trace_text_ptr++ = 'l';
-            *trace_text_ptr++ = 'l';
+        char *s;
+        s = va_arg(args, char *);
+        if (s) {
+          int i = 0;
+          while (*s) {
+            *trace_text_ptr++ = *s++;
+            i++;
+            if (i > 256)
+              break;
           }
-          break;
+        } else {
+          *trace_text_ptr++ = 'n';
+          *trace_text_ptr++ = 'i';
+          *trace_text_ptr++ = 'l';
+          *trace_text_ptr++ = 'l';
         }
+        break;
+      }
 
-        case 'E': {
-          identifier = ENVINFO;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9': {
+        identifier = 100 + ch - '0';
+        nr_numbers = ch - '0' + 1;
+        pnumbers = (unsigned int *)va_arg(args, int);
+        break;
+      }
 
-          char *s;
-          s = va_arg(args, char *);
-          if (s) {
-            int i = 0;
-            while (*s) {
-              *trace_text_ptr++ = *s++;
-              i++;
-              if (i > 256) break;
-            }
-          } else {
-            *trace_text_ptr++ = 'n';
-            *trace_text_ptr++ = 'i';
-            *trace_text_ptr++ = 'l';
-            *trace_text_ptr++ = 'l';
-          }
-          break;
-        }
-
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9': {
-          identifier = 100 + ch - '0';
-          nr_numbers = ch - '0' + 1;
-          pnumbers = (unsigned int *)va_arg(args, int);
-          break;
-        }
-
-        default:
-          break;
+      default:
+        break;
       }
 
     } else {
@@ -3433,7 +3484,8 @@ void tditrace_internal(va_list args, const char *format) {
     }
   }
 
-  while ((unsigned int)trace_text_ptr & 0x3) *trace_text_ptr++ = 0;
+  while ((unsigned int)trace_text_ptr & 0x3)
+    *trace_text_ptr++ = 0;
 
   int nr_textdwords = (trace_text_ptr - (char *)trace_text) >> 2;
 
@@ -3484,7 +3536,8 @@ void tditrace_internal(va_list args, const char *format) {
         gtrace_buffer[i] = 0;
       }
       gtrace_buffer_dword_ptr = gtrace_buffer_rewind_ptr;
-      if (!do_offload) do_dump_proc_self_maps = 1;
+      if (!do_offload)
+        do_dump_proc_self_maps = 1;
     } else {
       fprintf(stderr, "tdi: full[%s][%d]\n", gprocname, gpid);
       gtditrace_inited = 0;
@@ -3494,7 +3547,7 @@ void tditrace_internal(va_list args, const char *format) {
   UNLOCK();
 }
 
-}  // extern "C"
+} // extern "C"
 
 static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();

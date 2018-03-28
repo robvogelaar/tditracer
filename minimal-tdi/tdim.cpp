@@ -8,7 +8,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <errno.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -76,6 +78,17 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  else if (argc > 1 && (strcmp(argv[1], "-r") == 0)) {
+    FILE *file;
+    char filename[128];
+    sprintf(filename, "/dev/ktdim");
+    if ((file = fopen(filename, "r")) != NULL) {
+      ioctl(fileno(file), _IO('T', 1), NULL);
+      fclose(file);
+    }
+    return 0;
+  }
+
   else if (argc > 1 && (strcmp(argv[1], "-h") == 0)) {
     usage();
     return -1;
@@ -116,15 +129,64 @@ static int tdidump(int argc, char *argv[]) {
 static int tdistat(int argc, char *argv[]) {
   DIR *dp;
   struct dirent *ep;
+  FILE *file;
+  char filename[128];
+  char *bufmmapped;
 
   int found = 0;
+
+  sprintf(filename, "/dev/ktdim");
+  if ((file = fopen(filename, "r")) != NULL) {
+    long size = ioctl(fileno(file), _IO('T', 0), NULL);
+
+    fprintf(stdout, "\"%s\", (%lluMB), ", filename,
+            (unsigned long long)size / (1024 * 1024));
+
+    bufmmapped = (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+
+    // token should hold "TDITRACE"
+    if (strncmp("TDITRACE", bufmmapped, 8) != 0) {
+      fprintf(stderr, "invalid "
+                      "tracebuffer, skipping\n");
+    }
+
+    /*
+     * [TDIT]
+     * [RACE]
+     * [    ]timeofday_offset.tv_usec
+     * [    ]timeofday_offset.tv_sec
+     * [    ]clock_monotonic_offset.tv_nsec
+     * [    ]clock_monotonic_offset.tv_sec
+     * ------
+     * [    ]marker, lower 2 bytes is length in dwords
+     * [    ]clock_monotonic_timestamp.tv_nsec
+     * [    ]clock_monotonic_timestamp.tv_sec
+     * [    ]text, padded with 0 to multiple of 4 bytes
+     * ...
+     * ------
+     */
+
+    else {
+      unsigned int *ptr = (unsigned int *)bufmmapped;
+      int i = 0;
+      ptr += 6;
+      while (*ptr) {
+        ptr += *ptr & 0xffff;
+        i++;
+      }
+      fprintf(stdout, "%lld%% (#%d, %dB)\n",
+              ((char *)ptr - bufmmapped) * 100LL / size + 1, i,
+              (char *)ptr - bufmmapped);
+      munmap(bufmmapped, size);
+      found = 1;
+    }
+    fclose(file);
+  }
+
   dp = opendir(getenv("TMPFS") ? getenv("TMPFS") : TMPFS);
   if (dp != NULL) {
     while ((ep = readdir(dp))) {
       if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
-        FILE *file;
-        char filename[128];
-        char *bufmmapped;
 
         sprintf(filename, "%s%s", getenv("TMPFS") ? getenv("TMPFS") : TMPFS,
                 ep->d_name);
@@ -135,7 +197,7 @@ static int tdistat(int argc, char *argv[]) {
           struct stat st;
           stat(filename, &st);
 
-          fprintf(stderr, "\"%s\", (%lluMB), ", filename,
+          fprintf(stdout, "\"%s\", (%lluMB), ", filename,
                   (unsigned long long)st.st_size / (1024 * 1024));
 
           fflush(stderr);
@@ -145,9 +207,8 @@ static int tdistat(int argc, char *argv[]) {
 
           // token should hold "TDITRACE"
           if (strncmp("TDITRACE", bufmmapped, 8) != 0) {
-            fprintf(stderr,
-                    "invalid "
-                    "tracebuffer, skipping\n");
+            fprintf(stderr, "invalid "
+                            "tracebuffer, skipping\n");
             break;
           }
 
@@ -176,7 +237,7 @@ static int tdistat(int argc, char *argv[]) {
             i++;
           }
           fprintf(stdout, "%lld%% (#%d, %dB)\n",
-                  ((char *)ptr - bufmmapped) * 100LL / (st.st_size) + 1, i,
+                  ((char *)ptr - bufmmapped) * 100LL / st.st_size + 1, i,
                   (char *)ptr - bufmmapped);
 
           munmap(bufmmapped, st.st_size);
@@ -229,7 +290,7 @@ static void *thread_task(void *param) {
 
 #define I(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
-#define I5(n) \
+#define I5(n)                                                                  \
   I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
 
 #if 0
@@ -268,27 +329,27 @@ static int tditest(int argc, char *argv[]) {
 
 #define I2(n) (p[n] == ' ' ? 0 : p[n] - '0')
 
-#define I5(n) \
+#define I5(n)                                                                  \
   I(n) * 10000 + I(n + 1) * 1000 + I(n + 2) * 100 + I(n + 3) * 10 + I(n + 4);
 
-#define I5r(n) \
+#define I5r(n)                                                                 \
   I(n) + I(n - 1) * 10 + I(n - 2) * 100 + I(n - 3) * 1000 + I(n - 4) * 10000;
 
-#define II(val, idx)                             \
-  if (p[idx] != ' ') {                           \
-    val += (p[idx] - '0');                       \
-    if (p[idx - 1] != ' ') {                     \
-      val += ((p[idx - 1] - '0') * 10);          \
-      if (p[idx - 2] != ' ') {                   \
-        val += ((p[idx - 2] - '0') * 100);       \
-        if (p[idx - 3] != ' ') {                 \
-          val += ((p[idx - 3] - '0') * 1000);    \
-          if (p[idx - 4] != ' ') {               \
-            val += ((p[idx - 4] - '0') * 10000); \
-          }                                      \
-        }                                        \
-      }                                          \
-    }                                            \
+#define II(val, idx)                                                           \
+  if (p[idx] != ' ') {                                                         \
+    val += (p[idx] - '0');                                                     \
+    if (p[idx - 1] != ' ') {                                                   \
+      val += ((p[idx - 1] - '0') * 10);                                        \
+      if (p[idx - 2] != ' ') {                                                 \
+        val += ((p[idx - 2] - '0') * 100);                                     \
+        if (p[idx - 3] != ' ') {                                               \
+          val += ((p[idx - 3] - '0') * 1000);                                  \
+          if (p[idx - 4] != ' ') {                                             \
+            val += ((p[idx - 4] - '0') * 10000);                               \
+          }                                                                    \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
   }
 
 #if 0
@@ -534,7 +595,7 @@ static int tdimessage(int argc, char *argv[]) {
 static int tdiproc(int argc, char *argv[]) {
   void *handle;
 
-  //setenv("NOSKIPINIT", "1", -1);
+  // setenv("NOSKIPINIT", "1", -1);
 
   handle = dlopen("libtdim.so", RTLD_LAZY);
   if (!handle) {
@@ -596,16 +657,14 @@ static int tdiproc(int argc, char *argv[]) {
             stat.cpu_user, stat.cpu_nice, stat.cpu_system, stat.cpu_idle,
             stat.cpu_iowait, stat.cpu_irq, stat.cpu_softirq);
 #endif
-    fprintf(stdout,
-            "stat            cpu0_user:%u, cpu0_nice:%u, cpu0_sys:%u, "
-            "cpu0_idle:%u, "
-            "cpu0_iowait:%u, cpu0_irq:%u, cpu0_softirq:%u\n",
+    fprintf(stdout, "stat            cpu0_user:%u, cpu0_nice:%u, cpu0_sys:%u, "
+                    "cpu0_idle:%u, "
+                    "cpu0_iowait:%u, cpu0_irq:%u, cpu0_softirq:%u\n",
             stat.cpu0_user, stat.cpu0_nice, stat.cpu0_system, stat.cpu0_idle,
             stat.cpu0_iowait, stat.cpu0_irq, stat.cpu0_softirq);
-    fprintf(stdout,
-            "stat            cpu1_user:%u, cpu1_nice:%u, cpu1_sys:%u, "
-            "cpu1_idle:%u, "
-            "cpu1_iowait:%u, cpu1_irq:%u, cpu1_softirq:%u\n",
+    fprintf(stdout, "stat            cpu1_user:%u, cpu1_nice:%u, cpu1_sys:%u, "
+                    "cpu1_idle:%u, "
+                    "cpu1_iowait:%u, cpu1_irq:%u, cpu1_softirq:%u\n",
             stat.cpu1_user, stat.cpu1_nice, stat.cpu1_system, stat.cpu1_idle,
             stat.cpu1_iowait, stat.cpu1_irq, stat.cpu1_softirq);
   }
@@ -663,13 +722,12 @@ static int tdiproc(int argc, char *argv[]) {
     tditrace("@A-tdiprocnetdev");
 
     for (m = 0; m < n; m++) {
-      fprintf(stdout,
-              "netdev          name:%s, r_bytes: %lu, r_packets: %u, "
-              "r_errs: %u, "
-              "r_drop: %u, r_fifo: %u, r_frame: %u, r_compressed: %u, "
-              "r_multicast: %u, t_bytes: %lu, t_packets: %u, "
-              "t_errs: %u, t_drop: %u, t_fifo: %u, t_frame: %u, "
-              "t_compressed: %u, t_multicast:%u\n",
+      fprintf(stdout, "netdev          name:%s, r_bytes: %lu, r_packets: %u, "
+                      "r_errs: %u, "
+                      "r_drop: %u, r_fifo: %u, r_frame: %u, r_compressed: %u, "
+                      "r_multicast: %u, t_bytes: %lu, t_packets: %u, "
+                      "t_errs: %u, t_drop: %u, t_fifo: %u, t_frame: %u, "
+                      "t_compressed: %u, t_multicast:%u\n",
               netdev[m].name, netdev[m].r_bytes, netdev[m].r_packets,
               netdev[m].r_errs, netdev[m].r_drop, netdev[m].r_fifo,
               netdev[m].r_frame, netdev[m].r_compressed, netdev[m].r_multicast,
@@ -702,9 +760,9 @@ const char *const eventnames[] = {"TASKS",  "ISRS",        "SEMAS",  "QUEUES",
                                   "EVENTS", "VALUES",      "CYCLES", "NOTES",
                                   "AGENTS", "MEMORYCYCLES"};
 
+#include <algorithm>
 #include <getopt.h>
 #include <regex.h>
-#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -802,7 +860,8 @@ static void do_line(char *buffer, const char *p, int id,
   regmatch_t pmatch[2];
   char buf[1024];
 
-  if (!p) return;
+  if (!p)
+    return;
 
   reti = regcomp(&regex, p, 0);
   if (reti) {
@@ -818,7 +877,8 @@ static void do_line(char *buffer, const char *p, int id,
 
     for (i = 0; i < strlen(buffer); i++) {
       buf[i] = buf[i];
-      if ((buf[i] == ' ') || (buf[i] == '\n')) buf[i] = '_';
+      if ((buf[i] == ' ') || (buf[i] == '\n'))
+        buf[i] = '_';
     }
 
     if (std::find(Nams.begin(), Nams.end(), buf) == Nams.end()) {
@@ -835,7 +895,8 @@ static void do_line(char *buffer, const char *p, int id,
 
     for (i = 0; i < strlen(buffer); i++) {
       buf[i] = buffer[i];
-      if (buf[i] == ' ') buf[i] = '_';
+      if (buf[i] == ' ')
+        buf[i] = '_';
       if (buf[i] == '\n') {
         buf[i] = 0;
         break;
@@ -858,26 +919,28 @@ static int tdipipe(int argc, char *argv[]) {
         {"n", required_argument, 0, 0}, {0, 0, 0, 0}};
 
     c = getopt_long(argc, argv, "", long_options, &option_index);
-    if (c == -1) break;
+    if (c == -1)
+      break;
 
     switch (c) {
-      case 0:
-        fprintf(stderr, "option %s", long_options[option_index].name);
-        if (optarg) fprintf(stderr, " with arg '%s'\n", optarg);
+    case 0:
+      fprintf(stderr, "option %s", long_options[option_index].name);
+      if (optarg)
+        fprintf(stderr, " with arg '%s'\n", optarg);
 
-        if (option_index == 1) {
-          ptimestamp_regex = optarg;
-        } else if (option_index == 2) {
-          SemaphoreRegexes.push_back(optarg);
-        } else if (option_index == 3) {
-          EventRegexes.push_back(optarg);
-        } else if (option_index == 4) {
-          NoteRegexes.push_back(optarg);
-        }
-        break;
+      if (option_index == 1) {
+        ptimestamp_regex = optarg;
+      } else if (option_index == 2) {
+        SemaphoreRegexes.push_back(optarg);
+      } else if (option_index == 3) {
+        EventRegexes.push_back(optarg);
+      } else if (option_index == 4) {
+        NoteRegexes.push_back(optarg);
+      }
+      break;
 
-      default:
-        printf("?? getopt returned character code 0%o ??\n", c);
+    default:
+      printf("?? getopt returned character code 0%o ??\n", c);
     }
   }
 
