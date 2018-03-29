@@ -1,0 +1,948 @@
+From 6c6183a2e65508465bf21ad5b12ea45a608a9bae Mon Sep 17 00:00:00 2001
+From: Rob Vogelaar <revogelaar@gmail.com>
+Date: Thu, 29 Mar 2018 14:44:15 -0700
+Subject: [PATCH] ktdim
+
+Signed-off-by: Rob Vogelaar <revogelaar@gmail.com>
+---
+ arch/x86/kernel/irq.c |   5 +
+ fs/exec.c             |   9 +
+ include/linux/slab.h  |   5 +
+ kernel/Makefile       |   2 +
+ kernel/fork.c         |   4 +
+ kernel/ktdim.c        | 629 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ kernel/kthread.c      |   5 +
+ kernel/sched/core.c   |   6 +
+ mm/page_alloc.c       |   9 +
+ mm/slub.c             |   4 +
+ mm/vmalloc.c          |  10 +-
+ 11 files changed, 687 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 arch/x86/kernel/irq.c
+ mode change 100644 => 100755 fs/exec.c
+ mode change 100644 => 100755 include/linux/slab.h
+ mode change 100644 => 100755 kernel/Makefile
+ mode change 100644 => 100755 kernel/fork.c
+ create mode 100755 kernel/ktdim.c
+ mode change 100644 => 100755 kernel/kthread.c
+ mode change 100644 => 100755 kernel/sched/core.c
+ mode change 100644 => 100755 mm/page_alloc.c
+ mode change 100644 => 100755 mm/slub.c
+ mode change 100644 => 100755 mm/vmalloc.c
+
+diff --git a/arch/x86/kernel/irq.c b/arch/x86/kernel/irq.c
+old mode 100644
+new mode 100755
+index 22d0687..9924b5e
+--- a/arch/x86/kernel/irq.c
++++ b/arch/x86/kernel/irq.c
+@@ -171,6 +171,7 @@ u64 arch_irq_stat(void)
+ 	return sum;
+ }
+ 
++void tditrace(const char *, ...);
+ 
+ /*
+  * do_IRQ handles all normal device IRQ's (the special
+@@ -190,6 +191,8 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
+ 
+ 	irq = __this_cpu_read(vector_irq[vector]);
+ 
++    tditrace("@I+irq%d", irq);
++
+ 	if (!handle_irq(irq, regs)) {
+ 		ack_APIC_irq();
+ 
+@@ -200,6 +203,8 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
+ 
+ 	irq_exit();
+ 
++    tditrace("@I-irq%d", irq);
++
+ 	set_irq_regs(old_regs);
+ 	return 1;
+ }
+diff --git a/fs/exec.c b/fs/exec.c
+old mode 100644
+new mode 100755
+index bb8afc1..72a0b00
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1423,6 +1423,8 @@ int search_binary_handler(struct linux_binprm *bprm)
+ }
+ EXPORT_SYMBOL(search_binary_handler);
+ 
++void tditrace(const char *, ...);
++
+ static int exec_binprm(struct linux_binprm *bprm)
+ {
+ 	pid_t old_pid, old_vpid;
+@@ -1434,7 +1436,14 @@ static int exec_binprm(struct linux_binprm *bprm)
+ 	old_vpid = task_pid_nr_ns(current, task_active_pid_ns(current->parent));
+ 	rcu_read_unlock();
+ 
++	//tditrace("@S+exec< %s[%d]", current->comm, current->pid);
++
+ 	ret = search_binary_handler(bprm);
++
++	//tditrace("@S+exec> %s[%d](p:%s)", current->comm, current->pid, current->parent->comm);
++	tditrace("@T-%s|%d", current->parent->comm, current->pid);
++	tditrace("@T+%s|%d", current->comm, current->pid);
++
+ 	if (ret >= 0) {
+ 		trace_sched_process_exec(current, old_pid, bprm);
+ 		ptrace_event(PTRACE_EVENT_EXEC, old_vpid);
+diff --git a/include/linux/slab.h b/include/linux/slab.h
+old mode 100644
+new mode 100755
+index 74f1058..9d6c506
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -378,6 +378,8 @@ static __always_inline void *kmalloc_large(size_t size, gfp_t flags)
+ 	return kmalloc_order_trace(size, flags, order);
+ }
+ 
++void tditrace(const char *, ...);
++
+ /**
+  * kmalloc - allocate memory
+  * @size: how many bytes of memory are required.
+@@ -388,6 +390,9 @@ static __always_inline void *kmalloc_large(size_t size, gfp_t flags)
+  */
+ static __always_inline void *kmalloc(size_t size, gfp_t flags)
+ {
++
++	//tditrace("km %u", (u32)size);
++
+ 	if (__builtin_constant_p(size)) {
+ 		if (size > KMALLOC_MAX_CACHE_SIZE)
+ 			return kmalloc_large(size, flags);
+diff --git a/kernel/Makefile b/kernel/Makefile
+old mode 100644
+new mode 100755
+index d62c713..051c60c
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -113,6 +113,8 @@ obj-$(CONFIG_CRASH_DUMP) += crash_dump.o
+ obj-$(CONFIG_JUMP_LABEL) += jump_label.o
+ obj-$(CONFIG_CONTEXT_TRACKING) += context_tracking.o
+ 
++obj-y += ktdim.o
++
+ $(obj)/configs.o: $(obj)/config_data.h
+ 
+ # config_data.h contains the same information as ikconfig.h but gzipped.
+diff --git a/kernel/fork.c b/kernel/fork.c
+old mode 100644
+new mode 100755
+index 458953c..60f047c
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1560,6 +1560,8 @@ struct task_struct *fork_idle(int cpu)
+ 	return task;
+ }
+ 
++void tditrace(const char *, ...);
++
+ /*
+  *  Ok, this is the main fork-routine.
+  *
+@@ -1603,6 +1605,8 @@ long do_fork(unsigned long clone_flags,
+ 	if (!IS_ERR(p)) {
+ 		struct completion vfork;
+ 
++		//tditrace("@S+fork %s|%d %s|%d", current->comm, current->pid, p->comm, p->pid);
++
+ 		trace_sched_process_fork(current, p);
+ 
+ 		nr = task_pid_vnr(p);
+diff --git a/kernel/ktdim.c b/kernel/ktdim.c
+new file mode 100755
+index 0000000..534791b
+--- /dev/null
++++ b/kernel/ktdim.c
+@@ -0,0 +1,629 @@
++
++#include <asm/uaccess.h>
++#include <linux/ctype.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/hrtimer.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/ktime.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/pci.h>
++#include <linux/proc_fs.h>
++#include <linux/seq_file.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/string.h>
++#include <linux/time.h>
++#include <linux/types.h>
++
++static DEFINE_SPINLOCK(ktdim_lock);
++
++#define KTDIM_IOCTL_GET_TRACEBUFFERSIZE _IO('T', 0)
++#define KTDIM_IOCTL_REWIND _IO('T', 1)
++#define KTDIM_IOCTL_ON _IO('T', 2)
++#define KTDIM_IOCTL_OFF _IO('T', 3)
++
++/*
++ * [TDIT]
++ * [RACE]
++ * [    ]timeofday_start.tv_usec
++ * [    ]timeofday_start.tv_sec
++ * [    ]clock_monotonic_start.tv_nsec
++ * [    ]clock_monotonic_start.tv_sec
++ * ------
++ * [    ]marker, lower 2 bytes is total length in dwords,
++ * [    ]clock_monotonic_timestamp.tv_nsec
++ * [    ]clock_monotonic_timestamp.tv_sec
++ * [    ]<optional> numbers
++ * [    ]<optional> text, padded with 0's to multiple of 4 bytes
++ * ...
++ * ------
++ */
++
++typedef unsigned long long _u64;
++
++static u32 gtracebuffersize;
++static u8 gtditrace_enabled;
++static char *gtrace_buffer;
++static unsigned int *gtrace_buffer_dword_ptr;
++
++static struct page *gtracebuffer_shared_page;
++
++static int tditrace_create_buffer(void) {
++  /*
++   *
++    [TDIT]
++   * [RACE]
++   * [    ]timeofday_start.tv_usec
++   * [    ]timeofday_start.tv_sec
++   * [    ]clock_monotonic_start.tv_nsec
++   * [    ]clock_monotonic_start.tv_sec
++   * ------
++   * [    ]marker, lower 2 bytes is total length in dwords
++   * [    ]clock_monotonic_timestamp.tv_nsec
++   * [    ]clock_monotonic_timestamp.tv_sec
++   * [    ]text, padded with 0 to multiple of 4 bytes
++   * ...
++   * ------
++   */
++
++  unsigned int *p;
++  _u64 atimeofday_start;
++  _u64 amonotonic_start;
++
++  gtracebuffersize = 4 * 1024 * 1024;
++
++  gtrace_buffer =
++      (char *)__get_free_pages(GFP_KERNEL, get_order(gtracebuffersize));
++
++  gtracebuffer_shared_page = virt_to_page(gtrace_buffer);
++
++  if (gtrace_buffer == 0)
++    printk("ktdim: unable to allocate %dMB tracebuffer\n",
++           gtracebuffersize / (1024 * 1024));
++
++  memset(gtrace_buffer, 0, gtracebuffersize);
++
++  printk("ktdim: allocated %dMB @0x%08x tracebuffer\n",
++         gtracebuffersize / (1024 * 1024), (u32)gtrace_buffer);
++
++  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
++
++  /*
++   * write one time start text
++   */
++  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
++  gtrace_buffer_dword_ptr += 2;
++
++  p = gtrace_buffer_dword_ptr;
++
++  do_gettimeofday((struct timeval *)gtrace_buffer_dword_ptr);
++  gtrace_buffer_dword_ptr += 2;
++
++  do_posix_clock_monotonic_gettime((struct timespec *)gtrace_buffer_dword_ptr);
++  gtrace_buffer_dword_ptr += 2;
++
++  atimeofday_start = (_u64)*p++ * 1000000000;
++  atimeofday_start += (_u64)*p++ * 1000;
++
++  amonotonic_start = (_u64)*p++ * 1000000000;
++  amonotonic_start += (_u64)*p++;
++
++  *gtrace_buffer_dword_ptr = 0;
++
++  gtditrace_enabled = 1;
++
++  return 0;
++}
++
++static void tditrace_internal(va_list args, const char *format);
++
++void tditrace(const char *format, ...) {
++  va_list args;
++
++  va_start(args, format);
++
++  tditrace_internal(args, format);
++
++  va_end(args);
++}
++
++EXPORT_SYMBOL(tditrace);
++
++static void tditrace_internal(va_list args, const char *format) {
++
++  unsigned int trace_text[512 / 4];
++  unsigned int i;
++  char *trace_text_ptr;
++  unsigned int *trace_text_dword_ptr;
++  char ch;
++  struct timespec mytime;
++  int nr_textdwords;
++
++  unsigned long flags;
++
++  if (!gtditrace_enabled) {
++    return;
++  }
++
++  /*
++   * take and store timestamp
++   */
++  do_posix_clock_monotonic_gettime(&mytime);
++  /*
++   * parse the format string
++   */
++  trace_text_ptr = (char *)trace_text;
++  trace_text_dword_ptr = (unsigned int *)trace_text;
++
++  while ((ch = *(format++))) {
++    if (ch == '%') {
++      switch (ch = (*format++)) {
++      case 's': {
++        char *s;
++        s = va_arg(args, char *);
++        if (s) {
++          int i = 0;
++          while (*s) {
++            *trace_text_ptr++ = *s++;
++            i++;
++            if (i > 256)
++              break;
++          }
++        } else {
++          *trace_text_ptr++ = 'n';
++          *trace_text_ptr++ = 'i';
++          *trace_text_ptr++ = 'l';
++          *trace_text_ptr++ = 'l';
++        }
++        break;
++      }
++      case 'd': {
++        int n = 0;
++        unsigned int d = 1;
++        int num = va_arg(args, int);
++        if (num < 0) {
++          num = -num;
++          *trace_text_ptr++ = '-';
++        }
++
++        while (num / d >= 10)
++          d *= 10;
++
++        while (d != 0) {
++          int digit = num / d;
++          num %= d;
++          d /= 10;
++          if (n || digit > 0 || d == 0) {
++            *trace_text_ptr++ = digit + '0';
++            n++;
++          }
++        }
++        break;
++      }
++      case 'u': {
++        int n = 0;
++        unsigned int d = 1;
++        unsigned int num = va_arg(args, int);
++
++        while (num / d >= 10)
++          d *= 10;
++
++        while (d != 0) {
++          int digit = num / d;
++          num %= d;
++          d /= 10;
++          if (n || digit > 0 || d == 0) {
++            *trace_text_ptr++ = digit + '0';
++            n++;
++          }
++        }
++        break;
++      }
++
++      case 'x':
++      case 'p': {
++        int n = 0;
++        unsigned int d = 1;
++        unsigned int num = va_arg(args, int);
++
++        while (num / d >= 16)
++          d *= 16;
++
++        while (d != 0) {
++          int dgt = num / d;
++          num %= d;
++          d /= 16;
++          if (n || dgt > 0 || d == 0) {
++            *trace_text_ptr++ = dgt + (dgt < 10 ? '0' : 'a' - 10);
++            ++n;
++          }
++        }
++        break;
++      }
++
++      default:
++        break;
++      }
++
++    } else {
++      *trace_text_ptr++ = ch;
++    }
++  }
++
++  while ((unsigned int)trace_text_ptr & 0x3)
++    *trace_text_ptr++ = 0;
++
++  nr_textdwords = (trace_text_ptr - (char *)trace_text) >> 2;
++
++  /*
++   * store into tracebuffer
++   */
++
++  spin_lock_irqsave(&ktdim_lock, flags);
++
++  /*
++   * marker, 4 bytes
++   *       bytes 1+0 hold total length in dwords : 3 (marker,sec,nsec) +
++   *                                               nr_dwordtext
++   */
++
++  *gtrace_buffer_dword_ptr++ = (3 + nr_textdwords);
++  *gtrace_buffer_dword_ptr++ = mytime.tv_sec;
++  *gtrace_buffer_dword_ptr++ = mytime.tv_nsec;
++
++  i = nr_textdwords;
++  while (i--) {
++    *gtrace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
++  }
++
++  /*
++   * mark the next marker as invalid
++   */
++  *gtrace_buffer_dword_ptr = 0;
++
++  if (((unsigned int)gtrace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
++      (gtracebuffersize - 1024)) {
++    gtditrace_enabled = 0;
++  }
++
++  spin_unlock_irqrestore(&ktdim_lock, flags);
++
++  if (gtditrace_enabled == 0)
++    printk("ktdim: full\n");
++}
++
++static void tditrace_rewind(void) {
++
++  gtditrace_enabled = 0;
++
++  printk("ktdim: rewind\n");
++
++  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
++
++  /*
++   * write one time start text
++   */
++  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
++  gtrace_buffer_dword_ptr += 2;
++
++  do_gettimeofday((struct timeval *)gtrace_buffer_dword_ptr);
++  gtrace_buffer_dword_ptr += 2;
++
++  do_posix_clock_monotonic_gettime((struct timespec *)gtrace_buffer_dword_ptr);
++  gtrace_buffer_dword_ptr += 2;
++
++  *gtrace_buffer_dword_ptr = 0;
++
++  gtditrace_enabled = 1;
++}
++
++static long ktdim_Ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
++
++static int ktdim_Mmap(struct file *file, struct vm_area_struct *vma);
++
++static struct file_operations gktdimFops = {.unlocked_ioctl = ktdim_Ioctl,
++                                            .mmap = ktdim_Mmap};
++
++static struct miscdevice gktdimMiscDev = {
++    .minor = MISC_DYNAMIC_MINOR, .name = "ktdim", .fops = &gktdimFops};
++
++static long ktdim_Ioctl(struct file *filp, unsigned int cmd,
++                        unsigned long arg) {
++  switch (cmd) {
++  case KTDIM_IOCTL_GET_TRACEBUFFERSIZE:
++    return gtracebuffersize;
++
++  case KTDIM_IOCTL_REWIND:
++    tditrace_rewind();
++    return 0;
++
++  case KTDIM_IOCTL_ON:
++    gtditrace_enabled = 1;
++    printk("ktdim: on\n");
++    return 0;
++
++  case KTDIM_IOCTL_OFF:
++    gtditrace_enabled = 0;
++    printk("ktdim: off\n");
++    return 0;
++
++  default:
++    printk("ktdim: unknown ioctl:0x%08x\n", cmd);
++    return -ENOSYS;
++  }
++}
++
++static int ktdim_Mmap(struct file *file, struct vm_area_struct *vma) {
++  unsigned int size;
++
++  if (vma->vm_pgoff != 0) {
++    return -EINVAL;
++  }
++
++  size = vma->vm_end - vma->vm_start;
++  if (size != PAGE_ALIGN(gtracebuffersize)) {
++    printk("ktdim: incorrect mmap size\n");
++    return -EINVAL;
++  }
++
++  /* Prevent the swapper from considering these pages for swap and touching
++   * them
++   */
++  vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP | VM_DONTEXPAND;
++
++  return remap_pfn_range(vma, vma->vm_start,
++                         page_to_pfn(gtracebuffer_shared_page), size,
++                         vma->vm_page_prot);
++}
++
++static void rev_parse_args(char *str, u8 *argc, char **argv, int max_arg) {
++  char *ps = str;
++  char *token;
++  const char delimiters[] = " \t\n";
++
++  while ((token = strsep(&ps, delimiters)) != NULL) {
++#if 0
++    printk("[%s]\n", token);
++#endif
++    argv[*argc] = token;
++    (*argc)++;
++  }
++}
++
++int proc_ktdim_status(struct seq_file *sf, void *v) {
++  int idx;
++  for (idx = 0; idx < 3; idx++) {
++    seq_printf(sf, "status(%d):\n", idx);
++  }
++  return 0;
++}
++
++static int do_something(void *kvm, u32 len) {
++  void *x;
++  if (!kvm || !len)
++    return -1;
++
++  for (x = kvm; x < (kvm + len); x += PAGE_SIZE) {
++    memset(x, 0xff, 0x10);
++  }
++  return 0;
++}
++
++u32 *vm;
++u32 *km;
++u32 *fp;
++
++int proc_ktdim_control(struct file *file, const char __user *buffer,
++                       size_t count, loff_t *ppos) {
++  char *str;
++  u8 argc = 0;
++  char *argv[5];
++#if 1
++  u8 i;
++#endif
++  u32 sz;
++
++  str = kzalloc(count + 1, GFP_KERNEL);
++  if (!str)
++    return -ENOMEM;
++
++  if (copy_from_user(str, buffer, count))
++    return -EFAULT;
++
++  rev_parse_args(str, &argc, argv, 5);
++
++#if 1
++  for (i = 0; i < argc; i++) {
++    printk("ktdim: argv[%d]=%s, %02x\n", i, argv[i], *argv[i]);
++  }
++#endif
++
++  if (argc && (*argv[argc - 1] == 0x0))
++    argc--;
++
++  if ((argc == 1) && !strcmp(argv[0], "rewind")) {
++    tditrace_rewind();
++  } else if ((argc == 2) && !strcmp(argv[0], "kmalloc")) {
++    sz = (int)simple_strtol(argv[1], NULL, 10);
++    km = kmalloc(sz, GFP_KERNEL);
++    do_something(km, sz);
++    if (!km)
++      printk("ktdim: kmalloc of %u bytes FAILED!\n", sz);
++    else {
++      printk("ktdim: kmalloc'd %u bytes (%u Kb, %u MB) @ 0x%08x, ksize = %u\n",
++             sz, sz / 1024, sz / (1024 * 1024), (u32)km, ksize(km));
++    }
++  } else if ((argc == 2) && !strcmp(argv[0], "vmalloc")) {
++    sz = (int)simple_strtol(argv[1], NULL, 10);
++    vm = vmalloc(sz);
++    do_something(vm, sz);
++    if (!vm)
++      printk("ktdim: vmalloc of %u bytes FAILED!\n", sz);
++    else {
++      printk("ktdim: vmalloc'd %u bytes (%u Kb, %u MB) @ 0x%08x\n", sz,
++             sz / 1024, sz / (1024 * 1024), (u32)vm);
++    }
++  } else if ((argc == 1) && !strcmp(argv[0], "kfree")) {
++    if (!km)
++      printk("ktdim: km = 0!\n");
++    else {
++      kfree(km);
++      printk("ktdim: kfree'd\n");
++    }
++  } else if ((argc == 1) && !strcmp(argv[0], "vfree")) {
++    if (!vm)
++      printk("ktdim: vm = 0!\n");
++    else {
++      vfree(vm);
++      printk("ktdim: vfree'd\n");
++    }
++  } else if ((argc == 1) && !strcmp(argv[0], "__get_free_page")) {
++    fp = (u32 *)__get_free_page(GFP_KERNEL);
++    do_something(fp, 1);
++    if (!fp)
++      printk("ktdim: __get_free_page FAILED!\n");
++    else {
++      printk("ktdim: __get_free_page @ 0x%08x\n", (u32)fp);
++    }
++  } else if ((argc == 1) && !strcmp(argv[0], "get_zeroed_page")) {
++    fp = (u32 *)get_zeroed_page(GFP_KERNEL);
++    if (!fp)
++      printk("ktdim: get_zeroed_page FAILED!\n");
++    else {
++      printk("ktdim: get_zeroed_page @ 0x%08x\n", (u32)fp);
++    }
++  } else if ((argc == 2) && !strcmp(argv[0], "__get_free_pages")) {
++    sz = (int)simple_strtol(argv[1], NULL, 10);
++    fp = (u32 *)__get_free_pages(GFP_KERNEL, sz);
++    if (!fp)
++      printk("ktdim: __get_free_pages FAILED!\n");
++    else {
++      printk("ktdim: __get_free_pages allocated %u pages @ 0x%08x\n", 2 << sz,
++             (u32)fp);
++    }
++  } else {
++
++    printk("ktdim: unknown command\n");
++  }
++
++  kfree(str);
++  return count;
++}
++
++int proc_ktdim_tdi(struct file *file, const char __user *buffer, size_t count,
++                   loff_t *ppos) {
++
++  tditrace("%s", buffer);
++  return count;
++}
++
++int proc_ktdim_help(struct seq_file *sf, void *v) {
++  struct timeval now;
++  u32 *now_ref = (u32 *)&now;
++
++  do_gettimeofday(&now);
++  seq_printf(sf, "tv_sec:tv_usec=0x%08x=%ld:%ld\n", *now_ref, now.tv_sec,
++             now.tv_usec);
++
++  seq_printf(sf, "Usage:\n");
++  seq_printf(sf, "  echo \"kmalloc <bytes>\" > /proc/ktdim-control\n");
++  seq_printf(sf, "  echo \"vmalloc <bytes>\" > /proc/ktdim-control\n");
++  seq_printf(sf, "  echo \"kfree\" > /proc/ktdim-control\n");
++  seq_printf(sf, "  echo \"vfree\" > /proc/ktdim-control\n");
++  return 0;
++}
++
++int proc_ktdim_help_open(struct inode *inode, struct file *file) {
++  return single_open(file, proc_ktdim_help, PDE_DATA(inode));
++}
++
++int proc_ktdim_status_open(struct inode *inode, struct file *file) {
++  return single_open(file, proc_ktdim_status, PDE_DATA(inode));
++}
++
++struct file_operations proc_ktdim_help_fops = {
++    .owner = THIS_MODULE,
++    .open = proc_ktdim_help_open,
++    .read = seq_read,
++    .llseek = seq_lseek,
++    .release = seq_release,
++};
++
++struct file_operations proc_ktdim_control_fops = {
++    .owner = THIS_MODULE,
++    .read = seq_read,
++    .llseek = seq_lseek,
++    .write = proc_ktdim_control,
++};
++
++struct file_operations proc_ktdim_status_fops = {
++    .owner = THIS_MODULE,
++    .open = proc_ktdim_status_open,
++    .read = seq_read,
++    .llseek = seq_lseek,
++    .release = seq_release,
++};
++
++struct file_operations proc_ktdim_tdi_fops = {
++    .owner = THIS_MODULE,
++    .read = seq_read,
++    .llseek = seq_lseek,
++    .write = proc_ktdim_tdi,
++};
++
++static int __init ktdim_init(void) {
++  int err = -1;
++  int ret;
++
++  printk("ktdim: Init.. (%s-%s)\n", __DATE__, __TIME__);
++
++  ret = misc_register(&gktdimMiscDev);
++  if (ret < 0) {
++    printk("ktdim: can't register misc device (minor %d)!\n",
++           gktdimMiscDev.minor);
++    return ret;
++  }
++
++  tditrace_create_buffer();
++
++  if (proc_create("ktdim-help", S_IFREG | S_IRUGO | S_IWUSR, NULL,
++                  &proc_ktdim_help_fops) == NULL) {
++    printk("proc create entry error\n");
++  } else if (proc_create("ktdim-control", S_IFREG | S_IRUGO | S_IWUSR, NULL,
++                         &proc_ktdim_control_fops) == NULL) {
++    printk("proc create entry error\n");
++  } else if (proc_create("ktdim-status", S_IFREG | S_IRUGO | S_IWUSR, NULL,
++                         &proc_ktdim_status_fops) == NULL) {
++    printk("proc create entry error\n");
++  } else
++    err = 0;
++  return err;
++}
++
++static void __exit ktdim_exit(void) {
++  printk("ktdim: Exit..\n");
++
++  misc_deregister(&gktdimMiscDev);
++
++  if (gtracebuffer_shared_page) {
++    ClearPageReserved(gtracebuffer_shared_page);
++    free_pages((int)gtrace_buffer, get_order(gtracebuffersize));
++  }
++
++  remove_proc_entry("ktdim-help", NULL);
++  remove_proc_entry("ktdim-control", NULL);
++  remove_proc_entry("ktdim-status", NULL);
++}
++
++module_init(ktdim_init);
++module_exit(ktdim_exit);
++
++MODULE_AUTHOR("REV");
++MODULE_DESCRIPTION("ktdim");
++MODULE_LICENSE("GPL");
+diff --git a/kernel/kthread.c b/kernel/kthread.c
+old mode 100644
+new mode 100755
+index 760e86d..ede2fe1
+--- a/kernel/kthread.c
++++ b/kernel/kthread.c
+@@ -228,6 +228,8 @@ static void create_kthread(struct kthread_create_info *create)
+ 	}
+ }
+ 
++void tditrace(const char *, ...);
++
+ /**
+  * kthread_create_on_node - create a kthread.
+  * @threadfn: the function to run until signal_pending(current).
+@@ -277,6 +279,9 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
+ 		vsnprintf(create.result->comm, sizeof(create.result->comm),
+ 			  namefmt, args);
+ 		va_end(args);
++
++		//tditrace("@S+kthread %s|%d", create.result->comm, create.result->pid);
++
+ 		/*
+ 		 * root may have changed our (kthreadd's) priority or CPU mask.
+ 		 * The kernel thread should not inherit these properties.
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+old mode 100644
+new mode 100755
+index a494ace..10e1e7f
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1962,6 +1962,8 @@ asmlinkage void schedule_tail(struct task_struct *prev)
+ 		put_user(task_pid_vnr(current), current->set_child_tid);
+ }
+ 
++void tditrace(const char *, ...);
++
+ /*
+  * context_switch - switch to the new MM and the new
+  * thread's register state.
+@@ -1983,6 +1985,10 @@ context_switch(struct rq *rq, struct task_struct *prev,
+ 	 */
+ 	arch_start_context_switch(prev);
+ 
++	//tditrace("@S+switch %s[%d]:%s[%d]", prev->comm, prev->pid, next->comm, next->pid);
++	tditrace("@T-%s|%d", prev->comm, prev->pid);
++	tditrace("@T+%s|%d", next->comm, next->pid);
++
+ 	if (!mm) {
+ 		next->active_mm = oldmm;
+ 		atomic_inc(&oldmm->mm_count);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+old mode 100644
+new mode 100755
+index 6fca390..a012f49
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2770,6 +2770,8 @@ out:
+ }
+ EXPORT_SYMBOL(__alloc_pages_nodemask);
+ 
++void tditrace(const char *, ...);
++
+ /*
+  * Common helper functions.
+  */
+@@ -2784,6 +2786,10 @@ unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order)
+ 	VM_BUG_ON((gfp_mask & __GFP_HIGHMEM) != 0);
+ 
+ 	page = alloc_pages(gfp_mask, order);
++
++    tditrace("a%u", order);
++    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
++
+ 	if (!page)
+ 		return 0;
+ 	return (unsigned long) page_address(page);
+@@ -2804,6 +2810,9 @@ void __free_pages(struct page *page, unsigned int order)
+ 		else
+ 			__free_pages_ok(page, order);
+ 	}
++
++    tditrace("f%u", order);
++    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
+ }
+ 
+ EXPORT_SYMBOL(__free_pages);
+diff --git a/mm/slub.c b/mm/slub.c
+old mode 100644
+new mode 100755
+index 5c1343a..494fe02
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3323,11 +3323,15 @@ size_t ksize(const void *object)
+ }
+ EXPORT_SYMBOL(ksize);
+ 
++void tditrace(const char *, ...);
++
+ void kfree(const void *x)
+ {
+ 	struct page *page;
+ 	void *object = (void *)x;
+ 
++	// tditrace("kf");
++
+ 	trace_kfree(_RET_IP_, x);
+ 
+ 	if (unlikely(ZERO_OR_NULL_PTR(x)))
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+old mode 100644
+new mode 100755
+index 1074543..d136a7d
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1458,7 +1458,9 @@ static void __vunmap(const void *addr, int deallocate_pages)
+ 	kfree(area);
+ 	return;
+ }
+- 
++
++void tditrace(const char *, ...);
++
+ /**
+  *	vfree  -  release memory allocated by vmalloc()
+  *	@addr:		memory base address
+@@ -1475,6 +1477,8 @@ static void __vunmap(const void *addr, int deallocate_pages)
+  */
+ void vfree(const void *addr)
+ {
++	tditrace("vf");
++
+ 	BUG_ON(in_nmi());
+ 
+ 	kmemleak_free(addr);
+@@ -1707,6 +1711,8 @@ static inline void *__vmalloc_node_flags(unsigned long size,
+  */
+ void *vmalloc(unsigned long size)
+ {
++	tditrace("vm %u", size);
++
+ 	return __vmalloc_node_flags(size, NUMA_NO_NODE,
+ 				    GFP_KERNEL | __GFP_HIGHMEM);
+ }
+@@ -1724,6 +1730,8 @@ EXPORT_SYMBOL(vmalloc);
+  */
+ void *vzalloc(unsigned long size)
+ {
++	tditrace("vz %u", size);
++
+ 	return __vmalloc_node_flags(size, NUMA_NO_NODE,
+ 				GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO);
+ }
+-- 
+1.9.1
+
