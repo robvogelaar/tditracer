@@ -36,6 +36,8 @@ void usage(void) {
   printf("         'rewind' = rewind the tditracebuffer(s)\n");
   printf("\n       tdim -p [pid]\n");
   printf("         tdiproc : report procfs data.\n");
+  printf("\n       tdim -k [command]\n");
+  printf("         tdik : proc/ktdim/.\n");
   printf("\n       tdim -h\n");
   printf("         display this help message.\n\n");
 }
@@ -46,6 +48,7 @@ static int tditest(int argc, char *argv[]);
 static int tdimessage(int argc, char *argv[]);
 static int tdiproc(int argc, char *argv[]);
 static int tdipipe(int argc, char *argv[]);
+static int tdik(int argc, char *argv[]);
 
 #ifndef TMPFS
 #define TMPFS "/tmp/"
@@ -78,14 +81,8 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  else if (argc > 1 && (strcmp(argv[1], "-r") == 0)) {
-    FILE *file;
-    char filename[128];
-    sprintf(filename, "/dev/ktdim");
-    if ((file = fopen(filename, "r")) != NULL) {
-      ioctl(fileno(file), _IO('T', 1), NULL);
-      fclose(file);
-    }
+  else if (argc >= 2 && (strcmp(argv[1], "-k") == 0)) {
+    tdik(argc - 2, &argv[2]);
     return 0;
   }
 
@@ -972,5 +969,41 @@ static int tdipipe(int argc, char *argv[]) {
   }
   fprintf(stdout, "END\n");
 
+  return 0;
+}
+
+static int tdik(int argc, char *argv[]) {
+
+  if (argc >= 1) {
+    FILE *file;
+    char filename[128];
+    sprintf(filename, "/dev/ktdim");
+    if ((file = fopen(filename, "r")) != NULL) {
+      if ((argc == 1) && (strcmp(argv[0], "rewind") == 0)) {
+        ioctl(fileno(file), _IO('T', 1), NULL);
+      } else if ((argc == 1) && (strcmp(argv[0], "on") == 0)) {
+        ioctl(fileno(file), _IO('T', 2), NULL);
+      } else if ((argc == 1) && (strcmp(argv[0], "off") == 0)) {
+        ioctl(fileno(file), _IO('T', 3), NULL);
+      } else if ((argc == 2) && (strcmp(argv[0], "dump") == 0)) {
+
+        long size = ioctl(fileno(file), _IO('T', 0), NULL);
+        char *bufmmapped =
+            (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+        FILE *binfile;
+        if ((binfile = fopen(argv[1], "wb")) != NULL) {
+          fprintf(stdout, "writing \"%s\", (%lluMB), to \"%s\"\n", filename,
+                  (unsigned long long)size / (1024 * 1024), argv[1]);
+          fwrite(bufmmapped, size, 1, binfile);
+          fclose(binfile);
+        } else {
+          fprintf(stderr, "could not open \"%s\"\n", argv[1]);
+        }
+      }
+      fclose(file);
+    }
+  } else {
+    fprintf(stderr, "no cmd provided\n");
+  }
   return 0;
 }

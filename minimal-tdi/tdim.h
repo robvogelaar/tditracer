@@ -9,6 +9,31 @@
 #define AGENTS 8
 #define MEMORYCYCLES 9
 
+#define MAX_TASKS 4096
+#define MAX_ISRS 128
+#define MAX_SEMAS 128
+#define MAX_QUEUES 128
+#define MAX_EVENTS 128
+#define MAX_VALUES 128
+#define MAX_CYCLES 128
+#define MAX_NOTES 128
+#define MAX_AGENTS 128
+
+#define MAX_TEXT 1024
+
+#define TASKS_BASE 10000
+#define ISRS_BASE 20000
+#define SEMAS_BASE 21000
+#define QUEUES_BASE 22000
+#define EVENTS_BASE 23000
+#define VALUES_BASE 24000
+#define CYCLES_BASE 25000
+#define NOTES_BASE 26000
+#define AGENTS_BASE 27000
+#define MEMORYCYCLES_BASE 28000
+
+#define MULTIPLIER 100000
+
 /*
  * send new value
  */

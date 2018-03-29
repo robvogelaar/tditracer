@@ -21,8 +21,12 @@
 #include <linux/time.h>
 #include <linux/types.h>
 
+static DEFINE_SPINLOCK(ktdim_lock);
+
 #define KTDIM_IOCTL_GET_TRACEBUFFERSIZE _IO('T', 0)
 #define KTDIM_IOCTL_REWIND _IO('T', 1)
+#define KTDIM_IOCTL_ON _IO('T', 2)
+#define KTDIM_IOCTL_OFF _IO('T', 3)
 
 /*
  * [TDIT]
@@ -33,8 +37,6 @@
  * [    ]clock_monotonic_start.tv_sec
  * ------
  * [    ]marker, lower 2 bytes is total length in dwords,
- *         #middle byte is nr numbers
- *         #upper byte is identifier,
  * [    ]clock_monotonic_timestamp.tv_nsec
  * [    ]clock_monotonic_timestamp.tv_sec
  * [    ]<optional> numbers
@@ -46,9 +48,8 @@
 typedef unsigned long long _u64;
 
 static u32 gtracebuffersize;
-static u32 gtditrace_inited;
+static u8 gtditrace_enabled;
 static char *gtrace_buffer;
-static char *gtrace_buffer_byte_ptr;
 static unsigned int *gtrace_buffer_dword_ptr;
 
 static struct page *gtracebuffer_shared_page;
@@ -63,8 +64,7 @@ static int tditrace_create_buffer(void) {
    * [    ]clock_monotonic_start.tv_nsec
    * [    ]clock_monotonic_start.tv_sec
    * ------
-   * [    ]marker, lower 2 bytes is total length in dwords, upper 2 bytes is nr
-   * numbers
+   * [    ]marker, lower 2 bytes is total length in dwords
    * [    ]clock_monotonic_timestamp.tv_nsec
    * [    ]clock_monotonic_timestamp.tv_sec
    * [    ]text, padded with 0 to multiple of 4 bytes
@@ -92,7 +92,6 @@ static int tditrace_create_buffer(void) {
   printk("ktdim: allocated %dMB @0x%08x tracebuffer\n",
          gtracebuffersize / (1024 * 1024), (u32)gtrace_buffer);
 
-  gtrace_buffer_byte_ptr = gtrace_buffer;
   gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
 
   /*
@@ -106,7 +105,6 @@ static int tditrace_create_buffer(void) {
   do_gettimeofday((struct timeval *)gtrace_buffer_dword_ptr);
   gtrace_buffer_dword_ptr += 2;
 
-  // clock_gettime(CLOCK_MONOTONIC, (struct timespec *)gtrace_buffer_dword_ptr);
   do_posix_clock_monotonic_gettime((struct timespec *)gtrace_buffer_dword_ptr);
   gtrace_buffer_dword_ptr += 2;
 
@@ -118,7 +116,7 @@ static int tditrace_create_buffer(void) {
 
   *gtrace_buffer_dword_ptr = 0;
 
-  gtditrace_inited = 1;
+  gtditrace_enabled = 1;
 
   return 0;
 }
@@ -140,16 +138,16 @@ EXPORT_SYMBOL(tditrace);
 static void tditrace_internal(va_list args, const char *format) {
 
   unsigned int trace_text[512 / 4];
-  unsigned char identifier = 0;
   unsigned int i;
   char *trace_text_ptr;
   unsigned int *trace_text_dword_ptr;
   char ch;
   struct timespec mytime;
   int nr_textdwords;
+
   unsigned long flags;
 
-  if (!gtditrace_inited) {
+  if (!gtditrace_enabled) {
     return;
   }
 
@@ -267,7 +265,7 @@ static void tditrace_internal(va_list args, const char *format) {
    * store into tracebuffer
    */
 
-  local_irq_save(flags);
+  spin_lock_irqsave(&ktdim_lock, flags);
 
   /*
    * marker, 4 bytes
@@ -291,22 +289,21 @@ static void tditrace_internal(va_list args, const char *format) {
 
   if (((unsigned int)gtrace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
       (gtracebuffersize - 1024)) {
-    gtditrace_inited = 0;
+    gtditrace_enabled = 0;
   }
 
-  local_irq_restore(flags);
+  spin_unlock_irqrestore(&ktdim_lock, flags);
 
-  if (gtditrace_inited == 0)
+  if (gtditrace_enabled == 0)
     printk("ktdim: full\n");
 }
 
 static void tditrace_rewind(void) {
 
-  gtditrace_inited = 0;
+  gtditrace_enabled = 0;
 
   printk("ktdim: rewind\n");
 
-  gtrace_buffer_byte_ptr = gtrace_buffer;
   gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
 
   /*
@@ -323,7 +320,7 @@ static void tditrace_rewind(void) {
 
   *gtrace_buffer_dword_ptr = 0;
 
-  gtditrace_inited = 1;
+  gtditrace_enabled = 1;
 }
 
 static long ktdim_Ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
@@ -344,6 +341,16 @@ static long ktdim_Ioctl(struct file *filp, unsigned int cmd,
 
   case KTDIM_IOCTL_REWIND:
     tditrace_rewind();
+    return 0;
+
+  case KTDIM_IOCTL_ON:
+    gtditrace_enabled = 1;
+    printk("ktdim: on\n");
+    return 0;
+
+  case KTDIM_IOCTL_OFF:
+    gtditrace_enabled = 0;
+    printk("ktdim: off\n");
     return 0;
 
   default:
@@ -594,9 +601,6 @@ static int __init ktdim_init(void) {
   } else if (proc_create("ktdim-status", S_IFREG | S_IRUGO | S_IWUSR, NULL,
                          &proc_ktdim_status_fops) == NULL) {
     printk("proc create entry error\n");
-  } else if (proc_create("ktdim-tdi", S_IFREG | S_IRUGO | S_IWUSR, NULL,
-                         &proc_ktdim_tdi_fops) == NULL) {
-    printk("proc create entry error\n");
   } else
     err = 0;
   return err;
@@ -615,7 +619,6 @@ static void __exit ktdim_exit(void) {
   remove_proc_entry("ktdim-help", NULL);
   remove_proc_entry("ktdim-control", NULL);
   remove_proc_entry("ktdim-status", NULL);
-  remove_proc_entry("ktdim-tdi", NULL);
 }
 
 module_init(ktdim_init);

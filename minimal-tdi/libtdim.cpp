@@ -16,6 +16,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
@@ -24,7 +25,6 @@ extern "C" {
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <sys/ioctl.h>
 #include <syscall.h>
 #include <unistd.h>
 
@@ -79,42 +79,42 @@ static int report_tid;
 
 typedef unsigned long long _u64;
 
-// 128 tasks of 1024 chars each
-static char tasks_array[1024][128];
+static char tasks_array[MAX_TASKS][MAX_TEXT];
 static int nr_tasks = 0;
+static int nr_task_entries = 0;
 
-// 128 isrs of 1024 chars each
-static char isrs_array[1024][128];
+static char isrs_array[MAX_ISRS][MAX_TEXT];
 static int nr_isrs = 0;
+static int nr_isr_entries = 0;
 
-// 128 semas of 1024 chars each
-static char semas_array[1024][128];
+static char semas_array[MAX_SEMAS][MAX_TEXT];
 static int nr_semas = 0;
+static int nr_sema_entries = 0;
 
-// 128 queues of 1024 chars each
-static char queues_array[1024][128];
+static char queues_array[MAX_QUEUES][MAX_TEXT];
+static int prev_queues[MAX_QUEUES];
 static int nr_queues = 0;
-static int prev_queues[128];
+static int nr_queue_entries = 0;
 
-// 128 values of 1024 chars each
-static char values_array[1024][128];
+static char values_array[MAX_VALUES][MAX_TEXT];
 static int nr_values = 0;
+static int nr_value_entries = 0;
 
-// 128 cycles of 1024 chars each
-static char cycles_array[1024][128];
+static char cycles_array[MAX_CYCLES][MAX_TEXT];
 static int nr_cycles = 0;
+static int nr_cycle_entries = 0;
 
-// 128 events of 1024 chars each
-static char events_array[1024][128];
+static char events_array[MAX_EVENTS][MAX_TEXT];
 static int nr_events = 0;
+static int nr_event_entries = 0;
 
-// 128 notes of 1024 chars each
-static char notes_array[1024][128];
+static char notes_array[MAX_NOTES][MAX_TEXT];
 static int nr_notes = 0;
+static int nr_note_entries = 0;
 
-// 128 agents of 1000 chars each
-static char agents_array[1024][128];
+static char agents_array[MAX_AGENTS][MAX_TEXT];
 static int nr_agents = 0;
+static int nr_agent_entries = 0;
 
 static void tditrace_rewind();
 
@@ -431,6 +431,16 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   int value = 0;
   int isampersand;
 
+  static int maxtasks = 0;
+
+  if (maxtasks == 0) {
+    char *env;
+    if ((env = getenv("MAXTASKS")))
+      maxtasks = atoi(env);
+    else
+      maxtasks = MAX_TASKS;
+  }
+
   // if (nr_numbers) fprintf(stderr, "nr_numbers=%d(%x)\n", nr_numbers,
   // numbers[0]);
 
@@ -438,9 +448,9 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
   // text_len);
 
   // fprintf(stderr, "text_in(%d)=\"", text_len);
-  // for (i=0;i<text_len;i++)
+  // for (i = 0; i < text_len; i++)
   //   fprintf(stderr, "%c", text_in[i]);
-  // fprintf(stderr,"\"\n");
+  // fprintf(stderr, "\"\n");
 
   char text_in1[1024];
   char *text = text_in1;
@@ -490,50 +500,24 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     return;
   }
 
-#if 0
-  sprintf(text_in1, "[%s][%d][%d]", procname, pid, tid);
-#endif
   sprintf(text_in1, "[%d:%s]", pid, procname);
   int procpidtidlen = strlen(text_in1);
 
   isampersand =
       ((text_in[0] == '@') && ((text_in[2] == '+') || (text_in[2] == '-')));
 
-#if 0
-  if ((strncmp(text_in, "@T+", 3) == 0) || (strncmp(text_in, "@T-", 3) == 0) ||
-      (strncmp(text_in, "@I+", 3) == 0) || (strncmp(text_in, "@I-", 3) == 0) ||
-      (strncmp(text_in, "@A+", 3) == 0) || (strncmp(text_in, "@A-", 3) == 0) ||
-      (strncmp(text_in, "@S+", 3) == 0) || (strncmp(text_in, "@E+", 3) == 0)) {
-#endif
-
-#if 0
-  if ((text_in[0] == '@') && ((text_in[2] == '+') || (text_in[2] == '-'))) {
-#endif
-
   if (isampersand) {
     strncpy(text_in1, text_in, 3);
 
-#if 0
-    snprintf(&text_in1[3], procpidtidlen + text_len + 1 - 3, "[%s][%d][%d]%s",
-             procname, pid, tid, &text_in[3]);
-#endif
     snprintf(&text_in1[3], procpidtidlen + text_len + 1 - 3, "[%d:%s]%s", pid,
              procname, &text_in[3]);
 
   } else {
     if (text_len)
 
-#if 0
-      snprintf(text_in1, procpidtidlen + text_len + 1, "[%s][%d][%d]%s",
-               procname, pid, tid, text_in);
-#endif
       snprintf(text_in1, procpidtidlen + text_len + 1, "[%d:%s]%s", pid,
                procname, text_in);
     else
-#if 0
-      snprintf(text_in1, procpidtidlen + 2 + 1, "[%s][%d][%d]%02X", procname,
-               pid, tid, identifier);
-#endif
       snprintf(text_in1, procpidtidlen + 2 + 1, "[%d:%s]%02X", pid, procname,
                identifier);
   }
@@ -564,7 +548,16 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     if ((strncmp(text, "@T+", 3) == 0) || (strncmp(text, "@T-", 3) == 0)) {
       int enter_not_exit = (strncmp(text + 2, "+", 1) == 0);
 
+      nr_task_entries++;
+
       text += 3;
+
+      // if the entry contains a '|' then optionally replace with a space
+      for (i = 0; i < (int)strlen(text); i++) {
+        if (text[i] == '|')
+          text[i] = ' ';
+      }
+
       // if the entry has not been seen before, add a new entry for it and
       // issue a NAM
       entry = -1;
@@ -594,6 +587,10 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         int len;
         char *pos;
 
+        // ignore tasks if too many tasks
+        if (nr_tasks >= maxtasks)
+          return;
+
         pos = strchr(text, ' ');
         if (pos)
           len = pos - text;
@@ -608,17 +605,16 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        fprintf(stdout, "NAM %d %d %s\n", TASKS, TASKS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", TASKS, TASKS_BASE + entry,
                 tasks_array[entry]);
       }
 
       // Add the STA or STO entry
       fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", TASKS,
-              TASKS * 1000 + entry, timestamp);
+              TASKS_BASE + entry, timestamp);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
-
       for (i = 8; i < (int)strlen(fullentry); i++) {
         if (fullentry[i] == 32)
           fullentry[i] = 0x2c;
@@ -633,6 +629,9 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
      *
      */
     if (strncmp(text, "@S+", 3) == 0) {
+
+      nr_sema_entries++;
+
       text += 3;
       // if the entry has not been seen before, add a new entry for it and
       // issue a NAM
@@ -677,13 +676,14 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        fprintf(stdout, "NAM %d %d %s\n", SEMAS, SEMAS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", SEMAS, SEMAS_BASE + entry,
                 semas_array[entry]);
+        nr_sema_entries++;
       }
 
       // Add the OCC entry
-      fprintf(stdout, "OCC %d %d %lld\n", SEMAS, SEMAS * 1000 + entry,
-              timestamp);
+      fprintf(stdout, "OCC %d %d %lld\n", SEMAS, SEMAS_BASE + entry, timestamp);
+      nr_sema_entries++;
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -692,6 +692,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
           fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
+      nr_sema_entries++;
 
       return;
     }
@@ -702,6 +703,8 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
      */
     if ((strncmp(text, "@I+", 3) == 0) || (strncmp(text, "@I-", 3) == 0)) {
       int enter_not_exit = (strncmp(text + 2, "+", 1) == 0);
+
+      nr_isr_entries++;
 
       text += 3;
       // if the entry has not been seen before, add a new entry for it and
@@ -747,13 +750,15 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        fprintf(stdout, "NAM %d %d %s\n", ISRS, ISRS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", ISRS, ISRS_BASE + entry,
                 isrs_array[entry]);
+        nr_isr_entries++;
       }
 
       // Add the STA or STO entry
       fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", ISRS,
-              ISRS * 1000 + entry, timestamp);
+              ISRS_BASE + entry, timestamp);
+      nr_isr_entries++;
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -762,6 +767,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
           fullentry[i] = 0x2c;
       }
       fwrite(fullentry, strlen(fullentry), 1, stdout);
+      nr_isr_entries++;
 
       return;
     }
@@ -771,7 +777,11 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
      *
      */
     if (strncmp(text, "@E+", 3) == 0) {
+
+      nr_event_entries++;
+
       text += 3;
+
       // if the entry has not been seen before, add a new entry for it and
       // issue a NAM
       entry = -1;
@@ -815,13 +825,15 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        fprintf(stdout, "NAM %d %d %s\n", EVENTS, EVENTS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", EVENTS, EVENTS_BASE + entry,
                 events_array[entry]);
+        nr_event_entries++;
       }
 
       // Add the OCC entry
-      fprintf(stdout, "OCC %d %d %lld\n", EVENTS, EVENTS * 1000 + entry,
+      fprintf(stdout, "OCC %d %d %lld\n", EVENTS, EVENTS_BASE + entry,
               timestamp);
+      nr_event_entries++;
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -829,6 +841,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         if (fullentry[i] == 32)
           fullentry[i] = 0x2c;
       }
+      nr_event_entries++;
       fwrite(fullentry, strlen(fullentry), 1, stdout);
 
       return;
@@ -838,10 +851,6 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
  * AGENTS entry
  *
  */
-#if 0
-    if ((strncmp(text, "@A+", 3) == 0) || (strncmp(text, "@A-", 3) == 0)) {
-#endif
-
 #if 1
     if (1) {
 #endif
@@ -894,13 +903,13 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
         // Since we added a new entry we need to create a NAM, with only the
         // first part of the text
-        fprintf(stdout, "NAM %d %d %s\n", AGENTS, AGENTS * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", AGENTS, AGENTS_BASE + entry,
                 agents_array[entry]);
       }
 
       // Add the STA or STO entry
       fprintf(stdout, "%s %d %d %lld\n", enter_not_exit ? "STA" : "STO", AGENTS,
-              AGENTS * 1000 + entry, timestamp);
+              AGENTS_BASE + entry, timestamp);
 
       // Add the DSC entry, replace any spaces with commas
       sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -962,7 +971,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_queues++;
 
         // Since we added a new entry we need to create a NAM
-        fprintf(stdout, "NAM %d %d %s\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", QUEUES, QUEUES_BASE + entry,
                 queues_array[entry]);
 
         // reset the prev_value;
@@ -973,10 +982,10 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       // add a STA (with the delta) or a STO (with the delta) depending on
       // whether the value went up or went down
       if (value >= prev_queues[entry])
-        fprintf(stdout, "STA %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "STA %d %d %lld %d\n", QUEUES, QUEUES_BASE + entry,
                 timestamp, value - prev_queues[entry]);
       else
-        fprintf(stdout, "STO %d %d %lld %d\n", QUEUES, QUEUES * 1000 + entry,
+        fprintf(stdout, "STO %d %d %lld %d\n", QUEUES, QUEUES_BASE + entry,
                 timestamp, prev_queues[entry] - value);
       prev_queues[entry] = value;
 
@@ -1026,14 +1035,14 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_values++;
 
         // Since we added a new entry we need to create a NAM
-        fprintf(stdout, "NAM %d %d %s\n", VALUES, VALUES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", VALUES, VALUES_BASE + entry,
                 values_array[entry]);
       }
 
       // fill in the value
       // add a TIM and a VAL
       fprintf(stdout, "TIM %lld\n", timestamp);
-      fprintf(stdout, "VAL %d %d %d\n", VALUES, VALUES * 1000 + entry, value);
+      fprintf(stdout, "VAL %d %d %d\n", VALUES, VALUES_BASE + entry, value);
 
       return;
     }
@@ -1081,14 +1090,14 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
         nr_cycles++;
 
         // Since we added a new entry we need to create a NAM
-        fprintf(stdout, "NAM %d %d %s\n", CYCLES, CYCLES * 1000 + entry,
+        fprintf(stdout, "NAM %d %d %s\n", CYCLES, CYCLES_BASE + entry,
                 cycles_array[entry]);
       }
 
       // fill in the value
       // add a TIM and a CYCLE
       fprintf(stdout, "TIM %lld\n", timestamp);
-      fprintf(stdout, "VAL %d %d %lld\n", CYCLES, CYCLES * 1000 + entry,
+      fprintf(stdout, "VAL %d %d %lld\n", CYCLES, CYCLES_BASE + entry,
               value * 10000000LL);
 
       return;
@@ -1099,6 +1108,7 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
    * Treat everything else as a NOTES entry
    *
    */
+  nr_note_entries++;
 
   // if the entry has not been seen before, add a new entry for it and issue a
   // NAM
@@ -1143,12 +1153,12 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
 
     // Since we added a new entry we need to create a NAM, with only the
     // first part of the text
-    fprintf(stdout, "NAM %d %d %s\n", NOTES, NOTES * 1000 + entry,
+    fprintf(stdout, "NAM %d %d %s\n", NOTES, NOTES_BASE + entry,
             notes_array[entry]);
   }
 
   // Add the OCC entry
-  fprintf(stdout, "OCC %d %d %lld\n", NOTES, NOTES * 1000 + entry, timestamp);
+  fprintf(stdout, "OCC %d %d %lld\n", NOTES, NOTES_BASE + entry, timestamp);
 
   // Add the DSC entry, replace any spaces with commas
   sprintf(fullentry, "DSC %d %d %s\n", 0, 0, text + procpidtidlen);
@@ -3171,6 +3181,11 @@ void tditrace_exit(int argc, char *argv[]) {
     if (!tracebuffers[d].valid) {
       fprintf(stderr, "\"%s\" %d%% (#%d,%dB)\n", tracebuffers[d].filename,
               pctused, nr_entries, bytesused);
+
+      fprintf(stderr, "\"%s\" [t:%d,%d][i:%d,%d][s:%d,%d][e:%d,%d][n:%d,%d]\n",
+              tracebuffers[d].filename, nr_tasks, nr_task_entries, nr_isrs,
+              nr_isr_entries, nr_semas, nr_sema_entries, nr_events,
+              nr_event_entries, nr_notes, nr_note_entries);
     }
   }
 
