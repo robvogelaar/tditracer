@@ -391,7 +391,7 @@ void tditrace(const char *, ...);
 static __always_inline void *kmalloc(size_t size, gfp_t flags)
 {
 
-	//tditrace("km %u", (u32)size);
+	//tditrace("KM %u", (u32)size);
 
 	if (__builtin_constant_p(size)) {
 		if (size > KMALLOC_MAX_CACHE_SIZE)

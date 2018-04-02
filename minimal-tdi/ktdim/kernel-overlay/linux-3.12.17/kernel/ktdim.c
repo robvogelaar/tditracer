@@ -22,91 +22,77 @@
 #include <linux/types.h>
 
 static DEFINE_SPINLOCK(ktdim_lock);
+unsigned long ktdim_flags;
 
 #define KTDIM_IOCTL_GET_TRACEBUFFERSIZE _IO('T', 0)
 #define KTDIM_IOCTL_REWIND _IO('T', 1)
 #define KTDIM_IOCTL_ON _IO('T', 2)
 #define KTDIM_IOCTL_OFF _IO('T', 3)
 
-/*
- * [TDIT]
- * [RACE]
- * [    ]timeofday_start.tv_usec
- * [    ]timeofday_start.tv_sec
- * [    ]clock_monotonic_start.tv_nsec
- * [    ]clock_monotonic_start.tv_sec
- * ------
- * [    ]marker, lower 2 bytes is total length in dwords,
- * [    ]clock_monotonic_timestamp.tv_nsec
- * [    ]clock_monotonic_timestamp.tv_sec
- * [    ]<optional> numbers
- * [    ]<optional> text, padded with 0's to multiple of 4 bytes
- * ...
- * ------
- */
-
 typedef unsigned long long _u64;
 
 static u32 gtracebuffersize;
 static u8 gtditrace_enabled;
-static char *gtrace_buffer;
-static unsigned int *gtrace_buffer_dword_ptr;
+static char *gtracebuffer;
+static unsigned int *gtracebuffer_dword_ptr;
 
 static struct page *gtracebuffer_shared_page;
 
 static int tditrace_create_buffer(void) {
+
   /*
-   *
-    [TDIT]
+   * [TDIT]
    * [RACE]
    * [    ]timeofday_start.tv_usec
    * [    ]timeofday_start.tv_sec
    * [    ]clock_monotonic_start.tv_nsec
    * [    ]clock_monotonic_start.tv_sec
    * ------
-   * [    ]marker, lower 2 bytes is total length in dwords
+   * [    ]marker, byte 1,0 is total length in dwords,
+   *               byte 2   is nr numbers
+   *               byte 3   is identifier
    * [    ]clock_monotonic_timestamp.tv_nsec
    * [    ]clock_monotonic_timestamp.tv_sec
-   * [    ]text, padded with 0 to multiple of 4 bytes
+   * [    ]<optional> numbers
+   * [    ]<optional> text, padded with 0's to multiple of 4 bytes
    * ...
-   * ------
    */
 
   unsigned int *p;
   _u64 atimeofday_start;
   _u64 amonotonic_start;
 
-  gtracebuffersize = 4 * 1024 * 1024;
+  gtracebuffersize = 32 * 1024 * 1024;
+  gtracebuffer = (char *)vmalloc_user(gtracebuffersize);
 
-  gtrace_buffer =
-      (char *)__get_free_pages(GFP_KERNEL, get_order(gtracebuffersize));
+  gtracebuffer_shared_page = virt_to_page(gtracebuffer);
 
-  gtracebuffer_shared_page = virt_to_page(gtrace_buffer);
-
-  if (gtrace_buffer == 0)
+  if (gtracebuffer == 0) {
     printk("ktdim: unable to allocate %dMB tracebuffer\n",
            gtracebuffersize / (1024 * 1024));
+    return -1;
+  }
 
-  memset(gtrace_buffer, 0, gtracebuffersize);
+  memset(gtracebuffer, 0, gtracebuffersize);
 
   printk("ktdim: allocated %dMB @0x%08x tracebuffer\n",
-         gtracebuffersize / (1024 * 1024), (u32)gtrace_buffer);
+         gtracebuffersize / (1024 * 1024), (u32)gtracebuffer);
 
-  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
+  gtracebuffer_dword_ptr = (unsigned int *)gtracebuffer;
 
   /*
    * write one time start text
    */
-  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
-  gtrace_buffer_dword_ptr += 2;
+  sprintf((char *)gtracebuffer_dword_ptr, (char *)"TDITRACE");
+  gtracebuffer_dword_ptr += 2;
 
-  p = gtrace_buffer_dword_ptr;
+  p = gtracebuffer_dword_ptr;
 
-  do_gettimeofday((struct timeval *)gtrace_buffer_dword_ptr);
-  gtrace_buffer_dword_ptr += 2;
+  do_gettimeofday((struct timeval *)gtracebuffer_dword_ptr);
+  gtracebuffer_dword_ptr += 2;
 
-  do_posix_clock_monotonic_gettime((struct timespec *)gtrace_buffer_dword_ptr);
-  gtrace_buffer_dword_ptr += 2;
+  do_posix_clock_monotonic_gettime((struct timespec *)gtracebuffer_dword_ptr);
+  gtracebuffer_dword_ptr += 2;
 
   atimeofday_start = (_u64)*p++ * 1000000000;
   atimeofday_start += (_u64)*p++ * 1000;
@@ -114,7 +100,7 @@ static int tditrace_create_buffer(void) {
   amonotonic_start = (_u64)*p++ * 1000000000;
   amonotonic_start += (_u64)*p++;
 
-  *gtrace_buffer_dword_ptr = 0;
+  *gtracebuffer_dword_ptr = 0;
 
   gtditrace_enabled = 1;
 
@@ -138,14 +124,16 @@ EXPORT_SYMBOL(tditrace);
 static void tditrace_internal(va_list args, const char *format) {
 
   unsigned int trace_text[512 / 4];
+  unsigned int numbers[16];
+  unsigned int *pnumbers = numbers;
+  unsigned char nr_numbers = 0;
+  unsigned char identifier = 0;
   unsigned int i;
   char *trace_text_ptr;
   unsigned int *trace_text_dword_ptr;
   char ch;
   struct timespec mytime;
   int nr_textdwords;
-
-  unsigned long flags;
 
   if (!gtditrace_enabled) {
     return;
@@ -247,6 +235,17 @@ static void tditrace_internal(va_list args, const char *format) {
         break;
       }
 
+      case 'n': {
+        pnumbers[nr_numbers] = va_arg(args, int);
+        nr_numbers++;
+        break;
+      }
+
+      case 'm': {
+        identifier = va_arg(args, int) & 0xff;
+        break;
+      }
+
       default:
         break;
       }
@@ -265,34 +264,50 @@ static void tditrace_internal(va_list args, const char *format) {
    * store into tracebuffer
    */
 
-  spin_lock_irqsave(&ktdim_lock, flags);
+  spin_lock_irqsave(&ktdim_lock, ktdim_flags);
 
   /*
    * marker, 4 bytes
-   *       bytes 1+0 hold total length in dwords : 3 (marker,sec,nsec) +
-   *                                               nr_dwordtext
+   *       byte  0 |
+   *       byte  1 |- hold total length in dwords =
+   *
+   *                  3 (marker,sec,nsec) + nr_numbers + nr_dwordtext
+   *
+   *       byte  2 |- hold nr_numbers
+   *       byte  3 |- hold identifier : 00..ff
    */
 
-  *gtrace_buffer_dword_ptr++ = (3 + nr_textdwords);
-  *gtrace_buffer_dword_ptr++ = mytime.tv_sec;
-  *gtrace_buffer_dword_ptr++ = mytime.tv_nsec;
+  *gtracebuffer_dword_ptr++ = (3 + nr_numbers + nr_textdwords) |
+                              ((nr_numbers & 0xff) << 16) |
+                              ((identifier & 0xff) << 24);
+  *gtracebuffer_dword_ptr++ = mytime.tv_sec;
+  *gtracebuffer_dword_ptr++ = mytime.tv_nsec;
+
+  i = 0;
+  while (i != nr_numbers) {
+    *gtracebuffer_dword_ptr++ = pnumbers[i];
+    i++;
+  }
 
   i = nr_textdwords;
   while (i--) {
-    *gtrace_buffer_dword_ptr++ = *trace_text_dword_ptr++;
+    *gtracebuffer_dword_ptr++ = *trace_text_dword_ptr++;
   }
 
   /*
    * mark the next marker as invalid
    */
-  *gtrace_buffer_dword_ptr = 0;
+  *gtracebuffer_dword_ptr = 0;
 
-  if (((unsigned int)gtrace_buffer_dword_ptr - (unsigned int)gtrace_buffer) >
+  /*
+   * if full then disable
+   */
+  if (((unsigned int)gtracebuffer_dword_ptr - (unsigned int)gtracebuffer) >
       (gtracebuffersize - 1024)) {
     gtditrace_enabled = 0;
   }
 
-  spin_unlock_irqrestore(&ktdim_lock, flags);
+  spin_unlock_irqrestore(&ktdim_lock, ktdim_flags);
 
   if (gtditrace_enabled == 0)
     printk("ktdim: full\n");
@@ -300,25 +315,29 @@ static void tditrace_internal(va_list args, const char *format) {
 
 static void tditrace_rewind(void) {
 
+  spin_lock_irqsave(&ktdim_lock, ktdim_flags);
+
   gtditrace_enabled = 0;
+
+  spin_unlock_irqrestore(&ktdim_lock, ktdim_flags);
 
   printk("ktdim: rewind\n");
 
-  gtrace_buffer_dword_ptr = (unsigned int *)gtrace_buffer;
+  gtracebuffer_dword_ptr = (unsigned int *)gtracebuffer;
 
   /*
    * write one time start text
    */
-  sprintf((char *)gtrace_buffer_dword_ptr, (char *)"TDITRACE");
-  gtrace_buffer_dword_ptr += 2;
+  sprintf((char *)gtracebuffer_dword_ptr, (char *)"TDITRACE");
+  gtracebuffer_dword_ptr += 2;
 
-  do_gettimeofday((struct timeval *)gtrace_buffer_dword_ptr);
-  gtrace_buffer_dword_ptr += 2;
+  do_gettimeofday((struct timeval *)gtracebuffer_dword_ptr);
+  gtracebuffer_dword_ptr += 2;
 
-  do_posix_clock_monotonic_gettime((struct timespec *)gtrace_buffer_dword_ptr);
-  gtrace_buffer_dword_ptr += 2;
+  do_posix_clock_monotonic_gettime((struct timespec *)gtracebuffer_dword_ptr);
+  gtracebuffer_dword_ptr += 2;
 
-  *gtrace_buffer_dword_ptr = 0;
+  *gtracebuffer_dword_ptr = 0;
 
   gtditrace_enabled = 1;
 }
@@ -377,9 +396,7 @@ static int ktdim_Mmap(struct file *file, struct vm_area_struct *vma) {
    */
   vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP | VM_DONTEXPAND;
 
-  return remap_pfn_range(vma, vma->vm_start,
-                         page_to_pfn(gtracebuffer_shared_page), size,
-                         vma->vm_page_prot);
+  return remap_vmalloc_range(vma, gtracebuffer, 0);
 }
 
 static void rev_parse_args(char *str, u8 *argc, char **argv, int max_arg) {
@@ -421,17 +438,13 @@ u32 *fp;
 
 int proc_ktdim_control(struct file *file, const char __user *buffer,
                        size_t count, loff_t *ppos) {
-  char *str;
+  char str[512];
   u8 argc = 0;
   char *argv[5];
 #if 1
   u8 i;
 #endif
   u32 sz;
-
-  str = kzalloc(count + 1, GFP_KERNEL);
-  if (!str)
-    return -ENOMEM;
 
   if (copy_from_user(str, buffer, count))
     return -EFAULT;
@@ -512,14 +525,23 @@ int proc_ktdim_control(struct file *file, const char __user *buffer,
     printk("ktdim: unknown command\n");
   }
 
-  kfree(str);
   return count;
 }
 
 int proc_ktdim_tdi(struct file *file, const char __user *buffer, size_t count,
                    loff_t *ppos) {
+  char text[512];
 
-  tditrace("%s", buffer);
+  if (count > 1) {
+    strncpy(text, buffer, count - 1);
+    text[count - 1] = 0;
+    tditrace("%s", text);
+  } else {
+
+    // tditrace("%s", "test");
+
+    tditrace("mm%m%1", 192, 3000);
+  }
   return count;
 }
 
@@ -601,6 +623,9 @@ static int __init ktdim_init(void) {
   } else if (proc_create("ktdim-status", S_IFREG | S_IRUGO | S_IWUSR, NULL,
                          &proc_ktdim_status_fops) == NULL) {
     printk("proc create entry error\n");
+  } else if (proc_create("ktdim-tdi", S_IFREG | S_IRUGO | S_IWUSR, NULL,
+                         &proc_ktdim_tdi_fops) == NULL) {
+    printk("proc create entry error\n");
   } else
     err = 0;
   return err;
@@ -611,14 +636,12 @@ static void __exit ktdim_exit(void) {
 
   misc_deregister(&gktdimMiscDev);
 
-  if (gtracebuffer_shared_page) {
-    ClearPageReserved(gtracebuffer_shared_page);
-    free_pages((int)gtrace_buffer, get_order(gtracebuffersize));
-  }
+  vfree(gtracebuffer);
 
   remove_proc_entry("ktdim-help", NULL);
   remove_proc_entry("ktdim-control", NULL);
   remove_proc_entry("ktdim-status", NULL);
+  remove_proc_entry("ktdim-tdi", NULL);
 }
 
 module_init(ktdim_init);

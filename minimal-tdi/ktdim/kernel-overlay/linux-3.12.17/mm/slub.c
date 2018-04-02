@@ -2435,6 +2435,11 @@ void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
 	trace_kmem_cache_alloc(_RET_IP_, ret, s->object_size,
 				s->size, gfpflags);
 
+	if ((s->name[0] == 'k') && (s->name[1] == 'm')) {
+    	tditrace("%s", s->name);
+    	tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
+    }
+
 	return ret;
 }
 EXPORT_SYMBOL(kmem_cache_alloc);
@@ -2653,6 +2658,9 @@ void kmem_cache_free(struct kmem_cache *s, void *x)
 		return;
 	slab_free(s, virt_to_head_page(x), x, _RET_IP_);
 	trace_kmem_cache_free(_RET_IP_, x);
+
+    //tditrace("-%s", s->name);
+    //tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 }
 EXPORT_SYMBOL(kmem_cache_free);
 
@@ -3330,7 +3338,7 @@ void kfree(const void *x)
 	struct page *page;
 	void *object = (void *)x;
 
-	// tditrace("kf");
+	//tditrace("KF");
 
 	trace_kfree(_RET_IP_, x);
 
@@ -3736,6 +3744,9 @@ int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
 
 	if (err)
 		kmem_cache_close(s);
+
+    //tditrace("!%s", s->name);
+    //tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 
 	return err;
 }
