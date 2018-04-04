@@ -497,6 +497,8 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	if (!new_len)
 		return ret;
 
+    tditrace("+MR 0x%x", new_len);
+
 	down_write(&current->mm->mmap_sem);
 
 	if (flags & MREMAP_FIXED) {
@@ -579,8 +581,7 @@ out:
 	if (locked && new_len > old_len)
 		mm_populate(new_addr + old_len, new_len - old_len);
 
-    tditrace("mr:%x", new_len);
-    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
+    tditrace("-MR");
 
 	return ret;
 }

@@ -1492,6 +1492,8 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	struct rb_node **rb_link, *rb_parent;
 	unsigned long charged = 0;
 
+    tditrace("+MM 0x%x", len);
+
 	/* Check against address space limit. */
 	if (!may_expand_vm(mm, len >> PAGE_SHIFT)) {
 		unsigned long nr_pages;
@@ -1605,9 +1607,6 @@ munmap_back:
 out:
 	perf_event_mmap(vma);
 
-    tditrace("mm:%x", len);
-    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
-
 	vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	if (vm_flags & VM_LOCKED) {
 		if (!((vm_flags & VM_SPECIAL) || is_vm_hugetlb_page(vma) ||
@@ -1628,6 +1627,8 @@ out:
 	 * a completely new data area).
 	 */
 	vma->vm_flags |= VM_SOFTDIRTY;
+
+    tditrace("-MM");
 
 	return addr;
 
@@ -2156,9 +2157,6 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 					vma->vm_mm->highest_vm_end = address;
 				spin_unlock(&vma->vm_mm->page_table_lock);
 
-    			tditrace("mm+");
-			    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
-
 				perf_event_mmap(vma);
 			}
 		}
@@ -2227,9 +2225,6 @@ int expand_downwards(struct vm_area_struct *vma,
 				anon_vma_interval_tree_post_update_vma(vma);
 				vma_gap_update(vma);
 				spin_unlock(&vma->vm_mm->page_table_lock);
-
-    			tditrace("mm-");
-			    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 
 				perf_event_mmap(vma);
 			}
@@ -2605,6 +2600,8 @@ static unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (!len)
 		return addr;
 
+    tditrace("+BRK 0x%x", len);
+
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
 	error = get_unmapped_area(NULL, addr, len, 0, MAP_FIXED);
@@ -2676,13 +2673,14 @@ static unsigned long do_brk(unsigned long addr, unsigned long len)
 out:
 	perf_event_mmap(vma);
 
-    tditrace("brk:%x", len);
-    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 
 	mm->total_vm += len >> PAGE_SHIFT;
 	if (flags & VM_LOCKED)
 		mm->locked_vm += (len >> PAGE_SHIFT);
 	vma->vm_flags |= VM_SOFTDIRTY;
+
+    tditrace("-BRK");
+
 	return addr;
 }
 

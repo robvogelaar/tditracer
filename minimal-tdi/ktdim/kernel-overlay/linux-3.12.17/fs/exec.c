@@ -1436,13 +1436,7 @@ static int exec_binprm(struct linux_binprm *bprm)
 	old_vpid = task_pid_nr_ns(current, task_active_pid_ns(current->parent));
 	rcu_read_unlock();
 
-	//tditrace("@S+exec< %s[%d]", current->comm, current->pid);
-
 	ret = search_binary_handler(bprm);
-
-	//tditrace("@S+exec> %s[%d](p:%s)", current->comm, current->pid, current->parent->comm);
-	tditrace("@T-%s|%d", current->parent->comm, current->pid);
-	tditrace("@T+%s|%d", current->comm, current->pid);
 
 	if (ret >= 0) {
 		trace_sched_process_exec(current, old_pid, bprm);
@@ -1551,6 +1545,8 @@ static int do_execve_common(const char *filename,
 	retval = exec_binprm(bprm);
 	if (retval < 0)
 		goto out;
+
+	tditrace("@T+%s|%d", current->comm, current->pid);
 
 	/* execve succeeded */
 	current->fs->in_exec = 0;

@@ -2683,6 +2683,8 @@ got_pg:
 	return page;
 }
 
+void tditrace(const char *, ...);
+
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
@@ -2766,11 +2768,12 @@ out:
 
 	memcg_kmem_commit_charge(page, memcg, order);
 
+    tditrace("A%u", order);
+    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
+
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_nodemask);
-
-void tditrace(const char *, ...);
 
 /*
  * Common helper functions.
@@ -2786,9 +2789,6 @@ unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order)
 	VM_BUG_ON((gfp_mask & __GFP_HIGHMEM) != 0);
 
 	page = alloc_pages(gfp_mask, order);
-
-    tditrace("a%u", order);
-    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 
 	if (!page)
 		return 0;
@@ -2811,7 +2811,7 @@ void __free_pages(struct page *page, unsigned int order)
 			__free_pages_ok(page, order);
 	}
 
-    tditrace("f%u", order);
+    tditrace("F%u", order);
     tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 }
 

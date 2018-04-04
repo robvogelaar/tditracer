@@ -1459,8 +1459,6 @@ static void __vunmap(const void *addr, int deallocate_pages)
 	return;
 }
 
-void tditrace(const char *, ...);
-
 /**
  *	vfree  -  release memory allocated by vmalloc()
  *	@addr:		memory base address
@@ -1477,8 +1475,6 @@ void tditrace(const char *, ...);
  */
 void vfree(const void *addr)
 {
-	tditrace("vf");
-
 	BUG_ON(in_nmi());
 
 	kmemleak_free(addr);
@@ -1491,6 +1487,7 @@ void vfree(const void *addr)
 			schedule_work(&p->wq);
 	} else
 		__vunmap(addr, 1);
+
 }
 EXPORT_SYMBOL(vfree);
 
@@ -1606,6 +1603,8 @@ fail:
 	return NULL;
 }
 
+void tditrace(const char *, ...);
+
 /**
  *	__vmalloc_node_range  -  allocate virtually contiguous memory
  *	@size:		allocation size
@@ -1628,6 +1627,8 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	struct vm_struct *area;
 	void *addr;
 	unsigned long real_size = size;
+
+	tditrace("+VM %u", size);
 
 	size = PAGE_ALIGN(size);
 	if (!size || (size >> PAGE_SHIFT) > totalram_pages)
@@ -1655,6 +1656,8 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 	 * references to the virtual address of the vmalloc'ed block.
 	 */
 	kmemleak_alloc(addr, real_size, 3, gfp_mask);
+
+	tditrace("-VM");
 
 	return addr;
 
@@ -1711,10 +1714,9 @@ static inline void *__vmalloc_node_flags(unsigned long size,
  */
 void *vmalloc(unsigned long size)
 {
-	tditrace("vm %u", size);
-
 	return __vmalloc_node_flags(size, NUMA_NO_NODE,
 				    GFP_KERNEL | __GFP_HIGHMEM);
+
 }
 EXPORT_SYMBOL(vmalloc);
 
@@ -1730,10 +1732,9 @@ EXPORT_SYMBOL(vmalloc);
  */
 void *vzalloc(unsigned long size)
 {
-	tditrace("vz %u", size);
-
 	return __vmalloc_node_flags(size, NUMA_NO_NODE,
 				GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO);
+
 }
 EXPORT_SYMBOL(vzalloc);
 
@@ -1757,6 +1758,7 @@ void *vmalloc_user(unsigned long size)
 		area = find_vm_area(ret);
 		area->flags |= VM_USERMAP;
 	}
+
 	return ret;
 }
 EXPORT_SYMBOL(vmalloc_user);
