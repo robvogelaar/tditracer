@@ -73,8 +73,8 @@ cat /proc/slabinfo | awk '{SUM += ($3 * $4 / (1024 * 1024))} END {printf "Slabin
 lsmod | awk '{SUM += $2} END {printf "Kernel Modules: %8.1f MB\n", SUM / (1024*1024)}'
 _kmodules=$(lsmod | awk '{SUM += $2} END {printf SUM / 1024}')
 
-cat /proc/vmallocinfo | grep vmalloc | awk '{SUM += ($2 / (1024 * 1024))} END { printf "Kernel VMalloced:%7.1f MB\n", SUM}'
-_vmalloced=$(cat /proc/vmallocinfo | grep vmalloc | awk '{SUM += ($2 / (1 * 1024))} END { print SUM}')
+cat /proc/vmallocinfo | grep vmalloc | grep -v module_alloc | awk '{SUM += ($2 / (1024 * 1024))} END { printf "Kernel VMalloced:%7.1f MB\n", SUM}'
+_vmalloced=$(cat /proc/vmallocinfo | grep vmalloc | grep -v module_alloc | awk '{SUM += ($2 / (1 * 1024))} END { print SUM}')
 
 echo '                   ------ +'
 echo $_kernelstack $_pagetables $_slab $_kmodules $_vmalloced | awk '{printf "                %8.1f MB\n", ($1 + $2 + $3 + $4 + $5) / 1024}'
@@ -104,6 +104,5 @@ echo $_active $_inactive $_mlocked | awk '{printf "                %8.1f MB\n", 
 echo '---------------------------'
 
 #meminfo Unevictable
-#meminfo VmallocUsed:
-#meminfo Committed_AS:
-
+#meminfo VmallocUsed
+#meminfo Committed_AS
