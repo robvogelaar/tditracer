@@ -519,6 +519,8 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
 	return 0;
 }
 
+void tditrace(const char *, ...);
+
 /*
  * Freeing function for a buddy system allocator.
  *
@@ -616,6 +618,9 @@ static inline void __free_one_page(struct page *page,
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
 	zone->free_area[order].nr_free++;
+
+    tditrace("F%u", order);
+    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 }
 
 static inline int free_pages_check(struct page *page)
@@ -2683,8 +2688,6 @@ got_pg:
 	return page;
 }
 
-void tditrace(const char *, ...);
-
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
@@ -2810,9 +2813,6 @@ void __free_pages(struct page *page, unsigned int order)
 		else
 			__free_pages_ok(page, order);
 	}
-
-    tditrace("F%u", order);
-    tditrace("F~%u", global_page_state(NR_FREE_PAGES) << 2);
 }
 
 EXPORT_SYMBOL(__free_pages);
