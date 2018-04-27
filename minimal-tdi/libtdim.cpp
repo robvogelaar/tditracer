@@ -2991,13 +2991,15 @@ static void tditrace_rewind() {
   UNLOCK();
 }
 
+#define KTDIM_IOCTL_TYPE 99
+
 static void check_trace_buffer(int b) {
   FILE *file;
 
   if ((file = fopen(tracebuffers[b].filename, "r")) != NULL) {
     /* dev/ktdim */
     if (strncmp("/dev/", tracebuffers[b].filename, 5) == 0) {
-      long size = ioctl(fileno(file), _IO('T', 0), NULL);
+      long size = ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 0), NULL);
       sprintf(tracebuffers[b].procname, "K");
       tracebuffers[b].pid = 0;
       tracebuffers[b].bufmmapped =
