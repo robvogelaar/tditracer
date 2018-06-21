@@ -203,7 +203,7 @@ struct tdistructprocsmaps {
 typedef int (*pfntdiprocsmaps)(const char* pathname, struct tdistructprocsmaps *s);
 
 struct tdistructprocdiskstats {
-  char name[16];
+  char name[32];
   char match[64];
   unsigned int reads;
   unsigned int reads_merged;
@@ -218,8 +218,8 @@ typedef int (*pfntdiprocdiskstats)(struct tdistructprocdiskstats s[],
                                    const char *disks, int *nrdisks);
 
 struct tdistructprocnetdev {
-  char name[16];
-  char match[64];
+  char name[64];
+  char match[256];
   unsigned long r_bytes;
   unsigned int r_packets;
   unsigned int r_errs;
@@ -257,6 +257,6 @@ typedef int (*pfntdiprocnetdev)(struct tdistructprocnetdev s[],
 #define CPUINFO_MAXNUMBER   7   // 0..7
 #define MEMINFO_MAXNUMBER   9   // 0..9
 #define DSKINFO_MAXNUMBER   7   // 0..7
-#define NETINFO_MAXNUMBER   3   // 0..3
+#define NETINFO_MAXNUMBER   19   // 0..19 (10x interfaces)
 
 #define SLFINFO_MAXNUMBER  10   // 0..10

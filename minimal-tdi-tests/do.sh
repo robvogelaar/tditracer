@@ -1,5 +1,5 @@
-g++ -m32 -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so && cp -v libtdim.so /home/rev/nfs
-g++ -m32 -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -fPIC -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim && cp -v tdim /home/rev/nfs
+g++ -m32 -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.so && cp -v libtdim.so /home/rev/nfs
+g++ -m32 -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations ../minimal-tdi/tdim.cpp -ldl -lstdc++ -fPIC -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim && cp -v tdim /home/rev/nfs
 
 g++ -m32 -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs
 g++ -m32 simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver && cp -v simserver /home/rev/nfs
