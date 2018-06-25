@@ -2804,10 +2804,14 @@ int tditrace_init(void) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"route\" ; not tracing\n",
             gprocname, gpid);
     return -1;
+
+  #if 0
   } else if (strcmp(gprocname, "strace") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return -1;
+  #endif
+
   } else if (strcmp(gprocname, "gdbserver") == 0) {
     fprintf(stderr,
             "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
@@ -3291,7 +3295,7 @@ void tditrace_internal(va_list args, const char *format) {
 
   unsigned int trace_text[1024 / 4];
   unsigned int numbers[20];
-  unsigned int *pnumbers = numbers;
+  unsigned int *pnumbers = &numbers[0];
   unsigned char nr_numbers = 0;
   unsigned char identifier = 0;
   unsigned int i;
@@ -3410,35 +3414,35 @@ void tditrace_internal(va_list args, const char *format) {
       case 'C': {
         identifier = CPUINFO;
         nr_numbers = CPUINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'M': {
         identifier = MEMINFO;
         nr_numbers = MEMINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'S': {
         identifier = SLFINFO;
         nr_numbers = SLFINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'D': {
         identifier = DSKINFO;
         nr_numbers = DSKINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'N': {
         identifier = NETINFO;
         nr_numbers = NETINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
@@ -3522,7 +3526,7 @@ void tditrace_internal(va_list args, const char *format) {
       case '9': {
         identifier = 100 + ch - '0';
         nr_numbers = ch - '0' + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
@@ -3596,6 +3600,7 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   UNLOCK();
+
 }
 
 } // extern "C"
@@ -3604,6 +3609,7 @@ static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();
 
 static void tditracer_constructor() {
+
   if (tditrace_init() == -1) {
     return;
   }
