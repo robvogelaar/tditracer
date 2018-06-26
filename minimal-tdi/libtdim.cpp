@@ -328,6 +328,22 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
   }
 }
 
+static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
+#define MAXINTS 2
+  static int entries_added = 0;
+
+  if (!entries_added) {
+    fprintf(stdout, "NAM 5 %d cei00\n", 5900);
+    fprintf(stdout, "NAM 5 %d wdev0\n", 5901);
+    entries_added = 1;
+  }
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  dovalue(numbers[0], 5900, 0, 2);
+  dovalue(numbers[1], 5901, 0, 2);
+}
+
+
 static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
   static unsigned int pidlist[16];
   static int nrpids_seen = 0;
@@ -469,6 +485,9 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     return;
   } else if (identifier == NETINFO) {
     addentry_netinfo(numbers, timestamp);
+    return;
+  } else if (identifier == INTINFO) {
+    addentry_intinfo(numbers, timestamp);
     return;
   } else if (identifier == PIDINFO) {
     int i;
@@ -2265,6 +2284,38 @@ static void sample_info(void) {
     s_numbers[10] = (unsigned int)ru.ru_majflt;
     tditrace("%S", s_numbers);
   }
+
+
+
+  /*
+   *
+    cat /proc/interrupts
+    root@intel_ce_linux:~# cat /proc/interrupts
+               CPU0       CPU1
+      0:         58          0   IO-APIC-edge      timer
+      8:          1          0   IO-APIC-edge      rtc0
+      9:          0          0   IO-APIC-fasteoi   acpi
+     16:    3037602          0   IO-APIC-fasteoi   cei00
+     17:        323   33312695   IO-APIC-fasteoi   wdev0
+  *
+  */
+
+  char line[1024];
+  FILE *f = NULL;
+
+  int ints[2] = {0,0};
+
+  if ((f = fopen("/proc/interrupts", "r"))) {
+    for (int i = 0; i < 4; i++)
+      fgets(line, 256, f);
+    fgets(line, 256, f);
+    sscanf(line, "%*s %d", &ints[0]);
+    fgets(line, 256, f);
+    sscanf(line, "%*s %*d %d", &ints[1]);
+    fclose(f);
+  }
+
+  tditrace("%I", ints);
 }
 
 static void *socket_thread(void *param) {
@@ -3442,6 +3493,13 @@ void tditrace_internal(va_list args, const char *format) {
       case 'N': {
         identifier = NETINFO;
         nr_numbers = NETINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        break;
+      }
+
+      case 'I': {
+        identifier = INTINFO;
+        nr_numbers = INTINFO_MAXNUMBER + 1;
         pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
