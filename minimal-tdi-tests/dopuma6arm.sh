@@ -22,39 +22,6 @@
 #
 #
 
-#export SR="--sysroot=/opt/puma6-gw-6.1-toolchain/usr/armeb-buildroot-linux-uclibcgnueabi/sysroot"
-
-#arm-rdk-linux-gnueabi-g++ $SR -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter libtdim.cpp -ldl -o libtdim.so && cp -v libtdim.so /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ $SR -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim && cp -v tdim /home/rev/nfs
-
-
-#arm-rdk-linux-gnueabi-g++ $SR -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper && cp -v sleeper /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ $SR simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver && cp -v simserver /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ $SR simclient.cpp -Wall -Wno-unused-variable -o simclient && cp -v simclient /home/rev/nfs
-
-#arm-rdk-linux-gnueabi-g++ $SR membench.cpp -Wall -Wno-unused-variable -o membench && cp -v membench /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ memspeed.cpp -Wall -o memspeed && cp memspeed /home/rev/nfs
-
-#arm-rdk-linux-gnueabi-gcc smemcap.c -Wall -o smemcap && cp -v smemcap /home/rev/nfs
-
-#arm-rdk-linux-gnueabi-gcc fincore.c -Wall -lm -o fincore && cp -v fincore /home/rev/nfs
-
-#arm-rdk-linux-gnueabi-gcc memlock.c -Wall -o memlock && cp memlock /home/rev/nfs
-
-#arm-rdk-linux-gnueabi-g++ -O2 procdiskstats.cpp -Wall -o procdiskstats && cp -v procdiskstats /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ -O2 procnetdev.cpp -Wall -o procnetdev && cp -v procnetdev /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ -O2 procselfstat.cpp -Wall -o procselfstat && cp -v procselfstat /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ $SR -O2 procsmaps.cpp -Wall -o procsmaps && cp -v procsmaps /home/rev/nfs
-#arm-rdk-linux-gnueabi-g++ -O2 procstat.cpp -Wall -Wno-unused-result -o procstat && cp -v procstat /home/rev/nfs
-
-#gcc -m32 -shared -O0 libcode.c -o libcode.so
-#cp -v libcode.so /home/rev/nfs/
-#cp -v libcode.so /home/rev/nfs/libcode1.so
-#cp -v libcode.so /home/rev/nfs/libcode2.so
-#cp -v libcode.so /home/rev/nfs/libcode3.so
-#cp -v libcode.so /home/rev/nfs/libcode4.so
-#cp -v libcode.so /home/rev/nfs/libcode5.so
-#cp -v libcode.so /home/rev/nfs/libcode6.so
 
 export extra="-g0"
 
