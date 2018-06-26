@@ -56,7 +56,8 @@
 #cp -v libcode.so /home/rev/nfs/libcode5.so
 #cp -v libcode.so /home/rev/nfs/libcode6.so
 
-export extra="-g0"
+export extra="-g0 -Wno-unused-variable"
+
 gcc -m32 $extra -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.atom.so
 gcc -m32 $extra -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations ../minimal-tdi/tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim.atom
 

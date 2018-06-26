@@ -47,8 +47,8 @@ static int pid_procname_table_nr = 0;
 static char envs[128][16];
 static int envs_nr;
 
-static char diskslist[128];
-static char netslist[128];
+static char diskslist[256];
+static char netslist[256];
 
 static pthread_mutex_t lock;
 
@@ -297,7 +297,7 @@ static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
 }
 
 static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
-#define MAXNETS 2
+#define MAXNETS 10
   static int entries_added = 0;
   static int nrnets;
   static char nets[64][MAXNETS];
@@ -327,6 +327,22 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
     dovalue(numbers[i * 2 + 1], 5801, i, MAXNETS);
   }
 }
+
+static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
+#define MAXINTS 2
+  static int entries_added = 0;
+
+  if (!entries_added) {
+    fprintf(stdout, "NAM 5 %d cei00\n", 5900);
+    fprintf(stdout, "NAM 5 %d wdev0\n", 5901);
+    entries_added = 1;
+  }
+
+  fprintf(stdout, "TIM %lld\n", timestamp);
+  dovalue(numbers[0], 5900, 0, 2);
+  dovalue(numbers[1], 5901, 0, 2);
+}
+
 
 static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
   static unsigned int pidlist[16];
@@ -469,6 +485,9 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
     return;
   } else if (identifier == NETINFO) {
     addentry_netinfo(numbers, timestamp);
+    return;
+  } else if (identifier == INTINFO) {
+    addentry_intinfo(numbers, timestamp);
     return;
   } else if (identifier == PIDINFO) {
     int i;
@@ -1866,9 +1885,11 @@ int tdiprocnetdev(struct tdistructprocnetdev s[], const char *nets,
     int n;
     if ((f = fopen("/proc/net/dev", "r"))) {
       while (fgets(line, 256, f)) {
+
         for (n = 0; n < *nrnets; n++) {
           char *pos;
           struct tdistructprocnetdev *pn = &s[n];
+
           if ((pos = strstr(line, pn->name))) {
             sscanf(pos, pn->match, &pn->r_bytes, &pn->r_packets, &pn->r_errs,
                    &pn->r_drop, &pn->r_fifo, &pn->r_frame, &pn->r_compressed,
@@ -2155,7 +2176,7 @@ static void sample_info(void) {
   /*
    * procnetdev
    */
-  struct tdistructprocnetdev procnetdev[4];
+  struct tdistructprocnetdev procnetdev[10];
   int nrnets;
   if (do_procnetdev) {
     tdiprocnetdev(procnetdev, getenv("NETS"), &nrnets);
@@ -2203,14 +2224,46 @@ static void sample_info(void) {
     if (nrdisks)
       tditrace("%D", d_numbers);
 
-    unsigned int n_numbers[4];
+    unsigned int n_numbers[20];
     if (nrnets >= 1) {
-      n_numbers[0] = procnetdev[0].r_packets;
-      n_numbers[1] = procnetdev[0].t_packets;
+      n_numbers[0] = procnetdev[0].r_bytes;
+      n_numbers[1] = procnetdev[0].t_bytes;
     }
     if (nrnets >= 2) {
-      n_numbers[2] = procnetdev[1].r_packets;
-      n_numbers[3] = procnetdev[1].t_packets;
+      n_numbers[2] = procnetdev[1].r_bytes;
+      n_numbers[3] = procnetdev[1].t_bytes;
+    }
+    if (nrnets >= 3) {
+      n_numbers[4] = procnetdev[2].r_bytes;
+      n_numbers[5] = procnetdev[2].t_bytes;
+    }
+    if (nrnets >= 4) {
+      n_numbers[6] = procnetdev[3].r_bytes;
+      n_numbers[7] = procnetdev[3].t_bytes;
+    }
+    if (nrnets >= 5) {
+      n_numbers[8] = procnetdev[4].r_bytes;
+      n_numbers[9] = procnetdev[4].t_bytes;
+    }
+    if (nrnets >= 6) {
+      n_numbers[10] = procnetdev[5].r_bytes;
+      n_numbers[11] = procnetdev[5].t_bytes;
+    }
+    if (nrnets >= 7) {
+      n_numbers[12] = procnetdev[6].r_bytes;
+      n_numbers[13] = procnetdev[6].t_bytes;
+    }
+    if (nrnets >= 8) {
+      n_numbers[14] = procnetdev[7].r_bytes;
+      n_numbers[15] = procnetdev[7].t_bytes;
+    }
+    if (nrnets >= 9) {
+      n_numbers[16] = procnetdev[8].r_bytes;
+      n_numbers[17] = procnetdev[8].t_bytes;
+    }
+    if (nrnets >= 10) {
+      n_numbers[18] = procnetdev[9].r_bytes;
+      n_numbers[19] = procnetdev[9].t_bytes;
     }
     if (nrnets)
       tditrace("%N", n_numbers);
@@ -2231,6 +2284,38 @@ static void sample_info(void) {
     s_numbers[10] = (unsigned int)ru.ru_majflt;
     tditrace("%S", s_numbers);
   }
+
+
+
+  /*
+   *
+    cat /proc/interrupts
+    root@intel_ce_linux:~# cat /proc/interrupts
+               CPU0       CPU1
+      0:         58          0   IO-APIC-edge      timer
+      8:          1          0   IO-APIC-edge      rtc0
+      9:          0          0   IO-APIC-fasteoi   acpi
+     16:    3037602          0   IO-APIC-fasteoi   cei00
+     17:        323   33312695   IO-APIC-fasteoi   wdev0
+  *
+  */
+
+  char line[1024];
+  FILE *f = NULL;
+
+  int ints[2] = {0,0};
+
+  if ((f = fopen("/proc/interrupts", "r"))) {
+    for (int i = 0; i < 4; i++)
+      fgets(line, 256, f);
+    fgets(line, 256, f);
+    sscanf(line, "%*s %d", &ints[0]);
+    fgets(line, 256, f);
+    sscanf(line, "%*s %*d %d", &ints[1]);
+    fclose(f);
+  }
+
+  tditrace("%I", ints);
 }
 
 static void *socket_thread(void *param) {
@@ -2770,10 +2855,14 @@ int tditrace_init(void) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"route\" ; not tracing\n",
             gprocname, gpid);
     return -1;
+
+  #if 0
   } else if (strcmp(gprocname, "strace") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return -1;
+  #endif
+
   } else if (strcmp(gprocname, "gdbserver") == 0) {
     fprintf(stderr,
             "tdi: init[%s][%d], procname is \"gdbserver\" ; not tracing\n",
@@ -2991,13 +3080,15 @@ static void tditrace_rewind() {
   UNLOCK();
 }
 
+#define KTDIM_IOCTL_TYPE 99
+
 static void check_trace_buffer(int b) {
   FILE *file;
 
   if ((file = fopen(tracebuffers[b].filename, "r")) != NULL) {
     /* dev/ktdim */
     if (strncmp("/dev/", tracebuffers[b].filename, 5) == 0) {
-      long size = ioctl(fileno(file), _IO('T', 0), NULL);
+      long size = ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 0), NULL);
       sprintf(tracebuffers[b].procname, "K");
       tracebuffers[b].pid = 0;
       tracebuffers[b].bufmmapped =
@@ -3254,8 +3345,8 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   unsigned int trace_text[1024 / 4];
-  unsigned int numbers[16];
-  unsigned int *pnumbers = numbers;
+  unsigned int numbers[20];
+  unsigned int *pnumbers = &numbers[0];
   unsigned char nr_numbers = 0;
   unsigned char identifier = 0;
   unsigned int i;
@@ -3374,35 +3465,42 @@ void tditrace_internal(va_list args, const char *format) {
       case 'C': {
         identifier = CPUINFO;
         nr_numbers = CPUINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'M': {
         identifier = MEMINFO;
         nr_numbers = MEMINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'S': {
         identifier = SLFINFO;
         nr_numbers = SLFINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'D': {
         identifier = DSKINFO;
         nr_numbers = DSKINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
       case 'N': {
         identifier = NETINFO;
         nr_numbers = NETINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        break;
+      }
+
+      case 'I': {
+        identifier = INTINFO;
+        nr_numbers = INTINFO_MAXNUMBER + 1;
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
@@ -3486,7 +3584,7 @@ void tditrace_internal(va_list args, const char *format) {
       case '9': {
         identifier = 100 + ch - '0';
         nr_numbers = ch - '0' + 1;
-        pnumbers = (unsigned int *)va_arg(args, int);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
         break;
       }
 
@@ -3560,6 +3658,7 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   UNLOCK();
+
 }
 
 } // extern "C"
@@ -3568,6 +3667,7 @@ static void __attribute__((constructor)) tditracer_constructor();
 static void __attribute__((destructor)) tditracer_destructor();
 
 static void tditracer_constructor() {
+
   if (tditrace_init() == -1) {
     return;
   }

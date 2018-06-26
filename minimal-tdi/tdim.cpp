@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+#define KTDIM_IOCTL_TYPE 99
+
 extern "C" {
 #include "tdim.h"
 }
@@ -123,6 +125,7 @@ static int tdidump(int argc, char *argv[]) {
 }
 
 /******************************************************************************/
+
 static int tdistat(int argc, char *argv[]) {
   DIR *dp;
   struct dirent *ep;
@@ -134,13 +137,11 @@ static int tdistat(int argc, char *argv[]) {
 
   sprintf(filename, "/dev/ktdim");
   if ((file = fopen(filename, "r")) != NULL) {
-    long size = ioctl(fileno(file), _IO('T', 0), NULL);
+    long size = ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 0), NULL);
 
     fprintf(stdout, "\"%s\", (%lluMB), ", filename,
             (unsigned long long)size / (1024 * 1024));
-
     bufmmapped = (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
-
     // token should hold "TDITRACE"
     if (strncmp("TDITRACE", bufmmapped, 8) != 0) {
       fprintf(stderr, "invalid "
@@ -184,7 +185,6 @@ static int tdistat(int argc, char *argv[]) {
   if (dp != NULL) {
     while ((ep = readdir(dp))) {
       if (strncmp(ep->d_name, "tditracebuffer@", 15) == 0) {
-
         sprintf(filename, "%s%s", getenv("TMPFS") ? getenv("TMPFS") : TMPFS,
                 ep->d_name);
 
@@ -774,6 +774,8 @@ std::vector<std::string> EventRegexes;
 std::vector<std::string> NoteRegexes;
 
 static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
+  static long long int add24hr = 0;
+  static long long int ptstamp = 0;
   static long long int itstamp = 0;
   if (p) {
     size_t nmatch = 1;
@@ -830,6 +832,24 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
         }
         ts_once = 1;
       }
+
+      if (ptstamp == 0) {
+      } else {
+        if (*tstamp < ptstamp) {
+          fprintf(stderr, "timestamps decreased!! \"%s\" = %lldnsec\n", buf,
+                  *tstamp);
+          add24hr++;
+        }
+      }
+      if (add24hr) {
+        //fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
+        //        *tstamp, add24hr);
+        //fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
+        //        *tstamp, add24hr);
+      }
+      ptstamp = *tstamp;
+
+      *tstamp += add24hr * 24 * 3600 * 1000000000LL;
 
     } else if (reti == REG_NOMATCH) {
       // fprintf(stderr, "Regex tstamp no match [%s]\n", buffer);
@@ -946,7 +966,7 @@ static int tdipipe(int argc, char *argv[]) {
   static int do_once = 0;
   long long int tstamp;
 
-  while (fgets(buffer, 255, stdin)) {
+  while (fgets(buffer, 1024, stdin)) {
     if (!do_once) {
       do_once = 1;
       fprintf(stdout, "TIME 1000000000\n");
@@ -973,21 +993,19 @@ static int tdipipe(int argc, char *argv[]) {
 }
 
 static int tdik(int argc, char *argv[]) {
-
   if (argc >= 1) {
     FILE *file;
     char filename[128];
     sprintf(filename, "/dev/ktdim");
     if ((file = fopen(filename, "r")) != NULL) {
       if ((argc == 1) && (strcmp(argv[0], "rewind") == 0)) {
-        ioctl(fileno(file), _IO('T', 1), NULL);
+        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 1), NULL);
       } else if ((argc == 1) && (strcmp(argv[0], "on") == 0)) {
-        ioctl(fileno(file), _IO('T', 2), NULL);
+        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 2), NULL);
       } else if ((argc == 1) && (strcmp(argv[0], "off") == 0)) {
-        ioctl(fileno(file), _IO('T', 3), NULL);
+        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 3), NULL);
       } else if ((argc == 2) && (strcmp(argv[0], "dump") == 0)) {
-
-        long size = ioctl(fileno(file), _IO('T', 0), NULL);
+        long size = ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 0), NULL);
         char *bufmmapped =
             (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
         FILE *binfile;
