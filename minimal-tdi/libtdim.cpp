@@ -181,10 +181,10 @@ static void tditrace_rewind();
   _##id##_prev[pidid] = (number - _##id##_base[pidid]);
 
 #define dovalue(number, id, pidid, span)                                       \
-                                                                               \
   static unsigned int _##id##_seen[span];                                      \
   static unsigned int _##id##_prev[span];                                      \
   static unsigned int _##id##_prevprev[span];                                  \
+                                                                               \
   if (_##id##_seen[pidid] == 0) {                                              \
     if (number != 0) {                                                         \
       _##id##_seen[pidid] = 1;                                                 \
@@ -301,6 +301,16 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
   static int entries_added = 0;
   static int nrnets;
   static char nets[64][MAXNETS];
+  int i;
+
+
+  static int inc=1;
+  for (i=0;i<10;i++)
+    numbers[i*4]   = inc;
+    numbers[i*4+1] = inc;
+    numbers[i*4+2] = inc;
+    numbers[i*4+3] = inc;
+  inc+= 1;
 
   if (!entries_added) {
     char *saveptr;
@@ -309,9 +319,13 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
       strcpy(nets[nrnets], pt);
       pt = strtok_r(NULL, ",", &saveptr);
 
-      fprintf(stdout, "NAM 5 %d %s:receive\n", 5800 + nrnets * MAXNETS,
+      fprintf(stdout, "NAM 5 %d %s:rx_bytes\n", 5800 + nrnets * MAXNETS,
               nets[nrnets]);
-      fprintf(stdout, "NAM 5 %d %s:transmit\n", 5801 + nrnets * MAXNETS,
+      fprintf(stdout, "NAM 5 %d %s:rx_packets\n", 5801 + nrnets * MAXNETS,
+              nets[nrnets]);
+      fprintf(stdout, "NAM 5 %d %s:tx_bytes\n", 5802 + nrnets * MAXNETS,
+              nets[nrnets]);
+      fprintf(stdout, "NAM 5 %d %s:tx_packets\n", 5803 + nrnets * MAXNETS,
               nets[nrnets]);
       nrnets++;
       if (nrnets == MAXNETS)
@@ -321,10 +335,12 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
   }
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  int i;
   for (i = 0; i < nrnets; i++) {
-    dovalue(numbers[i * 2 + 0], 5800, i, MAXNETS);
-    dovalue(numbers[i * 2 + 1], 5801, i, MAXNETS);
+
+    dovalue(numbers[i * 4 + 0], 5800, i, MAXNETS);
+    dovalue(numbers[i * 4 + 1], 5801, i, MAXNETS);
+    dovalue(numbers[i * 4 + 2], 5802, i, MAXNETS);
+    dovalue(numbers[i * 4 + 3], 5803, i, MAXNETS);
   }
 }
 
@@ -339,8 +355,8 @@ static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
   }
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[0], 5900, 0, 2);
-  dovalue(numbers[1], 5901, 0, 2);
+  dovalue(numbers[0], 5900, 0, 1);
+  dovalue(numbers[1], 5901, 0, 1);
 }
 
 
@@ -2224,46 +2240,66 @@ static void sample_info(void) {
     if (nrdisks)
       tditrace("%D", d_numbers);
 
-    unsigned int n_numbers[20];
+    unsigned int n_numbers[40];
     if (nrnets >= 1) {
       n_numbers[0] = procnetdev[0].r_bytes;
-      n_numbers[1] = procnetdev[0].t_bytes;
+      n_numbers[1] = procnetdev[0].r_packets;
+      n_numbers[2] = procnetdev[0].t_bytes;
+      n_numbers[3] = procnetdev[0].t_packets;
     }
     if (nrnets >= 2) {
-      n_numbers[2] = procnetdev[1].r_bytes;
-      n_numbers[3] = procnetdev[1].t_bytes;
+      n_numbers[4] = procnetdev[1].r_bytes;
+      n_numbers[5] = procnetdev[1].r_packets;
+      n_numbers[6] = procnetdev[1].t_bytes;
+      n_numbers[7] = procnetdev[1].t_packets;
     }
     if (nrnets >= 3) {
-      n_numbers[4] = procnetdev[2].r_bytes;
-      n_numbers[5] = procnetdev[2].t_bytes;
+      n_numbers[8] = procnetdev[2].r_bytes;
+      n_numbers[9] = procnetdev[2].r_packets;
+      n_numbers[10] = procnetdev[2].t_bytes;
+      n_numbers[11] = procnetdev[2].t_packets;
     }
     if (nrnets >= 4) {
-      n_numbers[6] = procnetdev[3].r_bytes;
-      n_numbers[7] = procnetdev[3].t_bytes;
+      n_numbers[12] = procnetdev[3].r_bytes;
+      n_numbers[13] = procnetdev[3].r_packets;
+      n_numbers[14] = procnetdev[3].t_bytes;
+      n_numbers[15] = procnetdev[3].t_packets;
     }
     if (nrnets >= 5) {
-      n_numbers[8] = procnetdev[4].r_bytes;
-      n_numbers[9] = procnetdev[4].t_bytes;
+      n_numbers[16] = procnetdev[4].r_bytes;
+      n_numbers[17] = procnetdev[4].r_packets;
+      n_numbers[18] = procnetdev[4].t_bytes;
+      n_numbers[19] = procnetdev[4].t_packets;
     }
     if (nrnets >= 6) {
-      n_numbers[10] = procnetdev[5].r_bytes;
-      n_numbers[11] = procnetdev[5].t_bytes;
+      n_numbers[20] = procnetdev[5].r_bytes;
+      n_numbers[21] = procnetdev[5].r_packets;
+      n_numbers[22] = procnetdev[5].t_bytes;
+      n_numbers[23] = procnetdev[5].t_packets;
     }
     if (nrnets >= 7) {
-      n_numbers[12] = procnetdev[6].r_bytes;
-      n_numbers[13] = procnetdev[6].t_bytes;
+      n_numbers[24] = procnetdev[6].r_bytes;
+      n_numbers[25] = procnetdev[6].r_packets;
+      n_numbers[26] = procnetdev[6].t_bytes;
+      n_numbers[27] = procnetdev[6].t_packets;
     }
     if (nrnets >= 8) {
-      n_numbers[14] = procnetdev[7].r_bytes;
-      n_numbers[15] = procnetdev[7].t_bytes;
+      n_numbers[28] = procnetdev[7].r_bytes;
+      n_numbers[29] = procnetdev[7].r_packets;
+      n_numbers[30] = procnetdev[7].t_bytes;
+      n_numbers[31] = procnetdev[7].t_packets;
     }
     if (nrnets >= 9) {
-      n_numbers[16] = procnetdev[8].r_bytes;
-      n_numbers[17] = procnetdev[8].t_bytes;
+      n_numbers[32] = procnetdev[8].r_bytes;
+      n_numbers[33] = procnetdev[8].r_packets;
+      n_numbers[34] = procnetdev[8].t_bytes;
+      n_numbers[35] = procnetdev[8].t_packets;
     }
     if (nrnets >= 10) {
-      n_numbers[18] = procnetdev[9].r_bytes;
-      n_numbers[19] = procnetdev[9].t_bytes;
+      n_numbers[36] = procnetdev[9].r_bytes;
+      n_numbers[37] = procnetdev[9].r_packets;
+      n_numbers[38] = procnetdev[9].t_bytes;
+      n_numbers[39] = procnetdev[9].t_packets;
     }
     if (nrnets)
       tditrace("%N", n_numbers);
@@ -2284,7 +2320,6 @@ static void sample_info(void) {
     s_numbers[10] = (unsigned int)ru.ru_majflt;
     tditrace("%S", s_numbers);
   }
-
 
 
   /*
@@ -2431,8 +2466,8 @@ static void offload() {
 
   if (!offload_over50) {
     LOCK();
-    int check = (((unsigned int)gtrace_buffer_byte_ptr -
-                  (unsigned int)gtrace_buffer) > (gtracebuffersize / 2));
+    int check = ((gtrace_buffer_byte_ptr -
+                  gtrace_buffer) > (gtracebuffersize / 2));
     UNLOCK();
 
     if (check) {
@@ -2495,8 +2530,8 @@ static void offload() {
 
   } else {
     LOCK();
-    int check = (((unsigned int)gtrace_buffer_byte_ptr -
-                  (unsigned int)gtrace_buffer) < (gtracebuffersize / 2));
+    int check = ((gtrace_buffer_byte_ptr -
+                  gtrace_buffer) < (gtracebuffersize / 2));
     UNLOCK();
 
     if (check) {
