@@ -25,3 +25,8 @@ tdistat
 tdidump
 tditest
 *.arm*
+*.atom*
+*.tdi
+tdim
+libtdim.so
+
