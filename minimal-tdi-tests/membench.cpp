@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
                                     /* | MAP_POPULATE */
                                     ,
                                     -1, 0);
-        if ((int)allocations_mmap1[i] != -1) {
+        if (allocations_mmap1[i] != (char*)-1) {
           memset(allocations_mmap1[i], 0, mmap1);
           fprintf(stdout, ".");
           fflush(stdout);

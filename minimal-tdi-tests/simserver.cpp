@@ -136,7 +136,7 @@ void execute(const char* msg) {
                     -1, 0);
     TDITRACE("@T-action");
 
-    if ((int)mmaps[mmap_counter] != -1) {
+    if (mmaps[mmap_counter] != (char*)-1) {
       TDITRACE("@T+action memset %s", s);
       memset(mmaps[mmap_counter], 0, mmaps_bytes[mmap_counter]);
       TDITRACE("@T-action");
