@@ -3,8 +3,8 @@ g++ -fpermissive -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unus
 g++ -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations ../minimal-tdi/tdim.cpp -ldl -lstdc++ -fPIC -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
 g++ -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper
 
-g++ simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver
-g++ simclient.cpp -Wall -Wno-unused-variable -o simclient
+#g++ simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver
+#g++ simclient.cpp -Wall -Wno-unused-variable -o simclient
 
 #g++ membench.cpp -Wall -Wno-unused-variable -o membench
 #g++ -m32 memspeed.cpp -Wall -o memspeed && cp memspeed /home/rev/nfs

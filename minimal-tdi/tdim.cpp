@@ -172,7 +172,7 @@ static int tdistat(int argc, char *argv[]) {
         ptr += *ptr & 0xffff;
         i++;
       }
-      fprintf(stdout, "%lld%% (#%d, %dB)\n",
+      fprintf(stdout, "%lld%% (#%d, %ldB)\n",
               ((char *)ptr - bufmmapped) * 100LL / size + 1, i,
               (char *)ptr - bufmmapped);
       munmap(bufmmapped, size);
@@ -233,7 +233,7 @@ static int tdistat(int argc, char *argv[]) {
             ptr += *ptr & 0xffff;
             i++;
           }
-          fprintf(stdout, "%lld%% (#%d, %dB)\n",
+          fprintf(stdout, "%lld%% (#%d, %ldB)\n",
                   ((char *)ptr - bufmmapped) * 100LL / st.st_size + 1, i,
                   (char *)ptr - bufmmapped);
 
@@ -999,13 +999,13 @@ static int tdik(int argc, char *argv[]) {
     sprintf(filename, "/dev/ktdim");
     if ((file = fopen(filename, "r")) != NULL) {
       if ((argc == 1) && (strcmp(argv[0], "rewind") == 0)) {
-        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 1), NULL);
+        ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 1), NULL);
       } else if ((argc == 1) && (strcmp(argv[0], "on") == 0)) {
-        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 2), NULL);
+        ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 2), NULL);
       } else if ((argc == 1) && (strcmp(argv[0], "off") == 0)) {
-        ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 3), NULL);
+        ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 3), NULL);
       } else if ((argc == 2) && (strcmp(argv[0], "dump") == 0)) {
-        long size = ioctl(fileno(file), _IO('KTDIM_IOCTL_TYPE', 0), NULL);
+        long size = ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 0), NULL);
         char *bufmmapped =
             (char *)mmap(0, size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
         FILE *binfile;

@@ -94,15 +94,12 @@ static int nr_sema_entries = 0;
 static char queues_array[MAX_QUEUES][MAX_TEXT];
 static int prev_queues[MAX_QUEUES];
 static int nr_queues = 0;
-static int nr_queue_entries = 0;
 
 static char values_array[MAX_VALUES][MAX_TEXT];
 static int nr_values = 0;
-static int nr_value_entries = 0;
 
 static char cycles_array[MAX_CYCLES][MAX_TEXT];
 static int nr_cycles = 0;
-static int nr_cycle_entries = 0;
 
 static char events_array[MAX_EVENTS][MAX_TEXT];
 static int nr_events = 0;
@@ -114,7 +111,6 @@ static int nr_note_entries = 0;
 
 static char agents_array[MAX_AGENTS][MAX_TEXT];
 static int nr_agents = 0;
-static int nr_agent_entries = 0;
 
 static void tditrace_rewind();
 
@@ -303,14 +299,16 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
   static char nets[64][MAXNETS];
   int i;
 
-
-  static int inc=1;
-  for (i=0;i<10;i++)
-    numbers[i*4]   = inc;
-    numbers[i*4+1] = inc;
-    numbers[i*4+2] = inc;
-    numbers[i*4+3] = inc;
-  inc+= 1;
+#if 0
+  static int inc = 1;
+  for (i = 0; i < 10; i++) {
+    numbers[i * 4] = inc;
+    numbers[i * 4 + 1] = inc;
+    numbers[i * 4 + 2] = inc;
+    numbers[i * 4 + 3] = inc;
+  }
+  inc += 1;
+#endif
 
   if (!entries_added) {
     char *saveptr;
@@ -318,7 +316,6 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
     while (pt != NULL) {
       strcpy(nets[nrnets], pt);
       pt = strtok_r(NULL, ",", &saveptr);
-
       fprintf(stdout, "NAM 5 %d %s:rx_bytes\n", 5800 + nrnets * MAXNETS,
               nets[nrnets]);
       fprintf(stdout, "NAM 5 %d %s:rx_packets\n", 5801 + nrnets * MAXNETS,
@@ -336,11 +333,11 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
 
   fprintf(stdout, "TIM %lld\n", timestamp);
   for (i = 0; i < nrnets; i++) {
-
     dovalue(numbers[i * 4 + 0], 5800, i, MAXNETS);
     dovalue(numbers[i * 4 + 1], 5801, i, MAXNETS);
     dovalue(numbers[i * 4 + 2], 5802, i, MAXNETS);
     dovalue(numbers[i * 4 + 3], 5803, i, MAXNETS);
+    //fprintf(stderr, "%d:%d %d %d %d\n", i, numbers[i * 4 + 0], numbers[i * 4 + 1], numbers[i * 4 + 2], numbers[i * 4 + 3]);
   }
 }
 
@@ -358,7 +355,6 @@ static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
   dovalue(numbers[0], 5900, 0, 1);
   dovalue(numbers[1], 5901, 0, 1);
 }
-
 
 static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
   static unsigned int pidlist[16];
@@ -2321,7 +2317,6 @@ static void sample_info(void) {
     tditrace("%S", s_numbers);
   }
 
-
   /*
    *
     cat /proc/interrupts
@@ -2338,7 +2333,7 @@ static void sample_info(void) {
   char line[1024];
   FILE *f = NULL;
 
-  int ints[2] = {0,0};
+  int ints[2] = {0, 0};
 
   if ((f = fopen("/proc/interrupts", "r"))) {
     for (int i = 0; i < 4; i++)
@@ -2466,8 +2461,8 @@ static void offload() {
 
   if (!offload_over50) {
     LOCK();
-    int check = ((gtrace_buffer_byte_ptr -
-                  gtrace_buffer) > (gtracebuffersize / 2));
+    int check =
+        ((gtrace_buffer_byte_ptr - gtrace_buffer) > (gtracebuffersize / 2));
     UNLOCK();
 
     if (check) {
@@ -2530,8 +2525,8 @@ static void offload() {
 
   } else {
     LOCK();
-    int check = ((gtrace_buffer_byte_ptr -
-                  gtrace_buffer) < (gtracebuffersize / 2));
+    int check =
+        ((gtrace_buffer_byte_ptr - gtrace_buffer) < (gtracebuffersize / 2));
     UNLOCK();
 
     if (check) {
@@ -2891,12 +2886,12 @@ int tditrace_init(void) {
             gprocname, gpid);
     return -1;
 
-  #if 0
+#if 0
   } else if (strcmp(gprocname, "strace") == 0) {
     fprintf(stderr, "tdi: init[%s][%d], procname is \"strace\" ; not tracing\n",
             gprocname, gpid);
     return -1;
-  #endif
+#endif
 
   } else if (strcmp(gprocname, "gdbserver") == 0) {
     fprintf(stderr,
@@ -3500,42 +3495,42 @@ void tditrace_internal(va_list args, const char *format) {
       case 'C': {
         identifier = CPUINFO;
         nr_numbers = CPUINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
       case 'M': {
         identifier = MEMINFO;
         nr_numbers = MEMINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
       case 'S': {
         identifier = SLFINFO;
         nr_numbers = SLFINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
       case 'D': {
         identifier = DSKINFO;
         nr_numbers = DSKINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
       case 'N': {
         identifier = NETINFO;
         nr_numbers = NETINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
       case 'I': {
         identifier = INTINFO;
         nr_numbers = INTINFO_MAXNUMBER + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
@@ -3619,7 +3614,7 @@ void tditrace_internal(va_list args, const char *format) {
       case '9': {
         identifier = 100 + ch - '0';
         nr_numbers = ch - '0' + 1;
-        pnumbers = (unsigned int *)va_arg(args, unsigned int*);
+        pnumbers = (unsigned int *)va_arg(args, unsigned int *);
         break;
       }
 
@@ -3693,7 +3688,6 @@ void tditrace_internal(va_list args, const char *format) {
   }
 
   UNLOCK();
-
 }
 
 } // extern "C"
