@@ -802,6 +802,7 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       // journalctl                     'Feb 24 01:04:41'
       // journalctl -o short-monotonic  '   18.947554'
       // strace -tt                     '13:05:27.499299'
+      // putty                          '13:05:27:299'
       if (strchr(buf, ':')) {
         if (strchr(buf, '.')) {
           *tstamp =
@@ -809,7 +810,7 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
               1000000000LL;
         } else {
           *tstamp =
-              (atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13])) *
+              (atoi(&buf[0]) * 3600 + atoi(&buf[3]) * 60 + atoi(&buf[6]) + atoi(&buf[9]) / 1000.0 ) *
               1000000000LL;
         }
       } else {
