@@ -1,7 +1,6 @@
-
 g++ -fpermissive -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -fPIC -ldl -o libtdim.so
 g++ -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-aggressive-loop-optimizations ../minimal-tdi/tdim.cpp -ldl -lstdc++ -fPIC -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
-g++ -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -o sleeper
+g++ -pthread sleeper.cpp -O0 -Wall -Wno-unused-variable -fPIC -o sleeper
 
 #g++ simserver.cpp -Wall -Wno-unused-variable -ldl -o simserver
 #g++ simclient.cpp -Wall -Wno-unused-variable -o simclient

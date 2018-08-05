@@ -337,7 +337,8 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
     dovalue(numbers[i * 4 + 1], 5801, i, MAXNETS);
     dovalue(numbers[i * 4 + 2], 5802, i, MAXNETS);
     dovalue(numbers[i * 4 + 3], 5803, i, MAXNETS);
-    //fprintf(stderr, "%d:%d %d %d %d\n", i, numbers[i * 4 + 0], numbers[i * 4 + 1], numbers[i * 4 + 2], numbers[i * 4 + 3]);
+    // fprintf(stderr, "%d:%d %d %d %d\n", i, numbers[i * 4 + 0], numbers[i * 4
+    // + 1], numbers[i * 4 + 2], numbers[i * 4 + 3]);
   }
 }
 
@@ -469,16 +470,17 @@ static void addentry(FILE *stdout, const char *text_in, int text_len,
       maxtasks = MAX_TASKS;
   }
 
-  // if (nr_numbers) fprintf(stderr, "nr_numbers=%d(%x)\n", nr_numbers,
-  // numbers[0]);
+#if 0
+  if (nr_numbers)
+    fprintf(stderr, "nr_numbers=%d(%x)\n", nr_numbers, numbers[0]);
 
-  // fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers,
-  // text_len);
+  fprintf(stderr, "identifier=%x(%d)(%d)\n", identifier, nr_numbers, text_len);
 
-  // fprintf(stderr, "text_in(%d)=\"", text_len);
-  // for (i = 0; i < text_len; i++)
-  //   fprintf(stderr, "%c", text_in[i]);
-  // fprintf(stderr, "\"\n");
+  fprintf(stderr, "text_in(%d)=\"", text_len);
+  for (i = 0; i < text_len; i++)
+    fprintf(stderr, "%c", text_in[i]);
+  fprintf(stderr, "\"\n");
+#endif
 
   char text_in1[1024];
   char *text = text_in1;
@@ -1237,16 +1239,23 @@ static void parse(int bid) {
   // fprintf(stderr, "parse %d, tracebuffers[bid].dword_ptr = 0x%08x\n", bid,
   //       (int)tracebuffers[bid].dword_ptr);
 
+  static int byteswap = -1;
+
+  if (byteswap == -1)
+    byteswap = (int)(getenv("BYTESWAP") != NULL);
+
   tracebuffers[bid].valid = 0;
 
   unsigned int *p = tracebuffers[bid].dword_ptr;
-  unsigned int marker = *p++;
+
+  unsigned int marker = byteswap ? __bswap_32(*p++) : *p++;
 
   tracebuffers[bid].identifier = marker >> 24;
   tracebuffers[bid].dword_ptr += marker & 0xffff;
 
-  int tvsec = *p++;
-  int tvnsec = *p++;
+  int tvsec = byteswap ? __bswap_32(*p++) : *p++;
+  int tvnsec = byteswap ? __bswap_32(*p++) : *p++;
+
   tracebuffers[bid].monotonic_timestamp =
       (_u64)tvsec * (_u64)1000000000 + (_u64)tvnsec;
 

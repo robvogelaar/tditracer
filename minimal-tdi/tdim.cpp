@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <byteswap.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -58,6 +59,7 @@ static int tdik(int argc, char *argv[]);
 
 /******************************************************************************/
 int main(int argc, char *argv[]) {
+
   if (argc > 1 && (strcmp(argv[1], "-d") == 0)) {
     tdidump(argc - 1, &argv[1]);
     return 0;
@@ -135,6 +137,8 @@ static int tdistat(int argc, char *argv[]) {
 
   int found = 0;
 
+  int byteswap = (int)(getenv("BYTESWAP") != NULL);
+
   sprintf(filename, "/dev/ktdim");
   if ((file = fopen(filename, "r")) != NULL) {
     long size = ioctl(fileno(file), _IO(KTDIM_IOCTL_TYPE, 0), NULL);
@@ -197,7 +201,7 @@ static int tdistat(int argc, char *argv[]) {
           fprintf(stdout, "\"%s\", (%lluMB), ", filename,
                   (unsigned long long)st.st_size / (1024 * 1024));
 
-          fflush(stderr);
+          fflush(stdout);
 
           bufmmapped = (char *)mmap(0, st.st_size, PROT_READ, MAP_PRIVATE,
                                     fileno(file), 0);
@@ -230,7 +234,13 @@ static int tdistat(int argc, char *argv[]) {
           int i = 0;
           ptr += 6;
           while (*ptr) {
-            ptr += *ptr & 0xffff;
+
+            if ((byteswap ? __bswap_32(*ptr) : *ptr & 0xffff) == 0) {
+              fprintf(stdout, "parsing failed (try BYTESWAP)\n");
+              break;
+            }
+
+            ptr += byteswap ? __bswap_32(*ptr) : *ptr & 0xffff;
             i++;
           }
           fprintf(stdout, "%lld%% (#%d, %ldB)\n",
@@ -802,15 +812,16 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
       // journalctl                     'Feb 24 01:04:41'
       // journalctl -o short-monotonic  '   18.947554'
       // strace -tt                     '13:05:27.499299'
+      // putty                          '13:05:27:299'
       if (strchr(buf, ':')) {
         if (strchr(buf, '.')) {
           *tstamp =
               (atoi(&buf[0]) * 3600 + atoi(&buf[3]) * 60 + atof(&buf[6])) *
               1000000000LL;
         } else {
-          *tstamp =
-              (atoi(&buf[7]) * 3600 + atoi(&buf[10]) * 60 + atoi(&buf[13])) *
-              1000000000LL;
+          *tstamp = (atoi(&buf[0]) * 3600 + atoi(&buf[3]) * 60 + atoi(&buf[6]) +
+                     atoi(&buf[9]) / 1000.0) *
+                    1000000000LL;
         }
       } else {
         *tstamp = (long long int)(atof(buf) * 1000000000LL);
@@ -842,9 +853,9 @@ static int do_tstamp(char *buffer, char *p, long long int *tstamp) {
         }
       }
       if (add24hr) {
-        //fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
+        // fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
         //        *tstamp, add24hr);
-        //fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
+        // fprintf(stderr, "timestamps \"%s\" = %lldnsec %d\n", buf,
         //        *tstamp, add24hr);
       }
       ptstamp = *tstamp;

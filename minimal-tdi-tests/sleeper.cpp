@@ -8,6 +8,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <byteswap.h>
+
+#if 0
+extern "C" void tditrace(const char* format, ...) __attribute__((weak));
+#endif
+
 static void *thread_task(void *param) {
   // time_t t;
   // int *p = (int *)param;
@@ -31,6 +37,10 @@ static void *thread_task(void *param) {
     usleep(50 * 1000);
 #endif
 
+    #if 0
+    if (tditrace) tditrace("TICK");
+    #endif
+
     usleep(1 * 1000 * 1000);
   }
 
@@ -44,6 +54,7 @@ static int param_task[NR_THREADS_TASK];
 
 int main(int argc, char *argv[]) {
   int i;
+
   for (i = 0; i < NR_THREADS_TASK; i++) {
     param_task[i] = i;
     pthread_create(&thread_id_task[i], NULL, thread_task, &param_task[i]);

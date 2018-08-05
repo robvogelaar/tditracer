@@ -9,15 +9,15 @@
 #define AGENTS 8
 #define MEMORYCYCLES 9
 
-#define MAX_TASKS 4096
-#define MAX_ISRS 128
-#define MAX_SEMAS 128
-#define MAX_QUEUES 128
-#define MAX_EVENTS 128
-#define MAX_VALUES 128
-#define MAX_CYCLES 128
-#define MAX_NOTES 128
-#define MAX_AGENTS 128
+#define MAX_TASKS 2048
+#define MAX_ISRS 512
+#define MAX_SEMAS 512
+#define MAX_QUEUES 512
+#define MAX_EVENTS 512
+#define MAX_VALUES 512
+#define MAX_CYCLES 512
+#define MAX_NOTES 512
+#define MAX_AGENTS 512
 
 #define MAX_TEXT 1024
 
