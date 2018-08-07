@@ -2847,6 +2847,8 @@ int tditrace_init(void) {
     }
   }
 
+  setenv("LD_PRELOAD", "", 1);
+
   if (getenv("PROCONLY")) {
     if (strcmp(gprocname, getenv("PROCONLY")) != 0) {
       return -1;
