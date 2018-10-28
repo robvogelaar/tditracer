@@ -721,7 +721,7 @@ static int tdiproc(int argc, char *argv[]) {
 
   pfntdiprocnetdev tdiprocnetdev =
       (pfntdiprocnetdev)dlsym(handle, "tdiprocnetdev");
-  static struct tdistructprocnetdev netdev[10];
+  static struct tdistructprocnetdev netdev[20];
   if (tdiprocnetdev) {
     int m, n;
     tditrace("@A+tdiprocnetdev");

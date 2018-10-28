@@ -176,7 +176,7 @@ static void tditrace_rewind();
   }                                                                            \
   _##id##_prev[pidid] = (number - _##id##_base[pidid]);
 
-#define dovalue(number, id, pidid, span)                                       \
+#define dovalue(number, id, pidid, span, print)                                \
   static unsigned int _##id##_seen[span];                                      \
   static unsigned int _##id##_prev[span];                                      \
   static unsigned int _##id##_prevprev[span];                                  \
@@ -188,12 +188,15 @@ static void tditrace_rewind();
   } else if (_##id##_seen[pidid] == 1) {                                       \
     if (_##id##_prev[pidid] != number) {                                       \
       _##id##_seen[pidid] = 2;                                                 \
-      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                      \
-              _##id##_prev[pidid]);                                            \
+      if (print)                                                               \
+        fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                    \
+                _##id##_prev[pidid]);                                          \
     }                                                                          \
   } else if ((_##id##_prev[pidid] != number) ||                                \
              (_##id##_prevprev[pidid] != number)) {                            \
-    fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span, _##id##_prev[pidid]);  \
+    if (print)                                                                 \
+      fprintf(stdout, "VAL 5 %d %d\n", id + pidid * span,                      \
+              _##id##_prev[pidid]);                                            \
   }                                                                            \
   _##id##_prevprev[pidid] = _##id##_prev[pidid];                               \
   _##id##_prev[pidid] = number;
@@ -252,12 +255,12 @@ static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
   doqueue_base(numbers[5], 3505, 0, 1, timestamp);
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[6], 5500, 0, 1);
-  dovalue(numbers[7], 5501, 0, 1);
-  dovalue(numbers[8], 5502, 0, 1);
-  dovalue(numbers[9], 5503, 0, 1);
-  dovalue(numbers[4], 5504, 0, 1);
-  dovalue(numbers[5], 5505, 0, 1);
+  dovalue(numbers[6], 5500, 0, 1, 1);
+  dovalue(numbers[7], 5501, 0, 1, 1);
+  dovalue(numbers[8], 5502, 0, 1, 1);
+  dovalue(numbers[9], 5503, 0, 1, 1);
+  dovalue(numbers[4], 5504, 0, 1, 1);
+  dovalue(numbers[5], 5505, 0, 1, 1);
 }
 
 static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
@@ -287,28 +290,35 @@ static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
   fprintf(stdout, "TIM %lld\n", timestamp);
   int i;
   for (i = 0; i < nrdisks; i++) {
-    dovalue(numbers[i * 2 + 0], 5700, i, MAXDISKS);
-    dovalue(numbers[i * 2 + 1], 5701, i, MAXDISKS);
+    dovalue(numbers[i * 2 + 0], 5700, i, MAXDISKS, 1);
+    dovalue(numbers[i * 2 + 1], 5701, i, MAXDISKS, 1);
   }
 }
 
 static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
-#define MAXNETS 10
+#define MAXNETS 20
   static int entries_added = 0;
   static int nrnets;
   static char nets[64][MAXNETS];
   int i;
+  static int nets_bytes = -1;
+  static int nets_packets = -1;
 
-#if 0
-  static int inc = 1;
-  for (i = 0; i < 10; i++) {
-    numbers[i * 4] = inc;
-    numbers[i * 4 + 1] = inc;
-    numbers[i * 4 + 2] = inc;
-    numbers[i * 4 + 3] = inc;
+  if (nets_bytes == -1) {
+    char *env;
+    if ((env = getenv("NETS_BYTES")))
+      nets_bytes = atoi(env);
+    else
+      nets_bytes = 1;
   }
-  inc += 1;
-#endif
+
+  if (nets_packets == -1) {
+    char *env;
+    if ((env = getenv("NETS_PACKETS")))
+      nets_packets = atoi(env);
+    else
+      nets_packets = 1;
+  }
 
   if (!entries_added) {
     char *saveptr;
@@ -316,14 +326,18 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
     while (pt != NULL) {
       strcpy(nets[nrnets], pt);
       pt = strtok_r(NULL, ",", &saveptr);
-      fprintf(stdout, "NAM 5 %d %s:rx_bytes\n", 5800 + nrnets * MAXNETS,
-              nets[nrnets]);
-      fprintf(stdout, "NAM 5 %d %s:rx_packets\n", 5801 + nrnets * MAXNETS,
-              nets[nrnets]);
-      fprintf(stdout, "NAM 5 %d %s:tx_bytes\n", 5802 + nrnets * MAXNETS,
-              nets[nrnets]);
-      fprintf(stdout, "NAM 5 %d %s:tx_packets\n", 5803 + nrnets * MAXNETS,
-              nets[nrnets]);
+      if (nets_bytes)
+        fprintf(stdout, "NAM 5 %d %s:rx_bytes\n", 58000 + nrnets * MAXNETS,
+                nets[nrnets]);
+      if (nets_packets)
+        fprintf(stdout, "NAM 5 %d %s:rx_packets\n", 58001 + nrnets * MAXNETS,
+                nets[nrnets]);
+      if (nets_bytes)
+        fprintf(stdout, "NAM 5 %d %s:tx_bytes\n", 58002 + nrnets * MAXNETS,
+                nets[nrnets]);
+      if (nets_packets)
+        fprintf(stdout, "NAM 5 %d %s:tx_packets\n", 58003 + nrnets * MAXNETS,
+                nets[nrnets]);
       nrnets++;
       if (nrnets == MAXNETS)
         break;
@@ -333,12 +347,11 @@ static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
 
   fprintf(stdout, "TIM %lld\n", timestamp);
   for (i = 0; i < nrnets; i++) {
-    dovalue(numbers[i * 4 + 0], 5800, i, MAXNETS);
-    dovalue(numbers[i * 4 + 1], 5801, i, MAXNETS);
-    dovalue(numbers[i * 4 + 2], 5802, i, MAXNETS);
-    dovalue(numbers[i * 4 + 3], 5803, i, MAXNETS);
-    // fprintf(stderr, "%d:%d %d %d %d\n", i, numbers[i * 4 + 0], numbers[i * 4
-    // + 1], numbers[i * 4 + 2], numbers[i * 4 + 3]);
+
+    dovalue(numbers[i * 4 + 0], 58000, i, MAXNETS, nets_bytes);
+    dovalue(numbers[i * 4 + 1], 58001, i, MAXNETS, nets_packets);
+    dovalue(numbers[i * 4 + 2], 58002, i, MAXNETS, nets_bytes);
+    dovalue(numbers[i * 4 + 3], 58003, i, MAXNETS, nets_packets);
   }
 }
 
@@ -353,8 +366,8 @@ static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
   }
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[0], 5900, 0, 1);
-  dovalue(numbers[1], 5901, 0, 1);
+  dovalue(numbers[0], 5900, 0, 1, 1);
+  dovalue(numbers[1], 5901, 0, 1, 1);
 }
 
 static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
@@ -403,8 +416,8 @@ static void addentry_slfinfo(unsigned int *numbers, _u64 timestamp) {
   doqueue(numbers[8], 3607, i, 10, timestamp);
 
   fprintf(stdout, "TIM %lld\n", timestamp);
-  dovalue(numbers[9], 5600, i, 10);
-  dovalue(numbers[10], 5601, i, 10);
+  dovalue(numbers[9], 5600, i, 10, 1);
+  dovalue(numbers[10], 5601, i, 10, 1);
 }
 
 static void addentry_marker(const char *text, int text_len, _u64 timestamp) {
@@ -2197,7 +2210,7 @@ static void sample_info(void) {
   /*
    * procnetdev
    */
-  struct tdistructprocnetdev procnetdev[10];
+  struct tdistructprocnetdev procnetdev[20];
   int nrnets;
   if (do_procnetdev) {
     tdiprocnetdev(procnetdev, getenv("NETS"), &nrnets);
@@ -2305,6 +2318,66 @@ static void sample_info(void) {
       n_numbers[37] = procnetdev[9].r_packets;
       n_numbers[38] = procnetdev[9].t_bytes;
       n_numbers[39] = procnetdev[9].t_packets;
+    }
+    if (nrnets >= 11) {
+      n_numbers[40] = procnetdev[10].r_bytes;
+      n_numbers[41] = procnetdev[10].r_packets;
+      n_numbers[42] = procnetdev[10].t_bytes;
+      n_numbers[43] = procnetdev[10].t_packets;
+    }
+    if (nrnets >= 12) {
+      n_numbers[44] = procnetdev[11].r_bytes;
+      n_numbers[45] = procnetdev[11].r_packets;
+      n_numbers[46] = procnetdev[11].t_bytes;
+      n_numbers[47] = procnetdev[11].t_packets;
+    }
+    if (nrnets >= 13) {
+      n_numbers[48] = procnetdev[12].r_bytes;
+      n_numbers[49] = procnetdev[12].r_packets;
+      n_numbers[50] = procnetdev[12].t_bytes;
+      n_numbers[51] = procnetdev[12].t_packets;
+    }
+    if (nrnets >= 14) {
+      n_numbers[52] = procnetdev[13].r_bytes;
+      n_numbers[53] = procnetdev[13].r_packets;
+      n_numbers[54] = procnetdev[13].t_bytes;
+      n_numbers[55] = procnetdev[13].t_packets;
+    }
+    if (nrnets >= 15) {
+      n_numbers[56] = procnetdev[14].r_bytes;
+      n_numbers[57] = procnetdev[14].r_packets;
+      n_numbers[58] = procnetdev[14].t_bytes;
+      n_numbers[59] = procnetdev[14].t_packets;
+    }
+    if (nrnets >= 16) {
+      n_numbers[60] = procnetdev[15].r_bytes;
+      n_numbers[61] = procnetdev[15].r_packets;
+      n_numbers[62] = procnetdev[15].t_bytes;
+      n_numbers[63] = procnetdev[15].t_packets;
+    }
+    if (nrnets >= 17) {
+      n_numbers[64] = procnetdev[16].r_bytes;
+      n_numbers[65] = procnetdev[16].r_packets;
+      n_numbers[66] = procnetdev[16].t_bytes;
+      n_numbers[67] = procnetdev[16].t_packets;
+    }
+    if (nrnets >= 18) {
+      n_numbers[68] = procnetdev[17].r_bytes;
+      n_numbers[69] = procnetdev[17].r_packets;
+      n_numbers[70] = procnetdev[17].t_bytes;
+      n_numbers[71] = procnetdev[17].t_packets;
+    }
+    if (nrnets >= 19) {
+      n_numbers[72] = procnetdev[18].r_bytes;
+      n_numbers[73] = procnetdev[18].r_packets;
+      n_numbers[74] = procnetdev[18].t_bytes;
+      n_numbers[75] = procnetdev[18].t_packets;
+    }
+    if (nrnets >= 20) {
+      n_numbers[76] = procnetdev[19].r_bytes;
+      n_numbers[77] = procnetdev[19].r_packets;
+      n_numbers[78] = procnetdev[19].t_bytes;
+      n_numbers[79] = procnetdev[19].t_packets;
     }
     if (nrnets)
       tditrace("%N", n_numbers);
