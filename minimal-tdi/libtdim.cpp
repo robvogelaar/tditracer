@@ -360,8 +360,8 @@ static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
   static int entries_added = 0;
 
   if (!entries_added) {
-    fprintf(stdout, "NAM 5 %d cei00\n", 5900);
-    fprintf(stdout, "NAM 5 %d wdev0\n", 5901);
+    fprintf(stdout, "NAM 5 %d cei00:ints\n", 5900);
+    fprintf(stdout, "NAM 5 %d wdev0:ints\n", 5901);
     entries_added = 1;
   }
 
@@ -2258,7 +2258,7 @@ static void sample_info(void) {
     if (nrdisks)
       tditrace("%D", d_numbers);
 
-    unsigned int n_numbers[40];
+    unsigned int n_numbers[80];
     if (nrnets >= 1) {
       n_numbers[0] = procnetdev[0].r_bytes;
       n_numbers[1] = procnetdev[0].r_packets;
