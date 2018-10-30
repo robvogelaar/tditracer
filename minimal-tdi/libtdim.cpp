@@ -206,13 +206,19 @@ static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
 
   if (!nams_added) {
     fprintf(stdout, "NAM 6 6500 CPU0_USER\n");
-    fprintf(stdout, "NAM 6 6501 CPU0_SYSTEM\n");
-    fprintf(stdout, "NAM 6 6502 CPU0_IO\n");
-    fprintf(stdout, "NAM 6 6503 CPU0_IRQ\n");
-    fprintf(stdout, "NAM 6 6504 CPU1_USER\n");
-    fprintf(stdout, "NAM 6 6505 CPU1_SYSTEM\n");
-    fprintf(stdout, "NAM 6 6506 CPU1_IO\n");
-    fprintf(stdout, "NAM 6 6507 CPU1_IRQ\n");
+    fprintf(stdout, "NAM 6 6501 CPU0_NICE\n");
+    fprintf(stdout, "NAM 6 6502 CPU0_SYSTEM\n");
+    fprintf(stdout, "NAM 6 6503 CPU0_IDLE\n");
+    fprintf(stdout, "NAM 6 6504 CPU0_IO\n");
+    fprintf(stdout, "NAM 6 6505 CPU0_IRQ\n");
+    fprintf(stdout, "NAM 6 6506 CPU0_SIRQ\n");
+    fprintf(stdout, "NAM 6 6507 CPU1_USER\n");
+    fprintf(stdout, "NAM 6 6508 CPU1_NICE\n");
+    fprintf(stdout, "NAM 6 6509 CPU1_SYSTEM\n");
+    fprintf(stdout, "NAM 6 6510 CPU1_IDLE\n");
+    fprintf(stdout, "NAM 6 6511 CPU1_IO\n");
+    fprintf(stdout, "NAM 6 6512 CPU1_IRQ\n");
+    fprintf(stdout, "NAM 6 6513 CPU1_SIRQ\n");
     nams_added = 1;
   }
 
@@ -225,6 +231,12 @@ static void addentry_cpuinfo(unsigned int *numbers, _u64 timestamp) {
   docycle(numbers[5], 6505, 0, 1);
   docycle(numbers[6], 6506, 0, 1);
   docycle(numbers[7], 6507, 0, 1);
+  docycle(numbers[8], 6508, 0, 1);
+  docycle(numbers[9], 6509, 0, 1);
+  docycle(numbers[10], 6510, 0, 1);
+  docycle(numbers[11], 6511, 0, 1);
+  docycle(numbers[12], 6512, 0, 1);
+  docycle(numbers[13], 6513, 0, 1);
 }
 
 static void addentry_meminfo(unsigned int *numbers, _u64 timestamp) {
@@ -360,8 +372,8 @@ static void addentry_intinfo(unsigned int *numbers, _u64 timestamp) {
   static int entries_added = 0;
 
   if (!entries_added) {
-    fprintf(stdout, "NAM 5 %d cei00:ints\n", 5900);
-    fprintf(stdout, "NAM 5 %d wdev0:ints\n", 5901);
+    fprintf(stdout, "NAM 5 %d wdev0:ints\n", 5900);
+    fprintf(stdout, "NAM 5 %d cei00:ints\n", 5901);
     entries_added = 1;
   }
 
@@ -1406,6 +1418,7 @@ static int gmask = 0x0;
 
 static int do_sysinfo = 0;
 static int do_selfinfo = 0;
+static int do_ints = 0;
 static int do_persecond = 0;
 
 static int monitor;
@@ -2162,15 +2175,21 @@ static void sample_info(void) {
   if (do_procstat) {
     tdiprocstat(&procstat);
 
-    int c_numbers[8];
-    c_numbers[0] = procstat.cpu0_user + procstat.cpu0_nice;
-    c_numbers[1] = procstat.cpu0_system;
-    c_numbers[2] = procstat.cpu0_iowait;
-    c_numbers[3] = procstat.cpu0_irq + procstat.cpu0_softirq;
-    c_numbers[4] = procstat.cpu1_user + procstat.cpu1_nice;
-    c_numbers[5] = procstat.cpu1_system;
-    c_numbers[6] = procstat.cpu1_iowait;
-    c_numbers[7] = procstat.cpu1_irq + procstat.cpu1_softirq;
+    int c_numbers[14];
+    c_numbers[0] = procstat.cpu0_user;
+    c_numbers[1] = procstat.cpu0_nice;
+    c_numbers[2] = procstat.cpu0_system;
+    c_numbers[3] = procstat.cpu0_idle;
+    c_numbers[4] = procstat.cpu0_iowait;
+    c_numbers[5] = procstat.cpu0_irq;
+    c_numbers[6] = procstat.cpu0_softirq;
+    c_numbers[7] = procstat.cpu1_user;
+    c_numbers[8] = procstat.cpu1_nice;
+    c_numbers[9] = procstat.cpu1_system;
+    c_numbers[10] = procstat.cpu1_idle;
+    c_numbers[11] = procstat.cpu1_iowait;
+    c_numbers[12] = procstat.cpu1_irq;
+    c_numbers[13] = procstat.cpu1_softirq;
     tditrace("%C", c_numbers);
   }
 
@@ -2399,35 +2418,37 @@ static void sample_info(void) {
     tditrace("%S", s_numbers);
   }
 
-  /*
-   *
-    cat /proc/interrupts
-    root@intel_ce_linux:~# cat /proc/interrupts
-               CPU0       CPU1
-      0:         58          0   IO-APIC-edge      timer
-      8:          1          0   IO-APIC-edge      rtc0
-      9:          0          0   IO-APIC-fasteoi   acpi
-     16:    3037602          0   IO-APIC-fasteoi   cei00
-     17:        323   33312695   IO-APIC-fasteoi   wdev0
-  *
-  */
+  if (do_ints) {
+    /*
+     *
+      cat /proc/interrupts
+      root@intel_ce_linux:~# cat /proc/interrupts
+                 CPU0       CPU1
+        0:         58          0   IO-APIC-edge      timer
+        8:          1          0   IO-APIC-edge      rtc0
+        9:          0          0   IO-APIC-fasteoi   acpi
+       16:    3037602          0   IO-APIC-fasteoi   cei00
+       17:        323   33312695   IO-APIC-fasteoi   wdev0
+    *
+    */
 
-  char line[1024];
-  FILE *f = NULL;
+    char line[1024];
+    FILE *f = NULL;
 
-  int ints[2] = {0, 0};
+    int ints[2] = {0, 0};
 
-  if ((f = fopen("/proc/interrupts", "r"))) {
-    for (int i = 0; i < 4; i++)
+    if ((f = fopen("/proc/interrupts", "r"))) {
+      for (int i = 0; i < 4; i++)
+        fgets(line, 256, f);
       fgets(line, 256, f);
-    fgets(line, 256, f);
-    sscanf(line, "%*s %d", &ints[0]);
-    fgets(line, 256, f);
-    sscanf(line, "%*s %*d %d", &ints[1]);
-    fclose(f);
-  }
+      sscanf(line, "%*s %d", &ints[1]);
+      fgets(line, 256, f);
+      sscanf(line, "%*s %*d %d", &ints[0]);
+      fclose(f);
+    }
 
-  tditrace("%I", ints);
+    tditrace("%I", ints);
+  }
 }
 
 static void *socket_thread(void *param) {
@@ -3036,6 +3057,11 @@ int tditrace_init(void) {
     do_selfinfo = atoi(env);
     if (do_selfinfo > do_persecond)
       do_persecond = do_selfinfo;
+  }
+
+  do_ints = 0;
+  if ((env = getenv("INTS"))) {
+    do_ints = atoi(env);
   }
 
   do_offload = 0;

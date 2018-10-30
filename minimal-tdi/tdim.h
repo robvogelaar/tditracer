@@ -255,7 +255,7 @@ typedef int (*pfntdiprocnetdev)(struct tdistructprocnetdev s[],
 #define NETSLIST          138
 #define INTSLIST          139
 
-#define CPUINFO_MAXNUMBER   7   // 0..7
+#define CPUINFO_MAXNUMBER   14   // 0..13
 #define MEMINFO_MAXNUMBER   9   // 0..9
 #define DSKINFO_MAXNUMBER   7   // 0..7
 #define NETINFO_MAXNUMBER   79   // 0..79 (20x interfaces, 4 items per)

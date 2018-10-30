@@ -176,7 +176,7 @@ static int tdistat(int argc, char *argv[]) {
         ptr += *ptr & 0xffff;
         i++;
       }
-      fprintf(stdout, "%lld%% (#%d, %ldB)\n",
+      fprintf(stdout, "%lld%% (#%d, %dB)\n",
               ((char *)ptr - bufmmapped) * 100LL / size + 1, i,
               (char *)ptr - bufmmapped);
       munmap(bufmmapped, size);
@@ -243,7 +243,7 @@ static int tdistat(int argc, char *argv[]) {
             ptr += byteswap ? __bswap_32(*ptr) : *ptr & 0xffff;
             i++;
           }
-          fprintf(stdout, "%lld%% (#%d, %ldB)\n",
+          fprintf(stdout, "%lld%% (#%d, %dB)\n",
                   ((char *)ptr - bufmmapped) * 100LL / st.st_size + 1, i,
                   (char *)ptr - bufmmapped);
 
