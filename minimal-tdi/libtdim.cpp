@@ -47,8 +47,8 @@ static int pid_procname_table_nr = 0;
 static char envs[128][16];
 static int envs_nr;
 
-static char diskslist[256];
-static char netslist[256];
+static char diskslist[512];
+static char netslist[512];
 
 static pthread_mutex_t lock;
 
@@ -308,7 +308,6 @@ static void addentry_dskinfo(unsigned int *numbers, _u64 timestamp) {
 }
 
 static void addentry_netinfo(unsigned int *numbers, _u64 timestamp) {
-#define MAXNETS 20
   static int entries_added = 0;
   static int nrnets;
   static char nets[64][MAXNETS];
@@ -1901,7 +1900,7 @@ int tdiprocdiskstats(struct tdistructprocdiskstats s[], const char *disks,
 
 int tdiprocnetdev(struct tdistructprocnetdev s[], const char *nets,
                   int *nrnets) {
-  char nts[256];
+  char nts[1024];
   char *pt;
   char *saveptr;
 
@@ -1918,6 +1917,7 @@ int tdiprocnetdev(struct tdistructprocnetdev s[], const char *nets,
   pt = strtok_r(nts, ",", &saveptr);
   while (pt != NULL) {
     strcpy(s[*nrnets].name, pt);
+    strcat(s[*nrnets].name, ":");
     sprintf(s[*nrnets].match,
             "%s: %%lu %%u %%u %%u %%u %%u %%u %%u %%lu %%u %%u %%u %%u %%u %%u "
             "%%u",
@@ -2229,7 +2229,7 @@ static void sample_info(void) {
   /*
    * procnetdev
    */
-  struct tdistructprocnetdev procnetdev[20];
+  struct tdistructprocnetdev procnetdev[MAXNETS];
   int nrnets;
   if (do_procnetdev) {
     tdiprocnetdev(procnetdev, getenv("NETS"), &nrnets);
@@ -2258,145 +2258,19 @@ static void sample_info(void) {
     // tditrace("HEAP1FREE~%u", (unsigned int)(heap0free / 1024));
 
     unsigned int d_numbers[8];
-    if (nrdisks >= 1) {
-      d_numbers[0] = procdiskstats[0].reads_sectors;
-      d_numbers[1] = procdiskstats[0].writes_sectors;
-    }
-    if (nrdisks >= 2) {
-      d_numbers[2] = procdiskstats[1].reads_sectors;
-      d_numbers[3] = procdiskstats[1].writes_sectors;
-    }
-    if (nrdisks >= 3) {
-      d_numbers[4] = procdiskstats[2].reads_sectors;
-      d_numbers[5] = procdiskstats[2].writes_sectors;
-    }
-    if (nrdisks >= 4) {
-      d_numbers[6] = procdiskstats[3].reads_sectors;
-      d_numbers[7] = procdiskstats[3].writes_sectors;
+    for (int i = 0; i < nrdisks; i++) {
+      d_numbers[i * 2 + 0] = procdiskstats[i].reads_sectors;
+      d_numbers[i * 2 + 1] = procdiskstats[i].writes_sectors;
     }
     if (nrdisks)
       tditrace("%D", d_numbers);
 
-    unsigned int n_numbers[80];
-    if (nrnets >= 1) {
-      n_numbers[0] = procnetdev[0].r_bytes;
-      n_numbers[1] = procnetdev[0].r_packets;
-      n_numbers[2] = procnetdev[0].t_bytes;
-      n_numbers[3] = procnetdev[0].t_packets;
-    }
-    if (nrnets >= 2) {
-      n_numbers[4] = procnetdev[1].r_bytes;
-      n_numbers[5] = procnetdev[1].r_packets;
-      n_numbers[6] = procnetdev[1].t_bytes;
-      n_numbers[7] = procnetdev[1].t_packets;
-    }
-    if (nrnets >= 3) {
-      n_numbers[8] = procnetdev[2].r_bytes;
-      n_numbers[9] = procnetdev[2].r_packets;
-      n_numbers[10] = procnetdev[2].t_bytes;
-      n_numbers[11] = procnetdev[2].t_packets;
-    }
-    if (nrnets >= 4) {
-      n_numbers[12] = procnetdev[3].r_bytes;
-      n_numbers[13] = procnetdev[3].r_packets;
-      n_numbers[14] = procnetdev[3].t_bytes;
-      n_numbers[15] = procnetdev[3].t_packets;
-    }
-    if (nrnets >= 5) {
-      n_numbers[16] = procnetdev[4].r_bytes;
-      n_numbers[17] = procnetdev[4].r_packets;
-      n_numbers[18] = procnetdev[4].t_bytes;
-      n_numbers[19] = procnetdev[4].t_packets;
-    }
-    if (nrnets >= 6) {
-      n_numbers[20] = procnetdev[5].r_bytes;
-      n_numbers[21] = procnetdev[5].r_packets;
-      n_numbers[22] = procnetdev[5].t_bytes;
-      n_numbers[23] = procnetdev[5].t_packets;
-    }
-    if (nrnets >= 7) {
-      n_numbers[24] = procnetdev[6].r_bytes;
-      n_numbers[25] = procnetdev[6].r_packets;
-      n_numbers[26] = procnetdev[6].t_bytes;
-      n_numbers[27] = procnetdev[6].t_packets;
-    }
-    if (nrnets >= 8) {
-      n_numbers[28] = procnetdev[7].r_bytes;
-      n_numbers[29] = procnetdev[7].r_packets;
-      n_numbers[30] = procnetdev[7].t_bytes;
-      n_numbers[31] = procnetdev[7].t_packets;
-    }
-    if (nrnets >= 9) {
-      n_numbers[32] = procnetdev[8].r_bytes;
-      n_numbers[33] = procnetdev[8].r_packets;
-      n_numbers[34] = procnetdev[8].t_bytes;
-      n_numbers[35] = procnetdev[8].t_packets;
-    }
-    if (nrnets >= 10) {
-      n_numbers[36] = procnetdev[9].r_bytes;
-      n_numbers[37] = procnetdev[9].r_packets;
-      n_numbers[38] = procnetdev[9].t_bytes;
-      n_numbers[39] = procnetdev[9].t_packets;
-    }
-    if (nrnets >= 11) {
-      n_numbers[40] = procnetdev[10].r_bytes;
-      n_numbers[41] = procnetdev[10].r_packets;
-      n_numbers[42] = procnetdev[10].t_bytes;
-      n_numbers[43] = procnetdev[10].t_packets;
-    }
-    if (nrnets >= 12) {
-      n_numbers[44] = procnetdev[11].r_bytes;
-      n_numbers[45] = procnetdev[11].r_packets;
-      n_numbers[46] = procnetdev[11].t_bytes;
-      n_numbers[47] = procnetdev[11].t_packets;
-    }
-    if (nrnets >= 13) {
-      n_numbers[48] = procnetdev[12].r_bytes;
-      n_numbers[49] = procnetdev[12].r_packets;
-      n_numbers[50] = procnetdev[12].t_bytes;
-      n_numbers[51] = procnetdev[12].t_packets;
-    }
-    if (nrnets >= 14) {
-      n_numbers[52] = procnetdev[13].r_bytes;
-      n_numbers[53] = procnetdev[13].r_packets;
-      n_numbers[54] = procnetdev[13].t_bytes;
-      n_numbers[55] = procnetdev[13].t_packets;
-    }
-    if (nrnets >= 15) {
-      n_numbers[56] = procnetdev[14].r_bytes;
-      n_numbers[57] = procnetdev[14].r_packets;
-      n_numbers[58] = procnetdev[14].t_bytes;
-      n_numbers[59] = procnetdev[14].t_packets;
-    }
-    if (nrnets >= 16) {
-      n_numbers[60] = procnetdev[15].r_bytes;
-      n_numbers[61] = procnetdev[15].r_packets;
-      n_numbers[62] = procnetdev[15].t_bytes;
-      n_numbers[63] = procnetdev[15].t_packets;
-    }
-    if (nrnets >= 17) {
-      n_numbers[64] = procnetdev[16].r_bytes;
-      n_numbers[65] = procnetdev[16].r_packets;
-      n_numbers[66] = procnetdev[16].t_bytes;
-      n_numbers[67] = procnetdev[16].t_packets;
-    }
-    if (nrnets >= 18) {
-      n_numbers[68] = procnetdev[17].r_bytes;
-      n_numbers[69] = procnetdev[17].r_packets;
-      n_numbers[70] = procnetdev[17].t_bytes;
-      n_numbers[71] = procnetdev[17].t_packets;
-    }
-    if (nrnets >= 19) {
-      n_numbers[72] = procnetdev[18].r_bytes;
-      n_numbers[73] = procnetdev[18].r_packets;
-      n_numbers[74] = procnetdev[18].t_bytes;
-      n_numbers[75] = procnetdev[18].t_packets;
-    }
-    if (nrnets >= 20) {
-      n_numbers[76] = procnetdev[19].r_bytes;
-      n_numbers[77] = procnetdev[19].r_packets;
-      n_numbers[78] = procnetdev[19].t_bytes;
-      n_numbers[79] = procnetdev[19].t_packets;
+    unsigned int n_numbers[160];
+    for (int i = 0; i < nrnets; i++) {
+      n_numbers[i * 4 + 0] = procnetdev[i].r_bytes;
+      n_numbers[i * 4 + 1] = procnetdev[i].r_packets;
+      n_numbers[i * 4 + 2] = procnetdev[i].t_bytes;
+      n_numbers[i * 4 + 3] = procnetdev[i].t_packets;
     }
     if (nrnets)
       tditrace("%N", n_numbers);
@@ -3484,8 +3358,8 @@ void tditrace_internal(va_list args, const char *format) {
     return;
   }
 
-  unsigned int trace_text[1024 / 4];
-  unsigned int numbers[20];
+  unsigned int trace_text[512];
+  unsigned int numbers[160];
   unsigned int *pnumbers = &numbers[0];
   unsigned char nr_numbers = 0;
   unsigned char identifier = 0;
@@ -3516,7 +3390,7 @@ void tditrace_internal(va_list args, const char *format) {
           while (*s) {
             *trace_text_ptr++ = *s++;
             i++;
-            if (i > 256)
+            if (i > 512)
               break;
           }
         } else {
@@ -3656,7 +3530,7 @@ void tditrace_internal(va_list args, const char *format) {
           while (*s) {
             *trace_text_ptr++ = *s++;
             i++;
-            if (i > 256)
+            if (i > 512)
               break;
           }
         } else {
@@ -3678,7 +3552,7 @@ void tditrace_internal(va_list args, const char *format) {
           while (*s) {
             *trace_text_ptr++ = *s++;
             i++;
-            if (i > 256)
+            if (i > 512)
               break;
           }
         } else {
@@ -3700,7 +3574,7 @@ void tditrace_internal(va_list args, const char *format) {
           while (*s) {
             *trace_text_ptr++ = *s++;
             i++;
-            if (i > 256)
+            if (i > 512)
               break;
           }
         } else {

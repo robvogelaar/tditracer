@@ -217,6 +217,8 @@ struct tdistructprocdiskstats {
 typedef int (*pfntdiprocdiskstats)(struct tdistructprocdiskstats s[],
                                    const char *disks, int *nrdisks);
 
+#define MAXNETS 40
+
 struct tdistructprocnetdev {
   char name[64];
   char match[256];
@@ -255,10 +257,10 @@ typedef int (*pfntdiprocnetdev)(struct tdistructprocnetdev s[],
 #define NETSLIST          138
 #define INTSLIST          139
 
-#define CPUINFO_MAXNUMBER   14   // 0..13
-#define MEMINFO_MAXNUMBER   9   // 0..9
-#define DSKINFO_MAXNUMBER   7   // 0..7
-#define NETINFO_MAXNUMBER   79   // 0..79 (20x interfaces, 4 items per)
+#define CPUINFO_MAXNUMBER   14    // 0..13
+#define MEMINFO_MAXNUMBER   9     // 0..9
+#define DSKINFO_MAXNUMBER   7     // 0..7
+#define NETINFO_MAXNUMBER   159   // 0..159 (40x interfaces, 4 items per)
 #define INTINFO_MAXNUMBER   2
 
-#define SLFINFO_MAXNUMBER  10   // 0..10
+#define SLFINFO_MAXNUMBER  10     // 0..10
