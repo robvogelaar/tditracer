@@ -1,4 +1,4 @@
-EXTRA_CFLAGS := -I$(src) -Wno-error=date-time -Wno-error=unused-function -Wno-error=unused-result -Werror
+#EXTRA_CFLAGS := -I$(src) -Wno-error=date-time -Wno-error=unused-function -Wno-error=unused-result -Werror
 obj-m += ktdim.o
 SRC := $(shell pwd)
 

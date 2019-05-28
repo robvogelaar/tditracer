@@ -30,4 +30,10 @@ sleeper
 *.tdi
 tdim
 libtdim.so
+*.cmd
+*.ko
+modules.order
+Module.symvers
+.tmp_versions
+*.mod.c
 

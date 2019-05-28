@@ -19,7 +19,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-#include <ktdim.h>
+//#include <ktdim.h>
 
 /******************************************************************************
 * LOCAL MACROS                                                                *
