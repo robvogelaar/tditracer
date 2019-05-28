@@ -25,12 +25,13 @@
 
 export extra="-g0"
 
-armeb-linux-gcc $extra -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.arm.so
-armeb-linux-gcc $extra -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function ../minimal-tdi/tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim.arm
+armeb-linux-gcc $extra -fPIC -shared -pthread -O3 -Wall -Wextra -Wno-unused-result -Wno-unused-parameter ../minimal-tdi/libtdim.cpp -ldl -o libtdim.so
+armeb-linux-gcc $extra -pthread -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function ../minimal-tdi/tdim.cpp -ldl -lstdc++ -std=c++98 -D_GLIBCXX_USE_CXX11_ABI=0 -o tdim
 
-armeb-linux-gcc $extra -pthread sleeper.cpp -O0 -Wall -o sleeper.arm
-armeb-linux-gcc $extra smemcap.c -O2 -Wall -o smemcap.arm
-armeb-linux-gcc $extra fincore.c -O2 -Wall -lm -o fincore.arm
+armeb-linux-gcc $extra -pthread sleeper.cpp -O0 -Wall -o sleeper
+#armeb-linux-gcc $extra smemcap.c -O2 -Wall -o smemcap
+#armeb-linux-gcc $extra fincore.c -O2 -Wall -lm -o fincore
 
-armeb-linux-strip *.arm*
-
+armeb-linux-strip libtdim.so
+armeb-linux-strip tdim
+armeb-linux-strip sleeper

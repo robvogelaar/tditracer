@@ -54,7 +54,7 @@ static int tdipipe(int argc, char *argv[]);
 static int tdik(int argc, char *argv[]);
 
 #ifndef TMPFS
-#define TMPFS "/tmp/"
+#define TMPFS "/var/tmp/"
 #endif
 
 /******************************************************************************/

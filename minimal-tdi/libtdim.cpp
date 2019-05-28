@@ -34,7 +34,7 @@ void tditrace(const char *format, ...);
 void tditrace_ex(int mask, const char *format, ...);
 
 #ifndef TMPFS
-#define TMPFS "/tmp/"
+#define TMPFS "/var/tmp/"
 #endif
 
 static pid_t gpid;
