@@ -21,7 +21,7 @@ if NOEGL
 endif
 
 if !NOEGL
-   libtditracer_la_SOURCES += 
+   libtditracer_la_SOURCES += \
    traceregl.cpp
 endif
 
@@ -32,14 +32,14 @@ libtditracer_la_CPPFLAGS += -DNOGLES2
 endif
 
 if !NOGLES2
-   libtditracer_la_SOURCES += 
+   libtditracer_la_SOURCES += \
    tracergles2.cpp \
    gles2spinner.cpp \
    gles2text.cpp \
    gles2bars.cpp \
    gles2capture.cpp \
    gles2extra.cpp \
-   gles2util.cpp
+   gles2util.cpp \
    framecapture.c \
    framelinkedlist.c \
    shadercapture.c \
@@ -55,7 +55,7 @@ libtditracer_la_CPPFLAGS += -DNOLIBC
 endif
 
 if !NOLIBC
-   libtditracer_la_SOURCES +=
+   libtditracer_la_SOURCES += \
    tracerlibc.cpp
 endif
 
@@ -66,7 +66,7 @@ if NOLIBPTHREAD
 endif
 
 if !NOLIBPTHREAD
-   libtditracer_la_SOURCES +=
+   libtditracer_la_SOURCES += \
    tracerpthread.cpp \
    tracersem.cpp \
    tracermq.cpp
@@ -79,6 +79,6 @@ if NOSGX
 endif
 
 if !NOSGX
-   libtditracer_la_SOURCES +=
+   libtditracer_la_SOURCES += \
       tracersgx.cpp
 endif
